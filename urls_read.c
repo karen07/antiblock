@@ -103,6 +103,8 @@ void* urls_read(__attribute__((unused)) void* arg)
 
         fclose(urls_fd);
 
+        system("rm " FILES_FOLDER "block_urls_lines");
+
         if (urls_file_size > 0) {
             sleep(URLS_UPDATE_TIME);
         } else {
