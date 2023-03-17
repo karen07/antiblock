@@ -39,6 +39,20 @@ void add_ip_to_route_table(uint32_t ip, time_t check_time, char* url)
     fprintf(log_fd, "add  %s %s %s\n", ip_str, time_str, url);
 }
 
+void add_url_cname(char* ans_url, time_t check_time, char* data_url)
+{
+    struct tm* tm_struct = localtime(&check_time);
+    char time_str[200];
+    sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+    int32_t j = strlen(time_str);
+    for (int32_t i = 0; i < 8 - j; i++) {
+        time_str[j + 1 + i] = time_str[j + i];
+        time_str[j + i] = ' ';
+    }
+
+    fprintf(log_fd, "addu %s %s %s\n", time_str, ans_url, data_url);
+}
+
 void update_ip_in_route_table(uint32_t ip, time_t check_time, char* url)
 {
     struct in_addr rec_ip;
