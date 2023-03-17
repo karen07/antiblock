@@ -12,6 +12,6 @@ extern int32_t packets_ring_buffer_start;
 extern int32_t packets_ring_buffer_end;
 extern packet_t* packets_ring_buffer;
 
-int32_t get_url_from_packet(char* hand_point, char* receive_msg_end, char* url);
+int32_t get_url_from_packet(char* packet_start, char* hand_point, char* receive_msg_end, char* url);
 void* dns_ans_check(void* arg);
 void init_dns_ans_check_thread(void);

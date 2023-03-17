@@ -18,6 +18,7 @@
 #define ID_MAP_MAX_SIZE 1000
 #define TTL_MAP_MAX_SIZE 5000
 #define URLS_MAP_MAX_SIZE 500000
+#define CNAME_URLS_MAP_MAX_SIZE 1000
 #define PACKETS_RING_BUFFER_MAX_SIZE 100
 
 #define DNS_SOCKET_COUNT 10
@@ -35,8 +36,11 @@
 #define REPEATER_DNS_PORT 5054
 #define REPEATER_DNS_IP "0.0.0.0"
 
-#define DNS_PORT 5055
-#define DNS_IP "127.0.0.1"
+// #define DNS_PORT 5055
+// #define DNS_IP "127.0.0.1"
+
+#define DNS_PORT 53
+#define DNS_IP "1.1.1.1"
 
 #define VPN_IP "192.168.6.37"
 #define VPN_MASK "255.255.255.255"

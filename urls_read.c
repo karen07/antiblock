@@ -95,6 +95,11 @@ void* urls_read(__attribute__((unused)) void* arg)
 
             int32_t url_offset = 0;
             for (int32_t i = 0; i < urls_map_size; i++) {
+                if (urls[url_offset] == 'w' && urls[url_offset + 1] == 'w'
+                    && urls[url_offset + 2] == 'w' && urls[url_offset + 3] == '.') {
+                    url_offset += 4;
+                }
+
                 array_hashmap_add_elem(urls_map_struct, &url_offset, NULL, NULL);
 
                 url_offset = strchr(&urls[url_offset + 1], 0) - urls + 1;
