@@ -24,18 +24,30 @@ uint32_t djb33_hash_cname(const char* s)
     return h;
 }
 
+int32_t cname_url_on_collision(const void* void_elem1, const void* void_elem2)
+{
+    const cname_urls_map* elem1 = void_elem1;
+    const cname_urls_map* elem2 = void_elem2;
+
+    if (elem1->end_time > elem2->end_time) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 uint32_t cname_url_hash(const void* void_elem)
 {
-    const char** elem = (const char**)void_elem;
-    return djb33_hash_cname(*elem);
+    const cname_urls_map* elem = void_elem;
+    return djb33_hash_cname(elem->url);
 }
 
 int32_t cname_url_cmp(const void* void_elem1, const void* void_elem2)
 {
-    const char** elem1 = (const char**)void_elem1;
-    const char** elem2 = (const char**)void_elem2;
+    const cname_urls_map* elem1 = void_elem1;
+    const cname_urls_map* elem2 = void_elem2;
 
-    return !strcmp(*elem1, *elem2);
+    return !strcmp(elem1->url, elem2->url);
 }
 
 int32_t get_url_from_packet(char* packet_start, char* hand_point, char* receive_msg_end, char* url)
@@ -83,7 +95,10 @@ int32_t check_url(char* url, int32_t url_len)
                 return 1;
             }
 
-            find_res = array_hashmap_find_elem(cname_urls_map_struct, &dot_pos, NULL);
+            cname_urls_map find_elem;
+            find_elem.url = dot_pos;
+
+            find_res = array_hashmap_find_elem(cname_urls_map_struct, &find_elem, NULL);
             if (find_res == 1) {
                 return 1;
             }
@@ -214,9 +229,18 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                 char* data_url_str = malloc(data_url_len + 1);
                 strcpy(data_url_str, data_url + 1);
 
-                array_hashmap_add_elem(cname_urls_map_struct, &data_url_str, NULL, NULL);
+                cname_urls_map add_elem;
+                add_elem.url = data_url_str;
+                add_elem.end_time = check_time;
 
-                add_url_cname(ans_url + 1, check_time, data_url + 1);
+                cname_urls_map elem;
+                int32_t new_elem_flag = array_hashmap_add_elem(cname_urls_map_struct, &add_elem, &elem, cname_url_on_collision);
+                if (new_elem_flag == 1) {
+                    add_url_cname(ans_url + 1, add_elem.end_time, add_elem.url);
+                } else if (new_elem_flag == 0) {
+                    update_url_cname(ans_url + 1, elem.end_time, elem.url);
+                } else if (new_elem_flag == -1) {
+                }
             }
 
             hand_point += sizeof(dns_ans_t) - sizeof(uint32_t) + len;
@@ -232,7 +256,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
 
 void init_dns_ans_check_thread(void)
 {
-    cname_urls_map_struct = init_array_hashmap(CNAME_URLS_MAP_MAX_SIZE, 1.0, sizeof(char*));
+    cname_urls_map_struct = init_array_hashmap(CNAME_URLS_MAP_MAX_SIZE, 1.0, sizeof(cname_urls_map));
     if (cname_urls_map_struct == NULL) {
         printf("No free memory for cname_urls_map_struct\n");
         exit(EXIT_FAILURE);
