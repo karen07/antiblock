@@ -4,46 +4,60 @@
 int32_t route_socket;
 struct rtentry route;
 
+void add_spaces(char* in, int end_len)
+{
+    int len = strlen(in);
+    if (end_len > len)
+        memset(&in[len], ' ', end_len - len);
+    in[end_len] = 0;
+}
+
 void add_url_cname(char* ans_url, time_t check_time, char* data_url)
 {
-    struct tm* tm_struct = localtime(&check_time);
-    char time_str[200];
-    sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
-    int32_t j = strlen(time_str);
-    for (int32_t i = 0; i < 8 - j; i++) {
-        time_str[j + 1 + i] = time_str[j + i];
-        time_str[j + i] = ' ';
-    }
+    char now_time_str[200];
+    time_t now = time(NULL);
+    struct tm* tm_struct = localtime(&now);
+    sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+    add_spaces(now_time_str, 8);
 
-    fprintf(log_fd, "addu %s %s %s\n", time_str, ans_url, data_url);
+    char time_str[200];
+    tm_struct = localtime(&check_time);
+    sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+    add_spaces(time_str, 15);
+
+    fprintf(log_fd, "%s add  url %s %s %s\n", now_time_str, time_str, ans_url, data_url);
 }
 
 void update_url_cname(char* ans_url, time_t check_time, char* data_url)
 {
-    struct tm* tm_struct = localtime(&check_time);
-    char time_str[200];
-    sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
-    int32_t j = strlen(time_str);
-    for (int32_t i = 0; i < 8 - j; i++) {
-        time_str[j + 1 + i] = time_str[j + i];
-        time_str[j + i] = ' ';
-    }
+    char now_time_str[200];
+    time_t now = time(NULL);
+    struct tm* tm_struct = localtime(&now);
+    sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+    add_spaces(now_time_str, 8);
 
-    fprintf(log_fd, "copyu %s %s %s\n", time_str, ans_url, data_url);
+    char time_str[200];
+    tm_struct = localtime(&check_time);
+    sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+    add_spaces(time_str, 15);
+
+    fprintf(log_fd, "%s copy url %s %s %s\n", now_time_str, time_str, ans_url, data_url);
 }
 
 void del_url_cname(char* data_url, time_t check_time)
 {
-    struct tm* tm_struct = localtime(&check_time);
-    char time_str[200];
-    sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
-    int32_t j = strlen(time_str);
-    for (int32_t i = 0; i < 8 - j; i++) {
-        time_str[j + 1 + i] = time_str[j + i];
-        time_str[j + i] = ' ';
-    }
+    char now_time_str[200];
+    time_t now = time(NULL);
+    struct tm* tm_struct = localtime(&now);
+    sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+    add_spaces(now_time_str, 8);
 
-    fprintf(log_fd, "delu %s %s\n", time_str, data_url);
+    char time_str[200];
+    tm_struct = localtime(&check_time);
+    sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+    add_spaces(time_str, 15);
+
+    fprintf(log_fd, "%s del  url %s %s\n", now_time_str, time_str, data_url);
 
     free(data_url);
 }
@@ -65,22 +79,20 @@ void add_ip_to_route_table(uint32_t ip, time_t check_time, char* url)
 
     char ip_str[200];
     sprintf(ip_str, "%s", inet_ntoa(rec_ip));
-    int32_t j = strlen(ip_str);
-    for (int32_t i = 0; i < 15 - j; i++) {
-        ip_str[j + 1 + i] = ip_str[j + i];
-        ip_str[j + i] = ' ';
-    }
+    add_spaces(ip_str, 15);
 
-    struct tm* tm_struct = localtime(&check_time);
+    char now_time_str[200];
+    time_t now = time(NULL);
+    struct tm* tm_struct = localtime(&now);
+    sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+    add_spaces(now_time_str, 8);
+
     char time_str[200];
+    tm_struct = localtime(&check_time);
     sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
-    j = strlen(time_str);
-    for (int32_t i = 0; i < 8 - j; i++) {
-        time_str[j + 1 + i] = time_str[j + i];
-        time_str[j + i] = ' ';
-    }
+    add_spaces(time_str, 8);
 
-    fprintf(log_fd, "add  %s %s %s\n", ip_str, time_str, url);
+    fprintf(log_fd, "%s add   ip %s %s %s\n", now_time_str, ip_str, time_str, url);
 }
 
 void update_ip_in_route_table(uint32_t ip, time_t check_time, char* url)
@@ -90,22 +102,20 @@ void update_ip_in_route_table(uint32_t ip, time_t check_time, char* url)
 
     char ip_str[200];
     sprintf(ip_str, "%s", inet_ntoa(rec_ip));
-    int32_t j = strlen(ip_str);
-    for (int32_t i = 0; i < 15 - j; i++) {
-        ip_str[j + 1 + i] = ip_str[j + i];
-        ip_str[j + i] = ' ';
-    }
+    add_spaces(ip_str, 15);
 
-    struct tm* tm_struct = localtime(&check_time);
+    char now_time_str[200];
+    time_t now = time(NULL);
+    struct tm* tm_struct = localtime(&now);
+    sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+    add_spaces(now_time_str, 8);
+
     char time_str[200];
+    tm_struct = localtime(&check_time);
     sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
-    j = strlen(time_str);
-    for (int32_t i = 0; i < 8 - j; i++) {
-        time_str[j + 1 + i] = time_str[j + i];
-        time_str[j + i] = ' ';
-    }
+    add_spaces(time_str, 8);
 
-    fprintf(log_fd, "copy %s %s %s\n", ip_str, time_str, url);
+    fprintf(log_fd, "%s copy  ip %s %s %s\n", now_time_str, ip_str, time_str, url);
 }
 
 void not_block_ip_in_route_table(uint32_t ip, time_t check_time, char* url)
@@ -117,22 +127,20 @@ void not_block_ip_in_route_table(uint32_t ip, time_t check_time, char* url)
 
     char ip_str[200];
     sprintf(ip_str, "%s", inet_ntoa(rec_ip));
-    int32_t j = strlen(ip_str);
-    for (int32_t i = 0; i < 15 - j; i++) {
-        ip_str[j + 1 + i] = ip_str[j + i];
-        ip_str[j + i] = ' ';
-    }
+    add_spaces(ip_str, 15);
 
-    struct tm* tm_struct = localtime(&check_time);
+    char now_time_str[200];
+    time_t now = time(NULL);
+    struct tm* tm_struct = localtime(&now);
+    sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+    add_spaces(now_time_str, 8);
+
     char time_str[200];
+    tm_struct = localtime(&check_time);
     sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
-    j = strlen(time_str);
-    for (int32_t i = 0; i < 8 - j; i++) {
-        time_str[j + 1 + i] = time_str[j + i];
-        time_str[j + i] = ' ';
-    }
+    add_spaces(time_str, 8);
 
-    fprintf(log_fd, "free %s %s %s\n", ip_str, time_str, url);
+    fprintf(log_fd, "%s free  ip %s %s %s\n", now_time_str, ip_str, time_str, url);
 }
 
 void del_ip_from_route_table(uint32_t ip, time_t now)
@@ -156,22 +164,14 @@ void del_ip_from_route_table(uint32_t ip, time_t now)
 
     char ip_str[200];
     sprintf(ip_str, "%s", inet_ntoa(rec_ip));
-    int32_t j = strlen(ip_str);
-    for (int32_t i = 0; i < 15 - j; i++) {
-        ip_str[j + 1 + i] = ip_str[j + i];
-        ip_str[j + i] = ' ';
-    }
+    add_spaces(ip_str, 15);
 
-    struct tm* tm_struct = localtime(&now);
     char time_str[200];
+    struct tm* tm_struct = localtime(&now);
     sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
-    j = strlen(time_str);
-    for (int32_t i = 0; i < 8 - j; i++) {
-        time_str[j + 1 + i] = time_str[j + i];
-        time_str[j + i] = ' ';
-    }
+    add_spaces(time_str, 8);
 
-    fprintf(log_fd, "del  %s %s\n", ip_str, time_str);
+    fprintf(log_fd, "%s del   ip %s\n", time_str, ip_str);
 }
 
 void init_route_socket(void)
