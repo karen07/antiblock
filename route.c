@@ -43,7 +43,7 @@ void del_url_cname(char* data_url, time_t check_time)
     tm_struct = localtime(&check_time);
     sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-    fprintf(log_fd, "%s,del url,%s,,%s\n", now_time_str, data_url, time_str);
+    fprintf(log_fd, "%s,del url,,%s,%s\n", now_time_str, data_url, time_str);
 
     free(data_url);
 }
@@ -151,7 +151,7 @@ void del_ip_from_route_table(uint32_t ip, time_t check_time)
     tm_struct = localtime(&check_time);
     sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-    fprintf(log_fd, "%s,del ip,%s,,%s\n", now_time_str, ip_str, time_str);
+    fprintf(log_fd, "%s,del ip,,%s,%s\n", now_time_str, ip_str, time_str);
 }
 
 void init_route_socket(void)
