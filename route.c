@@ -43,7 +43,7 @@ void del_url_cname(char* data_url, time_t check_time)
     tm_struct = localtime(&check_time);
     sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-    fprintf(log_fd, "%s,del url,%s,%s\n", now_time_str, data_url, time_str);
+    fprintf(log_fd, "%s,del url,%s,,%s\n", now_time_str, data_url, time_str);
 
     free(data_url);
 }
@@ -120,7 +120,7 @@ void not_block_ip_in_route_table(uint32_t ip, time_t check_time, char* url)
     fprintf(log_fd, "%s,free ip,%s,%s,%s\n", now_time_str, url, ip_str, time_str);
 }
 
-void del_ip_from_route_table(uint32_t ip, time_t now)
+void del_ip_from_route_table(uint32_t ip, time_t check_time)
 {
     struct in_addr rec_ip;
     rec_ip.s_addr = ip;
@@ -133,7 +133,7 @@ void del_ip_from_route_table(uint32_t ip, time_t now)
         printf("Ioctl can't delete %s from route table :%s\n", inet_ntoa(rec_ip), strerror(errno));
     }
 
-    if (!now) {
+    if (!check_time) {
         return;
     }
 
@@ -142,11 +142,16 @@ void del_ip_from_route_table(uint32_t ip, time_t now)
     char ip_str[200];
     sprintf(ip_str, "%s", inet_ntoa(rec_ip));
 
-    char time_str[200];
+    char now_time_str[200];
+    time_t now = time(NULL);
     struct tm* tm_struct = localtime(&now);
+    sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+
+    char time_str[200];
+    tm_struct = localtime(&check_time);
     sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-    fprintf(log_fd, "%s,del ip,%s\n", time_str, ip_str);
+    fprintf(log_fd, "%s,del ip,%s,,%s\n", now_time_str, ip_str, time_str);
 }
 
 void init_route_socket(void)

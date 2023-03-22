@@ -11,7 +11,7 @@ int32_t cname_url_decide(const void* void_elem)
     const cname_urls_map* elem = void_elem;
 
     if (now_ttl_check > elem->end_time) {
-        del_url_cname(elem->url, now_ttl_check);
+        del_url_cname(elem->url, elem->end_time);
         return 1;
     } else {
         return 0;
@@ -23,7 +23,7 @@ int32_t ttl_decide(const void* void_elem)
     const ttl_map_t* elem = void_elem;
 
     if (now_ttl_check > elem->end_time) {
-        del_ip_from_route_table(elem->ip, now_ttl_check);
+        del_ip_from_route_table(elem->ip, elem->end_time);
         return 1;
     } else {
         return 0;
