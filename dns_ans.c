@@ -1,6 +1,7 @@
 #include "dns_ans.h"
 #include "DNS.h"
 #include "route.h"
+#include "net_data.h"
 #include "stat.h"
 #include "ttl_check.h"
 #include "urls_read.h"
@@ -247,6 +248,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
         }
 
     end:
+        send_packet(remain_div);
         packets_ring_buffer[remain_div].packet_size = 0;
         packets_ring_buffer_start++;
     }

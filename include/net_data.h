@@ -16,3 +16,4 @@ uint32_t djb33_hash_len(const char* s, size_t len);
 void* DNS_data(void* arg);
 void* client_data(void* arg);
 void init_data_threads(void);
+void send_packet(int packets_num);

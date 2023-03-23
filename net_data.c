@@ -19,7 +19,7 @@ uint32_t djb33_hash_len(const char* s, size_t len)
 
 void* DNS_data(__attribute__((unused)) void* arg)
 {
-    struct sockaddr_in repeater_DNS_addr, client_addr, receive_DNS_addr;
+    struct sockaddr_in repeater_DNS_addr, receive_DNS_addr;
 
     repeater_DNS_addr.sin_family = AF_INET;
     repeater_DNS_addr.sin_port = htons(REPEATER_DNS_PORT);
@@ -118,21 +118,6 @@ void* DNS_data(__attribute__((unused)) void* arg)
             stat.ping_sum += ping;
             stat.ping_count++;
 
-            header->id = htons(id_map[id].client_id);
-            client_addr.sin_family = AF_INET;
-            client_addr.sin_port = id_map[id].port;
-            client_addr.sin_addr.s_addr = id_map[id].ip;
-
-            id_map[id].send_time = 0;
-            id_map[id].url_hash = 0;
-
-            if (sendto(repeater_client_socket, receive_msg, receive_msg_len, 0,
-                    (struct sockaddr*)&client_addr, sizeof(client_addr))
-                < 0) {
-                stat.send_to_client_error++;
-                printf("Can't send to client %s\n", strerror(errno));
-            }
-
             packets_ring_buffer[remain_div].packet_size = receive_msg_len;
 
             pthread_mutex_lock(&packets_ring_buffer_mutex);
@@ -143,6 +128,35 @@ void* DNS_data(__attribute__((unused)) void* arg)
     }
 
     return NULL;
+}
+
+void send_packet(int packets_num)
+{
+    struct sockaddr_in client_addr;
+    char* receive_msg;
+    int32_t receive_msg_len = 0;
+
+    receive_msg = packets_ring_buffer[packets_num].packet;
+    receive_msg_len = packets_ring_buffer[packets_num].packet_size;
+
+    dns_header_t* header = (dns_header_t*)receive_msg;
+
+    uint16_t id = ntohs(header->id);
+
+    header->id = htons(id_map[id].client_id);
+    client_addr.sin_family = AF_INET;
+    client_addr.sin_port = id_map[id].port;
+    client_addr.sin_addr.s_addr = id_map[id].ip;
+
+    id_map[id].send_time = 0;
+    id_map[id].url_hash = 0;
+
+    if (sendto(repeater_client_socket, receive_msg, receive_msg_len, 0,
+            (struct sockaddr*)&client_addr, sizeof(client_addr))
+        < 0) {
+        stat.send_to_client_error++;
+        printf("Can't send to client %s\n", strerror(errno));
+    }
 }
 
 void* client_data(__attribute__((unused)) void* arg)
