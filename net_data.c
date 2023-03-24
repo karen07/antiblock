@@ -1,21 +1,12 @@
 #include "net_data.h"
 #include "DNS.h"
 #include "dns_ans.h"
+#include "hash.h"
 #include "stat.h"
 
 id_map_t* id_map;
 int32_t repeater_DNS_socket[DNS_SOCKET_COUNT];
 int32_t repeater_client_socket;
-
-uint32_t djb33_hash_len(const char* s, size_t len)
-{
-    uint32_t h = 5381;
-    while (*s && len--) {
-        h += (h << 5);
-        h ^= *s++;
-    }
-    return h;
-}
 
 void* DNS_data(__attribute__((unused)) void* arg)
 {

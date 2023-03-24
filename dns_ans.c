@@ -1,5 +1,6 @@
 #include "dns_ans.h"
 #include "DNS.h"
+#include "hash.h"
 #include "net_data.h"
 #include "route.h"
 #include "stat.h"
@@ -14,16 +15,6 @@ int32_t packets_ring_buffer_end;
 packet_t* packets_ring_buffer;
 
 const array_hashmap_t* cname_urls_map_struct;
-
-uint32_t djb33_hash_cname(const char* s)
-{
-    uint32_t h = 5381;
-    while (*s) {
-        h += (h << 5);
-        h ^= *s++;
-    }
-    return h;
-}
 
 int32_t cname_url_on_collision(const void* void_elem1, const void* void_elem2)
 {
@@ -40,7 +31,7 @@ int32_t cname_url_on_collision(const void* void_elem1, const void* void_elem2)
 uint32_t cname_url_hash(const void* void_elem)
 {
     const cname_urls_map* elem = void_elem;
-    return djb33_hash_cname(elem->url);
+    return djb33_hash_len(elem->url, -1);
 }
 
 int32_t cname_url_cmp(const void* void_elem1, const void* void_elem2)

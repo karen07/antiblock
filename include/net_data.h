@@ -12,7 +12,6 @@ extern id_map_t* id_map;
 extern int32_t repeater_DNS_socket[DNS_SOCKET_COUNT];
 extern int32_t repeater_client_socket;
 
-uint32_t djb33_hash_len(const char* s, size_t len);
 void* DNS_data(void* arg);
 void* client_data(void* arg);
 void init_data_threads(void);
