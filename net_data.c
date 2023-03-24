@@ -122,7 +122,7 @@ void* DNS_data(__attribute__((unused)) void* arg)
     return NULL;
 }
 
-void send_packet(int packets_num)
+void send_packet(int32_t packets_num)
 {
     struct sockaddr_in client_addr;
     char* receive_msg;

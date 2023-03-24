@@ -6,6 +6,8 @@ struct rtentry route;
 
 void add_url_cname(char* ans_url, time_t check_time, char* data_url)
 {
+    stat.now_cname_url_count++;
+
     char now_time_str[200];
     time_t now = time(NULL);
     struct tm* tm_struct = localtime(&now);
@@ -34,6 +36,8 @@ void update_url_cname(char* ans_url, time_t check_time, char* data_url)
 
 void del_url_cname(char* data_url, time_t check_time)
 {
+    stat.now_cname_url_count--;
+
     char now_time_str[200];
     time_t now = time(NULL);
     struct tm* tm_struct = localtime(&now);
