@@ -1,22 +1,13 @@
 #include "urls_read.h"
+#include "hash.h"
 
 char* urls;
 const array_hashmap_t* urls_map_struct;
 
-uint32_t djb33_hash(const char* s)
-{
-    uint32_t h = 5381;
-    while (*s) {
-        h += (h << 5);
-        h ^= *s++;
-    }
-    return h;
-}
-
 uint32_t add_url_hash(const void* void_elem)
 {
     const uint32_t* elem = void_elem;
-    return djb33_hash(&urls[*elem]);
+    return djb33_hash_len(&urls[*elem], -1);
 }
 
 int32_t add_url_cmp(const void* void_elem1, const void* void_elem2)
@@ -30,7 +21,7 @@ int32_t add_url_cmp(const void* void_elem1, const void* void_elem2)
 uint32_t find_url_hash(const void* void_elem)
 {
     const char* elem = void_elem;
-    return djb33_hash(elem);
+    return djb33_hash_len(elem, -1);
 }
 
 int32_t find_url_cmp(const void* void_elem1, const void* void_elem2)
