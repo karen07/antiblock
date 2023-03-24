@@ -24,6 +24,7 @@ void* stat_print(__attribute__((unused)) void* arg)
         fprintf(stat_fd, "Recive from dns: %d\n", stat.rec_from_dns);
         fprintf(stat_fd, "Recive difference: %d\n", stat.rec_from_client - stat.rec_from_dns);
         fprintf(stat_fd, "Now in route table: %d\n", stat.now_in_route_table);
+        fprintf(stat_fd, "Now cname urls: %d\n", stat.now_cname_url_count);
         fprintf(stat_fd, "Route not block urls: %d\n", stat.route_not_block_ip_count);
         if (stat.ping_count) {
             fprintf(stat_fd, "Min ping: %lf\n", stat.ping_min);
@@ -41,6 +42,7 @@ void* stat_print(__attribute__((unused)) void* arg)
 
         fprintf(stat_fd, "Ring buffer overflow: %d\n", stat.packets_ring_buffer_error);
         fprintf(stat_fd, "TTL map overflow: %d\n", stat.ttl_map_error);
+        fprintf(stat_fd, "Cname url map overflow: %d\n", stat.cname_url_map_error);
         fprintf(stat_fd, "\n");
 
         fflush(stat_fd);

@@ -181,11 +181,12 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             uint32_t ttl = ntohl(ans->ttl);
             time_t check_time = time(NULL) + ttl;
 
-            if (type == 1) {
-                if (hand_point + sizeof(dns_ans_t) > receive_msg_end) {
-                    goto end;
-                }
+            uint16_t len = ntohs(ans->len);
+            if (hand_point + sizeof(dns_ans_t) - sizeof(uint32_t) + len > receive_msg_end) {
+                goto end;
+            }
 
+            if (type == 1) {
                 ttl_map_t add_elem;
                 add_elem.ip = ans->ip4;
                 add_elem.end_time = check_time;
@@ -208,11 +209,6 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                 }
             }
 
-            uint16_t len = ntohs(ans->len);
-            if (hand_point + sizeof(dns_ans_t) - sizeof(uint32_t) + len > receive_msg_end) {
-                goto end;
-            }
-
             if (type == 5 && blocked_url_flag) {
                 char data_url[URL_MAX_SIZE];
                 int32_t data_url_len = get_url_from_packet(receive_msg,
@@ -231,7 +227,10 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                     add_url_cname(ans_url + 1, add_elem.end_time, add_elem.url);
                 } else if (new_elem_flag == 0) {
                     update_url_cname(ans_url + 1, elem.end_time, elem.url);
+                    free(data_url_str);
                 } else if (new_elem_flag == -1) {
+                    stat.cname_url_map_error++;
+                    free(data_url_str);
                 }
             }
 
