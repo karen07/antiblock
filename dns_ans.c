@@ -1,7 +1,7 @@
 #include "dns_ans.h"
 #include "DNS.h"
-#include "route.h"
 #include "net_data.h"
+#include "route.h"
 #include "stat.h"
 #include "ttl_check.h"
 #include "urls_read.h"

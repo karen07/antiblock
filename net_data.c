@@ -64,6 +64,7 @@ void* DNS_data(__attribute__((unused)) void* arg)
 
             int32_t remain_div = packets_ring_buffer_end % packets_ring_buffer_size;
             if (packets_ring_buffer[remain_div].packet_size > 0) {
+                send_packet(remain_div);
                 stat.packets_ring_buffer_error++;
             }
             packets_ring_buffer[remain_div].packet_size = 0;
