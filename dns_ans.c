@@ -227,7 +227,6 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                     add_url_cname(ans_url + 1, add_elem.end_time, add_elem.url);
                 } else if (new_elem_flag == 0) {
                     update_url_cname(ans_url + 1, elem.end_time, elem.url);
-                    free(data_url_str);
                 } else if (new_elem_flag == -1) {
                     stat.cname_url_map_error++;
                     free(data_url_str);
