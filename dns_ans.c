@@ -42,7 +42,7 @@ int32_t cname_url_cmp(const void* void_elem1, const void* void_elem2)
     return !strcmp(elem1->url, elem2->url);
 }
 
-int32_t get_url_from_packet(char* packet_start, char* hand_point, char* receive_msg_end, char* url)
+int32_t get_url_from_packet(char* packet_start, char* hand_point, char* receive_msg_end, char* url, int32_t* first_len)
 {
     int32_t url_len = 0;
     url[url_len++] = '.';
@@ -60,9 +60,13 @@ int32_t get_url_from_packet(char* packet_start, char* hand_point, char* receive_
         }
     }
 
+    if (first_len) {
+        *first_len = url_len + 1;
+    }
+
     if ((*hand_point & 0xc0) == 0xc0) {
         url_len--;
-        url_len += get_url_from_packet(packet_start, packet_start + *(hand_point + 1), receive_msg_end, &url[url_len]);
+        url_len += get_url_from_packet(packet_start, packet_start + *(hand_point + 1), receive_msg_end, &url[url_len], 0);
     }
 
     url[url_len] = 0;
@@ -137,13 +141,15 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             goto end;
         }
 
+        int32_t padding_len;
+
         char url[URL_MAX_SIZE];
-        int32_t url_len = get_url_from_packet(receive_msg, receive_msg + sizeof(dns_header_t), receive_msg_end, url);
+        int32_t url_len = get_url_from_packet(receive_msg, receive_msg + sizeof(dns_header_t), receive_msg_end, url, &padding_len);
         if (url_len == -1) {
             goto end;
         }
 
-        char* hand_point = receive_msg + sizeof(dns_header_t) + url_len + 1;
+        char* hand_point = receive_msg + sizeof(dns_header_t) + padding_len;
 
         hand_point += sizeof(dns_que_t);
         if (hand_point > receive_msg_end) {
@@ -152,7 +158,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
 
         for (int32_t i = 0; i < ans_count; i++) {
             char ans_url[URL_MAX_SIZE];
-            int32_t ans_url_len = get_url_from_packet(receive_msg, hand_point, receive_msg_end, ans_url);
+            int32_t ans_url_len = get_url_from_packet(receive_msg, hand_point, receive_msg_end, ans_url, &padding_len);
             if (ans_url_len == -1) {
                 goto end;
             }
@@ -160,17 +166,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             int32_t blocked_url_flag = 0;
             blocked_url_flag = check_url(ans_url, ans_url_len);
 
-            if (*hand_point & 0xc0) {
-                hand_point += 2;
-            } else {
-                while (*hand_point++ != 0) {
-                    uint32_t part_len = *(hand_point - 1);
-                    if (hand_point + part_len > receive_msg_end) {
-                        goto end;
-                    }
-                    hand_point += part_len;
-                }
-            }
+            hand_point += padding_len;
 
             if (hand_point + sizeof(dns_ans_t) - sizeof(uint32_t) > receive_msg_end) {
                 goto end;
@@ -212,7 +208,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             if (type == 5 && blocked_url_flag) {
                 char data_url[URL_MAX_SIZE];
                 int32_t data_url_len = get_url_from_packet(receive_msg,
-                    hand_point + sizeof(dns_ans_t) - sizeof(uint32_t), receive_msg_end, data_url);
+                    hand_point + sizeof(dns_ans_t) - sizeof(uint32_t), receive_msg_end, data_url, 0);
 
                 char* data_url_str = malloc(data_url_len + 1);
                 strcpy(data_url_str, data_url + 1);

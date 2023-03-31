@@ -20,6 +20,6 @@ extern packet_t* packets_ring_buffer;
 
 extern const array_hashmap_t* cname_urls_map_struct;
 
-int32_t get_url_from_packet(char* packet_start, char* hand_point, char* receive_msg_end, char* url);
+int32_t get_url_from_packet(char* packet_start, char* hand_point, char* receive_msg_end, char* url, int32_t* first_len);
 void* dns_ans_check(void* arg);
 void init_dns_ans_check_thread(void);
