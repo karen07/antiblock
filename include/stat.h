@@ -7,11 +7,6 @@ typedef struct statistics {
     int32_t now_in_route_table;
     int32_t now_cname_url_count;
 
-    double ping_min;
-    double ping_max;
-    double ping_sum;
-    int32_t ping_count;
-
     int32_t send_to_client_error;
     int32_t send_to_dns_error;
 
@@ -23,6 +18,8 @@ typedef struct statistics {
 
     int32_t packets_ring_buffer_error;
     int32_t cname_url_map_error;
+
+    int32_t request_parsing_error;
 } statistics_t;
 
 extern statistics_t stat;
