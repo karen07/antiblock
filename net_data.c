@@ -95,21 +95,6 @@ void* DNS_data(__attribute__((unused)) void* arg)
 
             stat.rec_from_dns++;
 
-            gettimeofday(&now_timeval, NULL);
-            now_us = now_timeval.tv_sec * MIL + now_timeval.tv_usec;
-            double ping = (now_us - id_map[id].send_time) / 1e3;
-
-            if (stat.ping_min > ping) {
-                stat.ping_min = ping;
-            }
-
-            if (stat.ping_max < ping) {
-                stat.ping_max = ping;
-            }
-
-            stat.ping_sum += ping;
-            stat.ping_count++;
-
             packets_ring_buffer[remain_div].packet_size = receive_msg_len;
 
             pthread_mutex_lock(&packets_ring_buffer_mutex);

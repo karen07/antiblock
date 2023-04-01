@@ -66,7 +66,12 @@ int32_t get_url_from_packet(char* packet_start, char* hand_point, char* receive_
 
     if ((*hand_point & 0xc0) == 0xc0) {
         url_len--;
-        url_len += get_url_from_packet(packet_start, packet_start + *(hand_point + 1), receive_msg_end, &url[url_len], 0);
+        int new_len;
+        new_len = get_url_from_packet(packet_start, packet_start + *(hand_point + 1), receive_msg_end, &url[url_len], 0);
+        if (new_len == -1) {
+            return -1;
+        }
+        url_len += new_len;
     }
 
     url[url_len] = 0;
@@ -121,6 +126,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
         char* receive_msg_end = receive_msg + receive_msg_len;
 
         if (receive_msg_len <= (int32_t)sizeof(dns_header_t)) {
+            stat.request_parsing_error++;
             goto end;
         }
 
@@ -128,6 +134,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
 
         uint16_t flags = ntohs(header->flags);
         if ((flags & FIRST_BIT) == 0) {
+            stat.request_parsing_error++;
             goto end;
         }
 
@@ -146,6 +153,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
         char url[URL_MAX_SIZE];
         int32_t url_len = get_url_from_packet(receive_msg, receive_msg + sizeof(dns_header_t), receive_msg_end, url, &padding_len);
         if (url_len == -1) {
+            stat.request_parsing_error++;
             goto end;
         }
 
@@ -153,6 +161,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
 
         hand_point += sizeof(dns_que_t);
         if (hand_point > receive_msg_end) {
+            stat.request_parsing_error++;
             goto end;
         }
 
@@ -160,6 +169,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             char ans_url[URL_MAX_SIZE];
             int32_t ans_url_len = get_url_from_packet(receive_msg, hand_point, receive_msg_end, ans_url, &padding_len);
             if (ans_url_len == -1) {
+                stat.request_parsing_error++;
                 goto end;
             }
 
@@ -169,6 +179,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             hand_point += padding_len;
 
             if (hand_point + sizeof(dns_ans_t) - sizeof(uint32_t) > receive_msg_end) {
+                stat.request_parsing_error++;
                 goto end;
             }
             dns_ans_t* ans = (dns_ans_t*)hand_point;
@@ -179,6 +190,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
 
             uint16_t len = ntohs(ans->len);
             if (hand_point + sizeof(dns_ans_t) - sizeof(uint32_t) + len > receive_msg_end) {
+                stat.request_parsing_error++;
                 goto end;
             }
 
