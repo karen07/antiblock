@@ -8,12 +8,9 @@ void* stat_print(__attribute__((unused)) void* arg)
 {
     pthread_barrier_wait(&threads_barrier);
 
-    uint32_t count = 0;
-
     while (1) {
-        if (count++ % 3 == 0) {
-            fseek(stat_fd, 0, SEEK_SET);
-        }
+        ftruncate(fileno(stat_fd), 0);
+        fseek(stat_fd, 0, SEEK_SET);
 
         time_t now = time(NULL);
         struct tm* tm_struct = localtime(&now);
@@ -34,7 +31,6 @@ void* stat_print(__attribute__((unused)) void* arg)
         fprintf(stat_fd, "Ring buffer overflow: %d\n", stat.packets_ring_buffer_error);
         fprintf(stat_fd, "TTL map overflow: %d\n", stat.ttl_map_error);
         fprintf(stat_fd, "Cname url map overflow: %d\n", stat.cname_url_map_error);
-        fprintf(stat_fd, "\n");
 
         fflush(stat_fd);
         fflush(log_fd);
