@@ -25,7 +25,7 @@
 #define DNS_PORT 53
 #define DNS_IP "1.1.1.1"
 
-#define VPN_IP "192.168.6.37"
+#define VPN_IP "10.8.0.5"
 #define VPN_MASK "255.255.255.255"
 
 #define FILES_FOLDER "/smb/"
