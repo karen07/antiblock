@@ -1,5 +1,5 @@
 #include "antiblock.h"
-#include "hashmap/array_hashmap.h"
+#include "array_hashmap.h"
 
 typedef struct packet {
     int32_t packet_size;

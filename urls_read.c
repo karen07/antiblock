@@ -1,5 +1,6 @@
 #include "urls_read.h"
 #include "hash.h"
+#include <curl/curl.h>
 
 char* urls;
 const array_hashmap_t* urls_map_struct;
@@ -32,38 +33,59 @@ int32_t find_url_cmp(const void* void_elem1, const void* void_elem2)
     return !strcmp(elem1, &urls[*elem2]);
 }
 
+struct memory {
+    char* response;
+    size_t size;
+};
+
+static size_t cb(void* data, size_t size, size_t nmemb, void* clientp)
+{
+    size_t realsize = size * nmemb;
+    struct memory* mem = (struct memory*)clientp;
+
+    char* ptr = realloc(mem->response, mem->size + realsize + 1);
+    if (!ptr)
+        return 0;  /* out of memory! */
+
+    mem->response = ptr;
+    memcpy(&(mem->response[mem->size]), data, realsize);
+    mem->size += realsize;
+    mem->response[mem->size] = 0;
+
+    return realsize;
+}
+
 void* urls_read(__attribute__((unused)) void* arg)
 {
     pthread_barrier_wait(&threads_barrier);
 
-    while (1) {
-        system("curl https://antifilter.download/list/domains.lst 2>/dev/null > " FILES_FOLDER "block_urls_lines");
+    struct memory chunk;
+    memset(&chunk, 0, sizeof(chunk));
 
-        FILE* urls_fd = fopen(FILES_FOLDER "block_urls_lines", "r");
-        if (urls_fd == NULL) {
-            printf("Can't open url file\n");
-            exit(EXIT_FAILURE);
+    while (1) {
+        if (chunk.response != NULL) {
+            free(chunk.response);
+            memset(&chunk, 0, sizeof(chunk));
         }
 
-        fseek(urls_fd, 0, SEEK_END);
-        int64_t urls_file_size = ftell(urls_fd);
-        fseek(urls_fd, 0, SEEK_SET);
+        curl_global_init(CURL_GLOBAL_DEFAULT);
+        CURL* curl = curl_easy_init();
+        if (curl) {
+            curl_easy_setopt(curl, CURLOPT_URL, "https://antifilter.download/list/domains.lst");
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+            curl_easy_setopt(curl, CURLOPT_CA_CACHE_TIMEOUT, 604800L);
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
+            curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&chunk);
+            curl_easy_perform(curl);
+            curl_easy_cleanup(curl);
+        }
+        curl_global_cleanup();
+
+        int64_t urls_file_size = chunk.size;
+        urls = chunk.response;
 
         if (urls_file_size > 0) {
-            if (urls) {
-                free(urls);
-            }
-
-            urls = malloc(urls_file_size);
-            if (urls == 0) {
-                printf("No free memory for urls\n");
-                exit(EXIT_FAILURE);
-            }
-            if (fread(urls, urls_file_size, 1, urls_fd) != 1) {
-                printf("Can't read url file\n");
-                exit(EXIT_FAILURE);
-            }
-
             int32_t urls_map_size = 0;
             for (int32_t i = 0; i < urls_file_size; i++) {
                 if (urls[i] == '\n') {
@@ -96,10 +118,6 @@ void* urls_read(__attribute__((unused)) void* arg)
                 url_offset = strchr(&urls[url_offset + 1], 0) - urls + 1;
             }
         }
-
-        fclose(urls_fd);
-
-        system("rm " FILES_FOLDER "block_urls_lines");
 
         if (urls_file_size > 0) {
             sleep(URLS_UPDATE_TIME);

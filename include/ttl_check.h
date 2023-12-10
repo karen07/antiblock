@@ -1,5 +1,5 @@
 #include "antiblock.h"
-#include "hashmap/array_hashmap.h"
+#include "array_hashmap.h"
 
 typedef struct ttl_map {
     time_t end_time;
