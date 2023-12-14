@@ -8,12 +8,30 @@
 #include "urls_read.h"
 
 pthread_barrier_t threads_barrier;
+int32_t is_log_print;
+int32_t is_stat_print;
 
-int main(void)
+int main(int argc, char* argv[])
 {
-    if (pthread_barrier_init(&threads_barrier, NULL, 7)) {
-        printf("Can't create threads_barrier\n");
-        exit(EXIT_FAILURE);
+    for (int i = 0; i < argc; i++) {
+        if (!strcmp(argv[i], "-log")) {
+            is_log_print = 1;
+        }
+        if (!strcmp(argv[i], "-stat")) {
+            is_stat_print = 1;
+        }
+    }
+
+    if (is_stat_print) {
+        if (pthread_barrier_init(&threads_barrier, NULL, 7)) {
+            printf("Can't create threads_barrier\n");
+            exit(EXIT_FAILURE);
+        }
+    } else {
+        if (pthread_barrier_init(&threads_barrier, NULL, 6)) {
+            printf("Can't create threads_barrier\n");
+            exit(EXIT_FAILURE);
+        }
     }
 
     init_stat_print_thread();

@@ -15,3 +15,5 @@
 #include <unistd.h>
 
 extern pthread_barrier_t threads_barrier;
+extern int32_t is_log_print;
+extern int32_t is_stat_print;

@@ -74,7 +74,6 @@ void* urls_read(__attribute__((unused)) void* arg)
             curl_easy_setopt(curl, CURLOPT_URL, "https://antifilter.download/list/domains.lst");
             curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
             curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-            curl_easy_setopt(curl, CURLOPT_CA_CACHE_TIMEOUT, 604800L);
             curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
             curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&chunk);
             curl_easy_perform(curl);
@@ -108,8 +107,7 @@ void* urls_read(__attribute__((unused)) void* arg)
 
             int32_t url_offset = 0;
             for (int32_t i = 0; i < urls_map_size; i++) {
-                if (urls[url_offset] == 'w' && urls[url_offset + 1] == 'w'
-                    && urls[url_offset + 2] == 'w' && urls[url_offset + 3] == '.') {
+                if (!memcmp(&urls[url_offset], "www.", 4)) {
                     url_offset += 4;
                 }
 

@@ -33,7 +33,6 @@ void* stat_print(__attribute__((unused)) void* arg)
         fprintf(stat_fd, "Cname url map overflow: %d\n", stat.cname_url_map_error);
 
         fflush(stat_fd);
-        fflush(log_fd);
 
         sleep(STAT_PRINT_TIME);
     }
@@ -45,26 +44,30 @@ void init_stat_print_thread(void)
 {
     memset(&stat, 0, sizeof(stat));
 
-    log_fd = fopen(FILES_FOLDER "log.txt", "w");
-    if (log_fd == NULL) {
-        printf("Can't open log file\n");
-        exit(EXIT_FAILURE);
+    if (is_log_print) {
+        log_fd = fopen(FILES_FOLDER "log.txt", "w");
+        if (log_fd == NULL) {
+            printf("Can't open log file\n");
+            exit(EXIT_FAILURE);
+        }
     }
 
-    stat_fd = fopen(FILES_FOLDER "stat.txt", "w");
-    if (stat_fd == NULL) {
-        printf("Can't open stat file\n");
-        exit(EXIT_FAILURE);
-    }
+    if (is_stat_print) {
+        stat_fd = fopen(FILES_FOLDER "stat.txt", "w");
+        if (stat_fd == NULL) {
+            printf("Can't open stat file\n");
+            exit(EXIT_FAILURE);
+        }
 
-    pthread_t stat_print_thread;
-    if (pthread_create(&stat_print_thread, NULL, stat_print, NULL)) {
-        printf("Can't create stat_print_thread\n");
-        exit(EXIT_FAILURE);
-    }
+        pthread_t stat_print_thread;
+        if (pthread_create(&stat_print_thread, NULL, stat_print, NULL)) {
+            printf("Can't create stat_print_thread\n");
+            exit(EXIT_FAILURE);
+        }
 
-    if (pthread_detach(stat_print_thread)) {
-        printf("Can't detach stat_print_thread\n");
-        exit(EXIT_FAILURE);
+        if (pthread_detach(stat_print_thread)) {
+            printf("Can't detach stat_print_thread\n");
+            exit(EXIT_FAILURE);
+        }
     }
 }
