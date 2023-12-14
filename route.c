@@ -8,46 +8,55 @@ void add_url_cname(char* ans_url, time_t check_time, char* data_url)
 {
     stat.now_cname_url_count++;
 
-    char now_time_str[200];
-    time_t now = time(NULL);
-    struct tm* tm_struct = localtime(&now);
-    sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+    if (log_fd) {
+        char now_time_str[200];
+        time_t now = time(NULL);
+        struct tm* tm_struct = localtime(&now);
+        sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-    char time_str[200];
-    tm_struct = localtime(&check_time);
-    sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+        char time_str[200];
+        tm_struct = localtime(&check_time);
+        sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-    fprintf(log_fd, "%s,add url,%s,%s,%s\n", now_time_str, ans_url, data_url, time_str);
+        fprintf(log_fd, "%s,add url,%s,%s,%s\n", now_time_str, ans_url, data_url, time_str);
+        fflush(log_fd);
+    }
 }
 
 void update_url_cname(char* ans_url, time_t check_time, char* data_url)
 {
-    char now_time_str[200];
-    time_t now = time(NULL);
-    struct tm* tm_struct = localtime(&now);
-    sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+    if (log_fd) {
+        char now_time_str[200];
+        time_t now = time(NULL);
+        struct tm* tm_struct = localtime(&now);
+        sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-    char time_str[200];
-    tm_struct = localtime(&check_time);
-    sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+        char time_str[200];
+        tm_struct = localtime(&check_time);
+        sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-    fprintf(log_fd, "%s,copy url,%s,%s,%s\n", now_time_str, ans_url, data_url, time_str);
+        fprintf(log_fd, "%s,copy url,%s,%s,%s\n", now_time_str, ans_url, data_url, time_str);
+        fflush(log_fd);
+    }
 }
 
 void del_url_cname(char* data_url, time_t check_time)
 {
     stat.now_cname_url_count--;
 
-    char now_time_str[200];
-    time_t now = time(NULL);
-    struct tm* tm_struct = localtime(&now);
-    sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+    if (log_fd) {
+        char now_time_str[200];
+        time_t now = time(NULL);
+        struct tm* tm_struct = localtime(&now);
+        sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-    char time_str[200];
-    tm_struct = localtime(&check_time);
-    sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+        char time_str[200];
+        tm_struct = localtime(&check_time);
+        sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-    fprintf(log_fd, "%s,del url,,%s,%s\n", now_time_str, data_url, time_str);
+        fprintf(log_fd, "%s,del url,,%s,%s\n", now_time_str, data_url, time_str);
+        fflush(log_fd);
+    }
 
     free(data_url);
 }
@@ -67,39 +76,45 @@ void add_ip_to_route_table(uint32_t ip, time_t check_time, char* url)
 
     stat.now_in_route_table++;
 
-    char ip_str[200];
-    sprintf(ip_str, "%s", inet_ntoa(rec_ip));
+    if (log_fd) {
+        char ip_str[200];
+        sprintf(ip_str, "%s", inet_ntoa(rec_ip));
 
-    char now_time_str[200];
-    time_t now = time(NULL);
-    struct tm* tm_struct = localtime(&now);
-    sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+        char now_time_str[200];
+        time_t now = time(NULL);
+        struct tm* tm_struct = localtime(&now);
+        sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-    char time_str[200];
-    tm_struct = localtime(&check_time);
-    sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+        char time_str[200];
+        tm_struct = localtime(&check_time);
+        sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-    fprintf(log_fd, "%s,add ip,%s,%s,%s\n", now_time_str, url, ip_str, time_str);
+        fprintf(log_fd, "%s,add ip,%s,%s,%s\n", now_time_str, url, ip_str, time_str);
+        fflush(log_fd);
+    }
 }
 
 void update_ip_in_route_table(uint32_t ip, time_t check_time, char* url)
 {
-    struct in_addr rec_ip;
-    rec_ip.s_addr = ip;
+    if (log_fd) {
+        struct in_addr rec_ip;
+        rec_ip.s_addr = ip;
 
-    char ip_str[200];
-    sprintf(ip_str, "%s", inet_ntoa(rec_ip));
+        char ip_str[200];
+        sprintf(ip_str, "%s", inet_ntoa(rec_ip));
 
-    char now_time_str[200];
-    time_t now = time(NULL);
-    struct tm* tm_struct = localtime(&now);
-    sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+        char now_time_str[200];
+        time_t now = time(NULL);
+        struct tm* tm_struct = localtime(&now);
+        sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-    char time_str[200];
-    tm_struct = localtime(&check_time);
-    sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+        char time_str[200];
+        tm_struct = localtime(&check_time);
+        sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-    fprintf(log_fd, "%s,copy ip,%s,%s,%s\n", now_time_str, url, ip_str, time_str);
+        fprintf(log_fd, "%s,copy ip,%s,%s,%s\n", now_time_str, url, ip_str, time_str);
+        fflush(log_fd);
+    }
 }
 
 void not_block_ip_in_route_table(uint32_t ip, time_t check_time, char* url)
@@ -109,19 +124,22 @@ void not_block_ip_in_route_table(uint32_t ip, time_t check_time, char* url)
 
     stat.route_not_block_ip_count++;
 
-    char ip_str[200];
-    sprintf(ip_str, "%s", inet_ntoa(rec_ip));
+    if (log_fd) {
+        char ip_str[200];
+        sprintf(ip_str, "%s", inet_ntoa(rec_ip));
 
-    char now_time_str[200];
-    time_t now = time(NULL);
-    struct tm* tm_struct = localtime(&now);
-    sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+        char now_time_str[200];
+        time_t now = time(NULL);
+        struct tm* tm_struct = localtime(&now);
+        sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-    char time_str[200];
-    tm_struct = localtime(&check_time);
-    sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+        char time_str[200];
+        tm_struct = localtime(&check_time);
+        sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-    fprintf(log_fd, "%s,free ip,%s,%s,%s\n", now_time_str, url, ip_str, time_str);
+        fprintf(log_fd, "%s,free ip,%s,%s,%s\n", now_time_str, url, ip_str, time_str);
+        fflush(log_fd);
+    }
 }
 
 void del_ip_from_route_table(uint32_t ip, time_t check_time)
@@ -143,19 +161,22 @@ void del_ip_from_route_table(uint32_t ip, time_t check_time)
 
     stat.now_in_route_table--;
 
-    char ip_str[200];
-    sprintf(ip_str, "%s", inet_ntoa(rec_ip));
+    if (log_fd) {
+        char ip_str[200];
+        sprintf(ip_str, "%s", inet_ntoa(rec_ip));
 
-    char now_time_str[200];
-    time_t now = time(NULL);
-    struct tm* tm_struct = localtime(&now);
-    sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+        char now_time_str[200];
+        time_t now = time(NULL);
+        struct tm* tm_struct = localtime(&now);
+        sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-    char time_str[200];
-    tm_struct = localtime(&check_time);
-    sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+        char time_str[200];
+        tm_struct = localtime(&check_time);
+        sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-    fprintf(log_fd, "%s,del ip,,%s,%s\n", now_time_str, ip_str, time_str);
+        fprintf(log_fd, "%s,del ip,,%s,%s\n", now_time_str, ip_str, time_str);
+        fflush(log_fd);
+    }
 }
 
 void init_route_socket(void)
