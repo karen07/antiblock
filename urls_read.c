@@ -45,7 +45,7 @@ static size_t cb(void* data, size_t size, size_t nmemb, void* clientp)
 
     char* ptr = realloc(mem->response, mem->size + realsize + 1);
     if (!ptr)
-        return 0;  /* out of memory! */
+        return 0; /* out of memory! */
 
     mem->response = ptr;
     memcpy(&(mem->response[mem->size]), data, realsize);
@@ -68,25 +68,52 @@ void* urls_read(__attribute__((unused)) void* arg)
             memset(&chunk, 0, sizeof(chunk));
         }
 
-        curl_global_init(CURL_GLOBAL_DEFAULT);
-        CURL* curl = curl_easy_init();
-        if (curl) {
-            curl_easy_setopt(curl, CURLOPT_URL, "https://antifilter.download/list/domains.lst");
-            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
-            curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&chunk);
-            curl_easy_perform(curl);
-            curl_easy_cleanup(curl);
+        if (is_domains_file_url) {
+            curl_global_init(CURL_GLOBAL_DEFAULT);
+            CURL* curl = curl_easy_init();
+            if (curl) {
+                curl_easy_setopt(curl, CURLOPT_URL, domains_file_url);
+                curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+                curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+                curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
+                curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&chunk);
+                curl_easy_perform(curl);
+                curl_easy_cleanup(curl);
+            }
+            curl_global_cleanup();
         }
-        curl_global_cleanup();
 
-        int64_t urls_file_size = chunk.size;
+        int64_t urls_web_file_size = chunk.size;
+
+        if (is_domains_file_path) {
+            FILE* urls_fd = fopen(domains_file_path, "r");
+            if (urls_fd == NULL) {
+                printf("Can't open url file\n");
+                exit(EXIT_FAILURE);
+            }
+            fseek(urls_fd, 0, SEEK_END);
+            int64_t urls_file_size_add = ftell(urls_fd);
+            fseek(urls_fd, 0, SEEK_SET);
+            char* ptr = realloc(chunk.response, chunk.size + urls_file_size_add + 1);
+            if (!ptr) {
+                printf("No free memory for urls_file\n");
+                exit(EXIT_FAILURE);
+            }
+            chunk.response = ptr;
+            if (fread(&(chunk.response[chunk.size]), urls_file_size_add, 1, urls_fd) != 1) {
+                printf("Can't read url file\n");
+                exit(EXIT_FAILURE);
+            }
+            chunk.size += urls_file_size_add;
+            chunk.response[chunk.size] = 0;
+            fclose(urls_fd);
+        }
+
         urls = chunk.response;
 
-        if (urls_file_size > 0) {
+        if (urls_web_file_size > 0) {
             int32_t urls_map_size = 0;
-            for (int32_t i = 0; i < urls_file_size; i++) {
+            for (int32_t i = 0; i < chunk.size; i++) {
                 if (urls[i] == '\n') {
                     urls[i] = 0;
                     urls_map_size++;
@@ -117,7 +144,7 @@ void* urls_read(__attribute__((unused)) void* arg)
             }
         }
 
-        if (urls_file_size > 0) {
+        if (urls_web_file_size > 0) {
             sleep(URLS_UPDATE_TIME);
         } else {
             sleep(URLS_ERROR_UPDATE_TIME);
