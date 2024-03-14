@@ -17,3 +17,7 @@
 extern pthread_barrier_t threads_barrier;
 extern int32_t is_log_print;
 extern int32_t is_stat_print;
+extern int32_t is_domains_file_url;
+extern int32_t is_domains_file_path;
+extern char domains_file_url[1000];
+extern char domains_file_path[1000];

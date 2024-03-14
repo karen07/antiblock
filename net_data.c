@@ -29,7 +29,7 @@ void* DNS_data(__attribute__((unused)) void* arg)
 
         repeater_DNS_addr.sin_port = htons(REPEATER_DNS_PORT + 10 * i);
         if (bind(repeater_DNS_socket[i], (struct sockaddr*)&repeater_DNS_addr,
-            sizeof(repeater_DNS_addr))
+                sizeof(repeater_DNS_addr))
             < 0) {
             printf("Can't bind to the port for listen from DNS :%s\n", strerror(errno));
             exit(EXIT_FAILURE);
@@ -44,7 +44,7 @@ void* DNS_data(__attribute__((unused)) void* arg)
     char* receive_msg;
     int32_t receive_msg_len = 0;
     while (1) {
-        while (poll(fd_DNS, DNS_SOCKET_COUNT, POLL_SLEEP_TIME) < 1) {}
+        while (poll(fd_DNS, DNS_SOCKET_COUNT, POLL_SLEEP_TIME) < 1) { }
 
         for (int32_t i = 0; i < DNS_SOCKET_COUNT; i++) {
             if ((fd_DNS[i].revents & POLLIN) == 0) {
@@ -129,7 +129,7 @@ void send_packet(int32_t packets_num)
     id_map[id].url_hash = 0;
 
     if (sendto(repeater_client_socket, receive_msg, receive_msg_len, 0,
-        (struct sockaddr*)&client_addr, sizeof(client_addr))
+            (struct sockaddr*)&client_addr, sizeof(client_addr))
         < 0) {
         stat.send_to_client_error++;
         printf("Can't send to client %s\n", strerror(errno));
@@ -157,7 +157,7 @@ void* client_data(__attribute__((unused)) void* arg)
     }
 
     if (bind(repeater_client_socket, (struct sockaddr*)&repeater_client_addr,
-        sizeof(repeater_client_addr))
+            sizeof(repeater_client_addr))
         < 0) {
         printf("Can't bind to the port for listen from client :%s\n", strerror(errno));
         exit(EXIT_FAILURE);
@@ -175,7 +175,7 @@ void* client_data(__attribute__((unused)) void* arg)
 
     uint32_t DNS_socket_num = 0;
     while (1) {
-        while (poll(&fd_in, 1, POLL_SLEEP_TIME) < 1) {}
+        while (poll(&fd_in, 1, POLL_SLEEP_TIME) < 1) { }
 
         if ((fd_in.revents & POLLIN) == 0) {
             continue;
@@ -226,7 +226,7 @@ void* client_data(__attribute__((unused)) void* arg)
 
         DNS_socket_num = (DNS_socket_num + 1) % DNS_SOCKET_COUNT;
         if (sendto(repeater_DNS_socket[DNS_socket_num], receive_msg.packet, receive_msg.packet_size, 0,
-            (struct sockaddr*)&dns_addr, sizeof(dns_addr))
+                (struct sockaddr*)&dns_addr, sizeof(dns_addr))
             < 0) {
             stat.send_to_dns_error++;
             printf("Can't send to DNS :%s\n", strerror(errno));

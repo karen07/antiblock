@@ -221,8 +221,8 @@ void init_route_socket(void)
     uint32_t irtt;
 
     while (fscanf(route_fd, "%s %x %x %x %x %x %x %x %x %x %x",
-        iface, &dest_ip, &gate_ip, &flags,
-        &refcnt, &use, &metric, &mask, &mtu, &window, &irtt)
+               iface, &dest_ip, &gate_ip, &flags,
+               &refcnt, &use, &metric, &mask, &mtu, &window, &irtt)
         != EOF) {
         if ((gate_ip == inet_addr(VPN_IP)) && (mask == inet_addr(VPN_MASK))) {
             del_ip_from_route_table(dest_ip, 0);
