@@ -7,8 +7,6 @@
 #define CNAME_URLS_MAP_MAX_SIZE 10000
 #define PACKETS_RING_BUFFER_MAX_SIZE 1000
 
-#define DNS_SOCKET_COUNT 10
-
 #define POLL_SLEEP_TIME 1000
 #define STAT_PRINT_TIME 10
 #define TTL_CHECK_TIME 60
@@ -23,9 +21,5 @@
 #define REPEATER_DNS_IP "0.0.0.0"
 
 #define DNS_PORT 53
-#define DNS_IP "1.1.1.1"
 
-#define VPN_IP "10.8.0.5"
 #define VPN_MASK "255.255.255.255"
-
-#define FILES_FOLDER "/smb/"

@@ -5,7 +5,7 @@
 #include "stat.h"
 
 id_map_t* id_map;
-int32_t repeater_DNS_socket[DNS_SOCKET_COUNT];
+int32_t repeater_DNS_socket;
 int32_t repeater_client_socket;
 
 void* DNS_data(__attribute__((unused)) void* arg)
@@ -18,90 +18,85 @@ void* DNS_data(__attribute__((unused)) void* arg)
 
     uint32_t receive_DNS_addr_length = sizeof(receive_DNS_addr);
 
-    struct pollfd fd_DNS[DNS_SOCKET_COUNT];
+    struct pollfd fd_DNS;
 
-    for (int32_t i = 0; i < DNS_SOCKET_COUNT; i++) {
-        repeater_DNS_socket[i] = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
-        if (repeater_DNS_socket[i] < 0) {
-            printf("Can't create socket for listen from DNS :%s\n", strerror(errno));
-            exit(EXIT_FAILURE);
-        }
-
-        repeater_DNS_addr.sin_port = htons(REPEATER_DNS_PORT + 10 * i);
-        if (bind(repeater_DNS_socket[i], (struct sockaddr*)&repeater_DNS_addr,
-                sizeof(repeater_DNS_addr))
-            < 0) {
-            printf("Can't bind to the port for listen from DNS :%s\n", strerror(errno));
-            exit(EXIT_FAILURE);
-        }
-
-        fd_DNS[i].fd = repeater_DNS_socket[i];
-        fd_DNS[i].events = POLLIN;
+    repeater_DNS_socket = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
+    if (repeater_DNS_socket < 0) {
+        printf("Can't create socket for listen from DNS :%s\n", strerror(errno));
+        exit(EXIT_FAILURE);
     }
+
+    if (bind(repeater_DNS_socket, (struct sockaddr*)&repeater_DNS_addr,
+            sizeof(repeater_DNS_addr))
+        < 0) {
+        printf("Can't bind to the port for listen from DNS :%s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    fd_DNS.fd = repeater_DNS_socket;
+    fd_DNS.events = POLLIN;
 
     pthread_barrier_wait(&threads_barrier);
 
     char* receive_msg;
     int32_t receive_msg_len = 0;
     while (1) {
-        while (poll(fd_DNS, DNS_SOCKET_COUNT, POLL_SLEEP_TIME) < 1) { }
+        while (poll(&fd_DNS, 1, POLL_SLEEP_TIME) < 1) { }
 
-        for (int32_t i = 0; i < DNS_SOCKET_COUNT; i++) {
-            if ((fd_DNS[i].revents & POLLIN) == 0) {
-                continue;
-            }
-
-            fd_DNS[i].revents = 0;
-
-            int32_t remain_div = packets_ring_buffer_end % packets_ring_buffer_size;
-            if (packets_ring_buffer[remain_div].packet_size > 0) {
-                send_packet(remain_div);
-                stat.packets_ring_buffer_error++;
-            }
-            packets_ring_buffer[remain_div].packet_size = 0;
-
-            receive_msg = packets_ring_buffer[remain_div].packet;
-            receive_msg_len = recvfrom(repeater_DNS_socket[i], receive_msg, PACKET_MAX_SIZE, 0,
-                (struct sockaddr*)&receive_DNS_addr, &receive_DNS_addr_length);
-
-            if (receive_msg_len < (int32_t)sizeof(dns_header_t)) {
-                continue;
-            }
-
-            dns_header_t* header = (dns_header_t*)receive_msg;
-
-            uint16_t id = ntohs(header->id);
-            uint16_t flags = ntohs(header->flags);
-
-            if ((flags & FIRST_BIT) == 0) {
-                continue;
-            }
-
-            struct timeval now_timeval;
-            gettimeofday(&now_timeval, NULL);
-            uint64_t now_us = now_timeval.tv_sec * MIL + now_timeval.tv_usec;
-            uint64_t delta_t = ID_CHECK_TIME * MIL;
-            if (now_us > id_map[id].send_time + delta_t) {
-                stat.from_dns_error++;
-                continue;
-            }
-
-            char* url_start = &receive_msg[sizeof(dns_header_t)];
-            uint32_t url_hash = djb33_hash_len(url_start, receive_msg_len - sizeof(dns_header_t));
-            if (url_hash != id_map[id].url_hash) {
-                stat.from_dns_error++;
-                continue;
-            }
-
-            stat.rec_from_dns++;
-
-            packets_ring_buffer[remain_div].packet_size = receive_msg_len;
-
-            pthread_mutex_lock(&packets_ring_buffer_mutex);
-            packets_ring_buffer_end++;
-            pthread_cond_signal(&packets_ring_buffer_step);
-            pthread_mutex_unlock(&packets_ring_buffer_mutex);
+        if ((fd_DNS.revents & POLLIN) == 0) {
+            continue;
         }
+
+        fd_DNS.revents = 0;
+
+        int32_t remain_div = packets_ring_buffer_end % packets_ring_buffer_size;
+        if (packets_ring_buffer[remain_div].packet_size > 0) {
+            send_packet(remain_div);
+            stat.packets_ring_buffer_error++;
+        }
+        packets_ring_buffer[remain_div].packet_size = 0;
+
+        receive_msg = packets_ring_buffer[remain_div].packet;
+        receive_msg_len = recvfrom(repeater_DNS_socket, receive_msg, PACKET_MAX_SIZE, 0,
+            (struct sockaddr*)&receive_DNS_addr, &receive_DNS_addr_length);
+
+        if (receive_msg_len < (int32_t)sizeof(dns_header_t)) {
+            continue;
+        }
+
+        dns_header_t* header = (dns_header_t*)receive_msg;
+
+        uint16_t id = ntohs(header->id);
+        uint16_t flags = ntohs(header->flags);
+
+        if ((flags & FIRST_BIT) == 0) {
+            continue;
+        }
+
+        struct timeval now_timeval;
+        gettimeofday(&now_timeval, NULL);
+        uint64_t now_us = now_timeval.tv_sec * MIL + now_timeval.tv_usec;
+        uint64_t delta_t = ID_CHECK_TIME * MIL;
+        if (now_us > id_map[id].send_time + delta_t) {
+            stat.from_dns_error++;
+            continue;
+        }
+
+        char* url_start = &receive_msg[sizeof(dns_header_t)];
+        uint32_t url_hash = djb33_hash_len(url_start, receive_msg_len - sizeof(dns_header_t));
+        if (url_hash != id_map[id].url_hash) {
+            stat.from_dns_error++;
+            continue;
+        }
+
+        stat.rec_from_dns++;
+
+        packets_ring_buffer[remain_div].packet_size = receive_msg_len;
+
+        pthread_mutex_lock(&packets_ring_buffer_mutex);
+        packets_ring_buffer_end++;
+        pthread_cond_signal(&packets_ring_buffer_step);
+        pthread_mutex_unlock(&packets_ring_buffer_mutex);
     }
 
     return NULL;
@@ -146,7 +141,7 @@ void* client_data(__attribute__((unused)) void* arg)
 
     dns_addr.sin_family = AF_INET;
     dns_addr.sin_port = htons(DNS_PORT);
-    dns_addr.sin_addr.s_addr = inet_addr(DNS_IP);
+    dns_addr.sin_addr.s_addr = inet_addr(dns_ip);
 
     uint32_t receive_client_addr_length = sizeof(receive_client_addr);
 
@@ -173,7 +168,6 @@ void* client_data(__attribute__((unused)) void* arg)
 
     packet_t receive_msg;
 
-    uint32_t DNS_socket_num = 0;
     while (1) {
         while (poll(&fd_in, 1, POLL_SLEEP_TIME) < 1) { }
 
@@ -224,8 +218,7 @@ void* client_data(__attribute__((unused)) void* arg)
 
         new_id = (new_id + 1) % ID_MAP_MAX_SIZE;
 
-        DNS_socket_num = (DNS_socket_num + 1) % DNS_SOCKET_COUNT;
-        if (sendto(repeater_DNS_socket[DNS_socket_num], receive_msg.packet, receive_msg.packet_size, 0,
+        if (sendto(repeater_DNS_socket, receive_msg.packet, receive_msg.packet_size, 0,
                 (struct sockaddr*)&dns_addr, sizeof(dns_addr))
             < 0) {
             stat.send_to_dns_error++;

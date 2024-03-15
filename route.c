@@ -192,7 +192,7 @@ void init_route_socket(void)
     struct sockaddr_in* route_addr;
     route_addr = (struct sockaddr_in*)&route.rt_gateway;
     route_addr->sin_family = AF_INET;
-    route_addr->sin_addr.s_addr = inet_addr(VPN_IP);
+    route_addr->sin_addr.s_addr = inet_addr(route_ip);
 
     route_addr = (struct sockaddr_in*)&route.rt_genmask;
     route_addr->sin_family = AF_INET;
@@ -224,7 +224,7 @@ void init_route_socket(void)
                iface, &dest_ip, &gate_ip, &flags,
                &refcnt, &use, &metric, &mask, &mtu, &window, &irtt)
         != EOF) {
-        if ((gate_ip == inet_addr(VPN_IP)) && (mask == inet_addr(VPN_MASK))) {
+        if ((gate_ip == inet_addr(route_ip)) && (mask == inet_addr(VPN_MASK))) {
             del_ip_from_route_table(dest_ip, 0);
         }
     }

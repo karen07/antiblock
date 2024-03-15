@@ -15,9 +15,17 @@
 #include <unistd.h>
 
 extern pthread_barrier_t threads_barrier;
+
 extern int32_t is_log_print;
 extern int32_t is_stat_print;
 extern int32_t is_domains_file_url;
 extern int32_t is_domains_file_path;
-extern char domains_file_url[1000];
-extern char domains_file_path[1000];
+extern int32_t is_route_ip;
+extern int32_t is_log_or_stat_path;
+
+extern char domains_file_url[PATH_MAX];
+extern char domains_file_path[PATH_MAX];
+extern char log_or_stat_folder[PATH_MAX];
+
+extern char route_ip[20];
+extern char dns_ip[20];

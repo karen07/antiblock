@@ -9,7 +9,7 @@ typedef struct id_map {
 } __attribute__((packed)) id_map_t;
 
 extern id_map_t* id_map;
-extern int32_t repeater_DNS_socket[DNS_SOCKET_COUNT];
+extern int32_t repeater_DNS_socket;
 extern int32_t repeater_client_socket;
 
 void* DNS_data(void* arg);
