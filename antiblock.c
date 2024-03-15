@@ -8,12 +8,21 @@
 #include "urls_read.h"
 
 pthread_barrier_t threads_barrier;
+
 int32_t is_log_print;
 int32_t is_stat_print;
 int32_t is_domains_file_url;
 int32_t is_domains_file_path;
-char domains_file_url[1000];
-char domains_file_path[1000];
+int32_t is_route_ip;
+int32_t is_dns_ip;
+int32_t is_log_or_stat_path;
+
+char domains_file_url[PATH_MAX];
+char domains_file_path[PATH_MAX];
+char log_or_stat_folder[PATH_MAX];
+
+char route_ip[20];
+char dns_ip[20];
 
 int main(int argc, char* argv[])
 {
@@ -26,7 +35,7 @@ int main(int argc, char* argv[])
         }
         if (!strcmp(argv[i], "-url")) {
             if (i != argc - 1) {
-                if (strlen(argv[i + 1]) < 1000) {
+                if (strlen(argv[i + 1]) < PATH_MAX) {
                     is_domains_file_url = 1;
                     strcpy(domains_file_url, argv[i + 1]);
                 }
@@ -34,9 +43,33 @@ int main(int argc, char* argv[])
         }
         if (!strcmp(argv[i], "-file")) {
             if (i != argc - 1) {
-                if (strlen(argv[i + 1]) < 1000) {
+                if (strlen(argv[i + 1]) < PATH_MAX) {
                     is_domains_file_path = 1;
                     strcpy(domains_file_path, argv[i + 1]);
+                }
+            }
+        }
+        if (!strcmp(argv[i], "-o")) {
+            if (i != argc - 1) {
+                if (strlen(argv[i + 1]) < PATH_MAX) {
+                    is_log_or_stat_path = 1;
+                    strcpy(log_or_stat_folder, argv[i + 1]);
+                }
+            }
+        }
+        if (!strcmp(argv[i], "-route_IP")) {
+            if (i != argc - 1) {
+                if (strlen(argv[i + 1]) < 20) {
+                    is_route_ip = 1;
+                    strcpy(route_ip, argv[i + 1]);
+                }
+            }
+        }
+        if (!strcmp(argv[i], "-DNS_IP")) {
+            if (i != argc - 1) {
+                if (strlen(argv[i + 1]) < 20) {
+                    is_dns_ip = 1;
+                    strcpy(dns_ip, argv[i + 1]);
                 }
             }
         }
@@ -44,14 +77,34 @@ int main(int argc, char* argv[])
             printf("-log         Show operations log\n"
                    "-stat        Show statistics data\n"
                    "-url         Domains file url\n"
-                   "-file        Domains file path\n");
+                   "-file        Domains file path\n"
+                   "-route_IP    Route IP\n"
+                   "-o           Log or statistics output folder\n"
+                   "-DNS_IP      DNS IP\n");
             exit(EXIT_FAILURE);
         }
+    }
+
+    if (!is_route_ip) {
+        printf("Programm need route IP\n");
+        exit(EXIT_FAILURE);
     }
 
     if (!(is_domains_file_url || is_domains_file_path)) {
         printf("Programm need domains file url or domains file path\n");
         exit(EXIT_FAILURE);
+    }
+
+    if (!is_dns_ip) {
+        printf("Programm need DNS IP\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (is_log_print || is_stat_print) {
+        if (!is_log_or_stat_path) {
+            printf("Programm need output folder for log or statistics\n");
+            exit(EXIT_FAILURE);
+        }
     }
 
     if (is_stat_print) {

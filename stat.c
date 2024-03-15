@@ -45,7 +45,9 @@ void init_stat_print_thread(void)
     memset(&stat, 0, sizeof(stat));
 
     if (is_log_print) {
-        log_fd = fopen(FILES_FOLDER "log.txt", "w");
+        char log_path[PATH_MAX];
+        sprintf(log_path, "%s%s", log_or_stat_folder, "/log.txt");
+        log_fd = fopen(log_path, "w");
         if (log_fd == NULL) {
             printf("Can't open log file\n");
             exit(EXIT_FAILURE);
@@ -53,7 +55,9 @@ void init_stat_print_thread(void)
     }
 
     if (is_stat_print) {
-        stat_fd = fopen(FILES_FOLDER "stat.txt", "w");
+        char stat_path[PATH_MAX];
+        sprintf(stat_path, "%s%s", log_or_stat_folder, "/stat.txt");
+        stat_fd = fopen(stat_path, "w");
         if (stat_fd == NULL) {
             printf("Can't open stat file\n");
             exit(EXIT_FAILURE);
