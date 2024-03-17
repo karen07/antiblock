@@ -13,7 +13,7 @@ void* DNS_data(__attribute__((unused)) void* arg)
     struct sockaddr_in repeater_DNS_addr, receive_DNS_addr;
 
     repeater_DNS_addr.sin_family = AF_INET;
-    repeater_DNS_addr.sin_port = htons(REPEATER_DNS_PORT);
+    repeater_DNS_addr.sin_port = htons(listen_port + 1);
     repeater_DNS_addr.sin_addr.s_addr = inet_addr(REPEATER_DNS_IP);
 
     uint32_t receive_DNS_addr_length = sizeof(receive_DNS_addr);
@@ -75,8 +75,8 @@ void* DNS_data(__attribute__((unused)) void* arg)
 
         struct timeval now_timeval;
         gettimeofday(&now_timeval, NULL);
-        uint64_t now_us = now_timeval.tv_sec * MIL + now_timeval.tv_usec;
-        uint64_t delta_t = ID_CHECK_TIME * MIL;
+        uint64_t now_us = now_timeval.tv_sec * 1000000 + now_timeval.tv_usec;
+        uint64_t delta_t = ID_CHECK_TIME * 1000000;
         if (now_us > id_map[id].send_time + delta_t) {
             stat.from_dns_error++;
             continue;
@@ -136,11 +136,11 @@ void* client_data(__attribute__((unused)) void* arg)
     struct sockaddr_in repeater_client_addr, dns_addr, receive_client_addr;
 
     repeater_client_addr.sin_family = AF_INET;
-    repeater_client_addr.sin_port = htons(REPEATER_CLIENT_PORT);
+    repeater_client_addr.sin_port = htons(listen_port);
     repeater_client_addr.sin_addr.s_addr = inet_addr(REPEATER_CLIENT_IP);
 
     dns_addr.sin_family = AF_INET;
-    dns_addr.sin_port = htons(DNS_PORT);
+    dns_addr.sin_port = htons(dns_port);
     dns_addr.sin_addr.s_addr = inet_addr(dns_ip);
 
     uint32_t receive_client_addr_length = sizeof(receive_client_addr);
@@ -195,8 +195,8 @@ void* client_data(__attribute__((unused)) void* arg)
 
         struct timeval now_timeval;
         gettimeofday(&now_timeval, NULL);
-        uint64_t now_us = now_timeval.tv_sec * MIL + now_timeval.tv_usec;
-        uint64_t delta_t = (ID_CHECK_TIME + 1) * MIL;
+        uint64_t now_us = now_timeval.tv_sec * 1000000 + now_timeval.tv_usec;
+        uint64_t delta_t = (ID_CHECK_TIME + 1) * 1000000;
         if (now_us < id_map[new_id].send_time + delta_t) {
             stat.from_client_error++;
             new_id = (new_id + 1) % ID_MAP_MAX_SIZE;
@@ -213,7 +213,7 @@ void* client_data(__attribute__((unused)) void* arg)
         id_map[new_id].port = receive_client_addr.sin_port;
         id_map[new_id].client_id = id;
         gettimeofday(&now_timeval, NULL);
-        now_us = now_timeval.tv_sec * MIL + now_timeval.tv_usec;
+        now_us = now_timeval.tv_sec * 1000000 + now_timeval.tv_usec;
         id_map[new_id].send_time = now_us;
 
         new_id = (new_id + 1) % ID_MAP_MAX_SIZE;

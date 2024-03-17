@@ -1,5 +1,4 @@
 #include "config.h"
-#include "const.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <limits.h>
@@ -27,5 +26,8 @@ extern char domains_file_url[PATH_MAX];
 extern char domains_file_path[PATH_MAX];
 extern char log_or_stat_folder[PATH_MAX];
 
-extern char route_ip[20];
-extern char dns_ip[20];
+extern char route_ip[IP4_STR_MAX_SIZE];
+extern char dns_ip[IP4_STR_MAX_SIZE];
+
+extern int32_t dns_port;
+extern int32_t listen_port;
