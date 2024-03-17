@@ -111,7 +111,7 @@ void* urls_read(__attribute__((unused)) void* arg)
 
         urls = chunk.response;
 
-        if (urls_web_file_size > 0) {
+        if (chunk.size > 0) {
             int32_t urls_map_size = 0;
             for (int32_t i = 0; i < chunk.size; i++) {
                 if (urls[i] == '\n') {
