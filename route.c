@@ -9,12 +9,12 @@ void add_url_cname(char* ans_url, time_t check_time, char* data_url)
     stat.now_cname_url_count++;
 
     if (log_fd) {
-        char now_time_str[200];
+        char now_time_str[DATE_STR_MAX_SIZE];
         time_t now = time(NULL);
         struct tm* tm_struct = localtime(&now);
         sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-        char time_str[200];
+        char time_str[DATE_STR_MAX_SIZE];
         tm_struct = localtime(&check_time);
         sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
@@ -26,12 +26,12 @@ void add_url_cname(char* ans_url, time_t check_time, char* data_url)
 void update_url_cname(char* ans_url, time_t check_time, char* data_url)
 {
     if (log_fd) {
-        char now_time_str[200];
+        char now_time_str[DATE_STR_MAX_SIZE];
         time_t now = time(NULL);
         struct tm* tm_struct = localtime(&now);
         sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-        char time_str[200];
+        char time_str[DATE_STR_MAX_SIZE];
         tm_struct = localtime(&check_time);
         sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
@@ -45,12 +45,12 @@ void del_url_cname(char* data_url, time_t check_time)
     stat.now_cname_url_count--;
 
     if (log_fd) {
-        char now_time_str[200];
+        char now_time_str[DATE_STR_MAX_SIZE];
         time_t now = time(NULL);
         struct tm* tm_struct = localtime(&now);
         sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-        char time_str[200];
+        char time_str[DATE_STR_MAX_SIZE];
         tm_struct = localtime(&check_time);
         sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
@@ -77,15 +77,15 @@ void add_ip_to_route_table(uint32_t ip, time_t check_time, char* url)
     stat.now_in_route_table++;
 
     if (log_fd) {
-        char ip_str[200];
+        char ip_str[IP4_STR_MAX_SIZE];
         sprintf(ip_str, "%s", inet_ntoa(rec_ip));
 
-        char now_time_str[200];
+        char now_time_str[DATE_STR_MAX_SIZE];
         time_t now = time(NULL);
         struct tm* tm_struct = localtime(&now);
         sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-        char time_str[200];
+        char time_str[DATE_STR_MAX_SIZE];
         tm_struct = localtime(&check_time);
         sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
@@ -100,15 +100,15 @@ void update_ip_in_route_table(uint32_t ip, time_t check_time, char* url)
         struct in_addr rec_ip;
         rec_ip.s_addr = ip;
 
-        char ip_str[200];
+        char ip_str[IP4_STR_MAX_SIZE];
         sprintf(ip_str, "%s", inet_ntoa(rec_ip));
 
-        char now_time_str[200];
+        char now_time_str[DATE_STR_MAX_SIZE];
         time_t now = time(NULL);
         struct tm* tm_struct = localtime(&now);
         sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-        char time_str[200];
+        char time_str[DATE_STR_MAX_SIZE];
         tm_struct = localtime(&check_time);
         sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
@@ -125,15 +125,15 @@ void not_block_ip_in_route_table(uint32_t ip, time_t check_time, char* url)
     stat.route_not_block_ip_count++;
 
     if (log_fd) {
-        char ip_str[200];
+        char ip_str[IP4_STR_MAX_SIZE];
         sprintf(ip_str, "%s", inet_ntoa(rec_ip));
 
-        char now_time_str[200];
+        char now_time_str[DATE_STR_MAX_SIZE];
         time_t now = time(NULL);
         struct tm* tm_struct = localtime(&now);
         sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-        char time_str[200];
+        char time_str[DATE_STR_MAX_SIZE];
         tm_struct = localtime(&check_time);
         sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
@@ -162,15 +162,15 @@ void del_ip_from_route_table(uint32_t ip, time_t check_time)
     stat.now_in_route_table--;
 
     if (log_fd) {
-        char ip_str[200];
+        char ip_str[IP4_STR_MAX_SIZE];
         sprintf(ip_str, "%s", inet_ntoa(rec_ip));
 
-        char now_time_str[200];
+        char now_time_str[DATE_STR_MAX_SIZE];
         time_t now = time(NULL);
         struct tm* tm_struct = localtime(&now);
         sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
-        char time_str[200];
+        char time_str[DATE_STR_MAX_SIZE];
         tm_struct = localtime(&check_time);
         sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 

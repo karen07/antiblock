@@ -47,7 +47,7 @@ int32_t get_url_from_packet(char* packet_start, char* hand_point, char* receive_
     int32_t url_len = 0;
     url[url_len++] = '.';
 
-    while ((*hand_point != 0) && ((*hand_point & 0xc0) != 0xc0)) {
+    while ((*hand_point != 0) && ((*hand_point & FIRST_TWO_BITS) != FIRST_TWO_BITS)) {
         uint32_t part_len = *hand_point++;
         if (hand_point + part_len > receive_msg_end) {
             return -1;
@@ -64,7 +64,7 @@ int32_t get_url_from_packet(char* packet_start, char* hand_point, char* receive_
         *first_len = url_len + 1;
     }
 
-    if ((*hand_point & 0xc0) == 0xc0) {
+    if ((*hand_point & FIRST_TWO_BITS) == FIRST_TWO_BITS) {
         url_len--;
         int new_len;
         new_len = get_url_from_packet(packet_start, packet_start + *(hand_point + 1), receive_msg_end, &url[url_len], 0);
