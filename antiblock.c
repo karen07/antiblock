@@ -5,6 +5,7 @@
 #include "route.h"
 #include "stat.h"
 #include "ttl_check.h"
+#include "tun.h"
 #include "urls_read.h"
 
 pthread_barrier_t threads_barrier;
@@ -18,8 +19,8 @@ int32_t is_dns_ip;
 int32_t is_log_or_stat_path;
 
 char domains_file_url[PATH_MAX];
-char domains_file_path[PATH_MAX];
-char log_or_stat_folder[PATH_MAX];
+char domains_file_path[PATH_MAX - 100];
+char log_or_stat_folder[PATH_MAX - 100];
 
 char route_ip[IP4_STR_MAX_SIZE];
 char dns_ip[IP4_STR_MAX_SIZE];
@@ -65,7 +66,7 @@ int main(int argc, char* argv[])
         }
         if (!strcmp(argv[i], "-file")) {
             if (i != argc - 1) {
-                if (strlen(argv[i + 1]) < PATH_MAX) {
+                if (strlen(argv[i + 1]) < PATH_MAX - 100) {
                     is_domains_file_path = 1;
                     strcpy(domains_file_path, argv[i + 1]);
                 }
@@ -75,7 +76,7 @@ int main(int argc, char* argv[])
         }
         if (!strcmp(argv[i], "-output")) {
             if (i != argc - 1) {
-                if (strlen(argv[i + 1]) < PATH_MAX) {
+                if (strlen(argv[i + 1]) < PATH_MAX - 100) {
                     is_log_or_stat_path = 1;
                     strcpy(log_or_stat_folder, argv[i + 1]);
                 }
@@ -186,6 +187,8 @@ int main(int argc, char* argv[])
     init_dns_ans_check_thread();
 
     init_data_threads();
+
+    init_tun_thread();
 
     pthread_barrier_wait(&threads_barrier);
 
