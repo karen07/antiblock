@@ -5,6 +5,7 @@
 #include "route.h"
 #include "stat.h"
 #include "ttl_check.h"
+#include "tun.h"
 #include "urls_read.h"
 
 pthread_mutex_t packets_ring_buffer_mutex;
@@ -195,7 +196,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             }
 
             if (type == 1) {
-                ttl_map_t add_elem;
+                /*ttl_map_t add_elem;
                 add_elem.ip = ans->ip4;
                 add_elem.end_time = check_time;
 
@@ -214,6 +215,25 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                     if (find_res == 1) {
                         not_block_ip_in_route_table(elem.ip, elem.end_time, ans_url + 1);
                     }
+                }*/
+
+                if (blocked_url_flag) {
+                    char str1[INET_ADDRSTRLEN];
+                    uint32_t start_subnet_ip_n = htonl(start_subnet_ip++);
+                    inet_ntop(AF_INET, &start_subnet_ip_n, str1, INET_ADDRSTRLEN);
+
+                    char str2[INET_ADDRSTRLEN];
+                    inet_ntop(AF_INET, &ans->ip4, str2, INET_ADDRSTRLEN);
+
+                    printf("BLOCK:%s %s %s\n", str1, str2, ans_url + 1);
+
+                    ip_ip_map_t add_elem;
+                    add_elem.ip_local = start_subnet_ip_n;
+                    add_elem.ip_global = ans->ip4;
+
+                    array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, NULL);
+
+                    ans->ip4 = start_subnet_ip_n;
                 }
             }
 

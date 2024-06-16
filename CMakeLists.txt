@@ -1,12 +1,8 @@
-cmake_minimum_required(VERSION 2.6)
-
+cmake_minimum_required(VERSION 3.25)
 project(antiblock)
-
+add_compile_options(-Wall -Werror)
 add_subdirectory(hashmap)
-
 include_directories(include hashmap/include) 
-add_executable(antiblock antiblock.c dns_ans.c hash.c net_data.c route.c stat.c ttl_check.c urls_read.c)
-
+add_executable(antiblock antiblock.c dns_ans.c hash.c net_data.c route.c stat.c ttl_check.c urls_read.c tun.c)
 target_link_libraries(antiblock hashmap curl)
-
 install(TARGETS hashmap RUNTIME DESTINATION /usr/bin/)
