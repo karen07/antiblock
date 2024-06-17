@@ -21,7 +21,15 @@ typedef struct ip_ip_map {
     uint32_t ip_global;
 } ip_ip_map_t;
 
+typedef struct nat_map {
+    uint32_t dst_ip;
+    uint16_t src_port;
+    uint32_t src_ip;
+} __attribute__((packed)) nat_map_t;
+
 extern const array_hashmap_t* ip_ip_map_struct;
+extern const array_hashmap_t* nat_map_struct;
+
 extern uint32_t start_subnet_ip;
 
 int tun_alloc(char* dev, int flags);
