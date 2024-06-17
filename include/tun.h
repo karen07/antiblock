@@ -10,7 +10,7 @@ typedef struct pseudo_header {
     uint32_t source_address;
     uint32_t dest_address;
     uint16_t protocol;
-    uint16_t tcp_length;
+    uint16_t length;
 } __attribute__((packed)) pseudo_header_t;
 
 typedef struct ip_ip_map {
