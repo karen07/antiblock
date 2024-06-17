@@ -1,6 +1,9 @@
 #include "tun.h"
+#include "hash.h"
 
 const array_hashmap_t* ip_ip_map_struct;
+const array_hashmap_t* nat_map_struct;
+
 uint32_t start_subnet_ip;
 
 int tun_alloc(char* dev, int flags)
@@ -71,10 +74,26 @@ int32_t ip_ip_cmp(const void* void_elem1, const void* void_elem2)
     }
 }
 
+uint32_t nat_hash(const void* void_elem)
+{
+    const nat_map_t* elem = void_elem;
+    return djb33_hash_len((const char*)elem, 6);
+}
+
+int32_t nat_cmp(const void* void_elem1, const void* void_elem2)
+{
+    const nat_map_t* elem1 = void_elem1;
+    const nat_map_t* elem2 = void_elem2;
+
+    if ((elem1->dst_ip == elem2->dst_ip) && (elem1->src_port == elem2->src_port)) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 void* tun(__attribute__((unused)) void* arg)
 {
-    uint32_t tmp = 0;
-
     int tap_fd;
     char tun_name[IFNAMSIZ];
     char buffer[4096];
@@ -123,18 +142,39 @@ void* tun(__attribute__((unused)) void* arg)
                 // printf("DST_PORT:%d ", dst_port);
 
                 if (iph->daddr & 0b00000000100000000000000000000000) {
+                    nat_map_t find_elem;
+                    find_elem.dst_ip = iph->saddr;
+                    find_elem.src_port = tcph->dest;
+
+                    nat_map_t res_elem;
+                    int32_t find_elem_flag = array_hashmap_find_elem(nat_map_struct, &find_elem, &res_elem);
+
+                    if (find_elem_flag != 1) {
+                        continue;
+                    }
+
                     iph->saddr = iph->daddr & (~0b00000000100000000000000000000000);
-                    iph->daddr = tmp;
+                    iph->daddr = res_elem.src_ip;
                 } else {
-                    ip_ip_map_t add_elem;
-                    ip_ip_map_t elem;
+                    ip_ip_map_t find_elem;
+                    find_elem.ip_local = iph->daddr;
 
-                    add_elem.ip_local = iph->daddr;
-                    array_hashmap_find_elem(ip_ip_map_struct, &add_elem, &elem);
+                    ip_ip_map_t res_elem;
+                    int32_t find_elem_flag = array_hashmap_find_elem(ip_ip_map_struct, &find_elem, &res_elem);
 
-                    tmp = iph->saddr;
+                    if (find_elem_flag != 1) {
+                        continue;
+                    }
+
+                    nat_map_t add_elem_nat;
+                    add_elem_nat.dst_ip = res_elem.ip_global;
+                    add_elem_nat.src_port = tcph->source;
+                    add_elem_nat.src_ip = iph->saddr;
+
+                    array_hashmap_add_elem(nat_map_struct, &add_elem_nat, NULL, NULL);
+
                     iph->saddr = iph->daddr | (0b00000000100000000000000000000000);
-                    iph->daddr = elem.ip_global;
+                    iph->daddr = res_elem.ip_global;
                 }
 
                 iph->check = 0;
@@ -167,13 +207,21 @@ void init_tun_thread(void)
 {
     start_subnet_ip = ntohl(inet_addr("10.7.1.2"));
 
-    ip_ip_map_struct = init_array_hashmap(1000, 1.0, sizeof(ip_ip_map_t));
+    ip_ip_map_struct = init_array_hashmap(LOC_TO_GLOBIP_MAP_MAX_SIZE, 1.0, sizeof(ip_ip_map_t));
     if (ip_ip_map_struct == NULL) {
         printf("No free memory for ip_ip_map_struct\n");
         exit(EXIT_FAILURE);
     }
 
     array_hashmap_set_func(ip_ip_map_struct, ip_ip_hash, ip_ip_cmp, ip_ip_hash, ip_ip_cmp);
+
+    nat_map_struct = init_array_hashmap(NAT_MAP_MAX_SIZE, 1.0, sizeof(nat_map_t));
+    if (nat_map_struct == NULL) {
+        printf("No free memory for nat_map_struct\n");
+        exit(EXIT_FAILURE);
+    }
+
+    array_hashmap_set_func(nat_map_struct, nat_hash, nat_cmp, nat_hash, nat_cmp);
 
     pthread_t tun_thread;
     if (pthread_create(&tun_thread, NULL, tun, NULL)) {
