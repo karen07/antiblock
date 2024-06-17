@@ -9,6 +9,7 @@
 #include <linux/ip.h>
 #include <linux/limits.h>
 #include <linux/tcp.h>
+#include <linux/udp.h>
 #include <net/route.h>
 #include <poll.h>
 #include <pthread.h>

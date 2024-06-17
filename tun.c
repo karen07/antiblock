@@ -111,95 +111,113 @@ void* tun(__attribute__((unused)) void* arg)
         int nread = read(tap_fd, buffer, sizeof(buffer));
         if (nread < 0) {
             printf("Can't read from interface\n");
-            close(tap_fd);
             exit(EXIT_FAILURE);
         }
 
         tun_header_t* tun_header = (tun_header_t*)buffer;
+
         int proto_L3 = ntohs(tun_header->proto);
-
-        // printf("nread:%d ", nread);
-        // printf("proto:%d ", proto);
-
-        if (proto_L3 == ETH_P_IP) {
-            struct iphdr* iph = (struct iphdr*)(buffer + sizeof(tun_header_t));
-
-            char proto_L4 = iph->protocol;
-            // printf("proto_L3:%d ", proto_L3);
-
-            if (proto_L4 == IPPROTO_TCP) {
-                // char str[INET_ADDRSTRLEN];
-                // inet_ntop(AF_INET, &iph->saddr, str, INET_ADDRSTRLEN);
-                // printf("SRC_IP:%s ", str);
-                // inet_ntop(AF_INET, &iph->daddr, str, INET_ADDRSTRLEN);
-                // rintf("DST_IP:%s ", str);
-
-                struct tcphdr* tcph = (struct tcphdr*)(buffer + sizeof(tun_header_t) + sizeof(struct iphdr));
-
-                // int src_port = ntohs(tcph->source);
-                // printf("SRC_PORT:%d ", src_port);
-                // int dst_port = ntohs(tcph->dest);
-                // printf("DST_PORT:%d ", dst_port);
-
-                if (iph->daddr & 0b00000000100000000000000000000000) {
-                    nat_map_t find_elem;
-                    find_elem.dst_ip = iph->saddr;
-                    find_elem.src_port = tcph->dest;
-
-                    nat_map_t res_elem;
-                    int32_t find_elem_flag = array_hashmap_find_elem(nat_map_struct, &find_elem, &res_elem);
-
-                    if (find_elem_flag != 1) {
-                        continue;
-                    }
-
-                    iph->saddr = iph->daddr & (~0b00000000100000000000000000000000);
-                    iph->daddr = res_elem.src_ip;
-                } else {
-                    ip_ip_map_t find_elem;
-                    find_elem.ip_local = iph->daddr;
-
-                    ip_ip_map_t res_elem;
-                    int32_t find_elem_flag = array_hashmap_find_elem(ip_ip_map_struct, &find_elem, &res_elem);
-
-                    if (find_elem_flag != 1) {
-                        continue;
-                    }
-
-                    nat_map_t add_elem_nat;
-                    add_elem_nat.dst_ip = res_elem.ip_global;
-                    add_elem_nat.src_port = tcph->source;
-                    add_elem_nat.src_ip = iph->saddr;
-
-                    array_hashmap_add_elem(nat_map_struct, &add_elem_nat, NULL, NULL);
-
-                    iph->saddr = iph->daddr | (0b00000000100000000000000000000000);
-                    iph->daddr = res_elem.ip_global;
-                }
-
-                iph->check = 0;
-                tcph->check = 0;
-
-                uint16_t tcp_len = ntohs(iph->tot_len) - (iph->ihl << 2);
-
-                pseudo_header_t psh;
-                psh.source_address = iph->saddr;
-                psh.dest_address = iph->daddr;
-                psh.protocol = htons(IPPROTO_TCP);
-                psh.tcp_length = htons(tcp_len);
-
-                memcpy(pseudogram, (char*)&psh, sizeof(pseudo_header_t));
-                memcpy(pseudogram + sizeof(pseudo_header_t), tcph, tcp_len);
-
-                int psize = sizeof(pseudo_header_t) + tcp_len;
-
-                tcph->check = checksum((const char*)pseudogram, psize);
-                iph->check = checksum((const char*)(buffer + sizeof(tun_header_t)), iph->ihl << 2);
-
-                write(tap_fd, buffer, nread);
-            }
+        if (proto_L3 != ETH_P_IP) {
+            continue;
         }
-        // printf("\n");
+
+        char* L3_start_pointer = buffer + sizeof(tun_header_t);
+        struct iphdr* iph = (struct iphdr*)L3_start_pointer;
+
+        char proto_L4 = iph->protocol;
+        if ((proto_L4 != IPPROTO_TCP) && (proto_L4 != IPPROTO_UDP)) {
+            continue;
+        }
+
+        uint16_t src_port;
+        uint16_t dst_port;
+
+        char* L4_start_pointer = L3_start_pointer + sizeof(struct iphdr);
+        if (proto_L4 == IPPROTO_TCP) {
+            struct tcphdr* tcph = (struct tcphdr*)L4_start_pointer;
+
+            src_port = tcph->source;
+            dst_port = tcph->dest;
+
+            tcph->check = 0;
+        }
+
+        if (proto_L4 == IPPROTO_UDP) {
+            struct udphdr* udph = (struct udphdr*)L4_start_pointer;
+
+            src_port = udph->source;
+            dst_port = udph->dest;
+
+            udph->check = 0;
+        }
+
+        if (iph->daddr & 0b00000000100000000000000000000000) {
+            nat_map_t find_elem;
+            find_elem.dst_ip = iph->saddr;
+            find_elem.src_port = dst_port;
+
+            nat_map_t res_elem;
+            int32_t find_elem_flag = array_hashmap_find_elem(nat_map_struct, &find_elem, &res_elem);
+
+            if (find_elem_flag != 1) {
+                continue;
+            }
+
+            iph->saddr = iph->daddr & (~0b00000000100000000000000000000000);
+            iph->daddr = res_elem.src_ip;
+        } else {
+            ip_ip_map_t find_elem;
+            find_elem.ip_local = iph->daddr;
+
+            ip_ip_map_t res_elem;
+            int32_t find_elem_flag = array_hashmap_find_elem(ip_ip_map_struct, &find_elem, &res_elem);
+
+            if (find_elem_flag != 1) {
+                continue;
+            }
+
+            nat_map_t add_elem_nat;
+            add_elem_nat.dst_ip = res_elem.ip_global;
+            add_elem_nat.src_port = src_port;
+            add_elem_nat.src_ip = iph->saddr;
+
+            array_hashmap_add_elem(nat_map_struct, &add_elem_nat, NULL, NULL);
+
+            iph->saddr = iph->daddr | (0b00000000100000000000000000000000);
+            iph->daddr = res_elem.ip_global;
+        }
+
+        iph->check = 0;
+
+        uint16_t L4_len = ntohs(iph->tot_len) - (iph->ihl << 2);
+
+        pseudo_header_t psh;
+        psh.source_address = iph->saddr;
+        psh.dest_address = iph->daddr;
+        psh.protocol = htons(proto_L4);
+        psh.length = htons(L4_len);
+
+        memcpy(pseudogram, (char*)&psh, sizeof(pseudo_header_t));
+        memcpy(pseudogram + sizeof(pseudo_header_t), L4_start_pointer, L4_len);
+
+        int psize = sizeof(pseudo_header_t) + L4_len;
+        uint16_t checksum_value = checksum((const char*)pseudogram, psize);
+
+        if (proto_L4 == IPPROTO_TCP) {
+            struct tcphdr* tcph = (struct tcphdr*)L4_start_pointer;
+
+            tcph->check = checksum_value;
+        }
+
+        if (proto_L4 == IPPROTO_UDP) {
+            struct udphdr* udph = (struct udphdr*)L4_start_pointer;
+
+            udph->check = checksum_value;
+        }
+
+        iph->check = checksum(L3_start_pointer, iph->ihl << 2);
+
+        write(tap_fd, buffer, nread);
     }
 }
 
