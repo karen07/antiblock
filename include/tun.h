@@ -1,9 +1,6 @@
 #include "antiblock.h"
 #include "array_hashmap.h"
 
-// ip route add default via 10.8.0.5 dev VPN table 2
-// curl --resolve 2ip.ru:80:10.7.1.2 http://2ip.ru
-
 typedef struct tun_header {
     uint16_t flags;
     uint16_t proto;
