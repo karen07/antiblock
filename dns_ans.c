@@ -225,7 +225,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                     char str2[INET_ADDRSTRLEN];
                     inet_ntop(AF_INET, &ans->ip4, str2, INET_ADDRSTRLEN);
 
-                    printf("BLOCK:%s %s %s\n", str1, str2, ans_url + 1);
+                    printf("BLOCK A:%s %s %s\n", str1, str2, ans_url + 1);
 
                     ip_ip_map_t add_elem;
                     add_elem.ip_local = start_subnet_ip_n;
@@ -248,6 +248,8 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                 cname_urls_map add_elem;
                 add_elem.url = data_url_str;
                 add_elem.end_time = check_time;
+
+                printf("BLOCK CNAME:%s %s\n", data_url_str, ans_url + 1);
 
                 cname_urls_map elem;
                 int32_t new_elem_flag = array_hashmap_add_elem(cname_urls_map_struct, &add_elem, &elem, cname_url_on_collision);
