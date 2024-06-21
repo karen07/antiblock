@@ -110,6 +110,25 @@ int32_t check_url(char* url, int32_t url_len)
     return 0;
 }
 
+struct simple_graph {
+    int32_t url_offet;
+    uint16_t type;
+    uint32_t ttl;
+    int32_t url_offet_or_ip;
+};
+
+void change_to_dns_string_format(char* str, int32_t str_len)
+{
+    int32_t current_pos = str_len;
+
+    for (int i = str_len; i >= 0; i--) {
+        if (str[i] == '.') {
+            str[i] = current_pos - i - 1;
+            current_pos = i;
+        }
+    }
+}
+
 void* dns_ans_check(__attribute__((unused)) void* arg)
 {
     pthread_barrier_wait(&threads_barrier);
@@ -181,9 +200,22 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
         dns_que_t* que = (dns_que_t*)cur_pos_ptr;
 
         uint16_t que_type __attribute__((unused)) = ntohs(que->type);
+        if (que_type != 1) {
+            goto end;
+        }
 
         cur_pos_ptr += sizeof(dns_que_t);
         // QUE DATA
+
+        // GRAPH
+        char* ans_start_prt = cur_pos_ptr;
+
+        char big_data[10000];
+        int32_t big_data_cur_pos = 0;
+
+        struct simple_graph simple_graph[100];
+        int32_t simple_graph_cur_pos = 0;
+        // GRAPH
 
         for (int32_t i = 0; i < ans_count; i++) {
             // ANS URL
@@ -196,7 +228,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                 goto end;
             }
 
-            int32_t block_ans_url_flag = 0;
+            int32_t block_ans_url_flag __attribute__((unused)) = 0;
             block_ans_url_flag = check_url(ans_url, ans_url_len);
 
             cur_pos_ptr += ans_url_pad_len;
@@ -211,10 +243,10 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             dns_ans_t* ans = (dns_ans_t*)cur_pos_ptr;
 
             uint16_t ans_type = ntohs(ans->type);
-            uint32_t ans_ttl = ntohl(ans->ttl);
+            uint32_t ans_ttl __attribute__((unused)) = ntohl(ans->ttl);
             uint16_t ans_len = ntohs(ans->len);
 
-            time_t check_time = time(NULL) + ans_ttl;
+            // time_t check_time = time(NULL) + ans_ttl;
 
             if (cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t) + ans_len > receive_msg_end) {
                 stat.request_parsing_error++;
@@ -222,15 +254,16 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             }
 
             if (ans_type == 1) {
-                if (block_ans_url_flag) {
-                    char str1[INET_ADDRSTRLEN];
+                strcpy(big_data + big_data_cur_pos, ans_url + 1);
+                simple_graph[simple_graph_cur_pos].url_offet = big_data_cur_pos;
+                big_data_cur_pos += ans_url_len;
+                simple_graph[simple_graph_cur_pos].type = 1;
+                simple_graph[simple_graph_cur_pos].ttl = ans->ttl;
+                simple_graph[simple_graph_cur_pos].url_offet_or_ip = ans->ip4;
+                simple_graph_cur_pos++;
+
+                /*if (block_ans_url_flag) {
                     uint32_t start_subnet_ip_n = htonl(start_subnet_ip++);
-                    inet_ntop(AF_INET, &start_subnet_ip_n, str1, INET_ADDRSTRLEN);
-
-                    char str2[INET_ADDRSTRLEN];
-                    inet_ntop(AF_INET, &ans->ip4, str2, INET_ADDRSTRLEN);
-
-                    printf("BLOCK A:%s %s %s\n", str1, str2, ans_url + 1);
 
                     ip_ip_map_t add_elem;
                     add_elem.ip_local = start_subnet_ip_n;
@@ -241,7 +274,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                     ans->ip4 = start_subnet_ip_n;
                 }
 
-                /*ttl_map_t add_elem;
+                ttl_map_t add_elem;
                 add_elem.ip = ans->ip4;
                 add_elem.end_time = check_time;
 
@@ -264,7 +297,21 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             }
 
             if (ans_type == 5) {
-                if (block_ans_url_flag) {
+                char cname_url[URL_MAX_SIZE];
+                char* cname_url_start = cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t);
+                int32_t cname_url_len = get_url_from_packet(receive_msg, cname_url_start, receive_msg_end, cname_url, 0);
+
+                strcpy(big_data + big_data_cur_pos, ans_url + 1);
+                simple_graph[simple_graph_cur_pos].url_offet = big_data_cur_pos;
+                big_data_cur_pos += ans_url_len;
+                simple_graph[simple_graph_cur_pos].type = 5;
+                simple_graph[simple_graph_cur_pos].ttl = ans->ttl;
+                strcpy(big_data + big_data_cur_pos, cname_url + 1);
+                simple_graph[simple_graph_cur_pos].url_offet_or_ip = big_data_cur_pos;
+                big_data_cur_pos += cname_url_len;
+                simple_graph_cur_pos++;
+
+                /*if (block_ans_url_flag) {
                     char data_url[URL_MAX_SIZE];
                     char* cname_url_start = cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t);
                     int32_t data_url_len = get_url_from_packet(receive_msg, cname_url_start, receive_msg_end, data_url, 0);
@@ -288,11 +335,91 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                         stat.cname_url_map_error++;
                         free(data_url_str);
                     }
-                }
+                }*/
             }
 
             cur_pos_ptr += sizeof(dns_ans_t) - sizeof(uint32_t) + ans_len;
             // ANS DATA
+        }
+
+        if (block_que_url_flag) {
+            uint16_t ans_count_new = 1;
+            header->ans = htons(ans_count_new);
+
+            printf("\nStart ans %d : %s\n", que_type, que_url + 1);
+
+            int32_t que_offet = 0;
+
+            for (int i = 0; i < simple_graph_cur_pos; i++) {
+                if (!strcmp(que_url + 1, &big_data[simple_graph[i].url_offet])) {
+                    que_offet = simple_graph[i].url_offet;
+                    break;
+                }
+            }
+
+            for (int i = 0; i < simple_graph_cur_pos; i++) {
+                if (simple_graph[i].type == 1) {
+                    char str2[INET_ADDRSTRLEN];
+                    inet_ntop(AF_INET, &simple_graph[i].url_offet_or_ip, str2, INET_ADDRSTRLEN);
+                    printf("A : %s %s\n", que_url + 1, str2);
+                } else {
+                    printf("CNAME : %s %s\n", &big_data[simple_graph[i].url_offet], &big_data[simple_graph[i].url_offet_or_ip]);
+                }
+            }
+
+            printf("Start ans %d : %s\n", que_type, que_url + 1);
+
+            change_to_dns_string_format(que_url, que_url_len);
+
+            while (1) {
+                int exit_flag = 0;
+                for (int i = 0; i < simple_graph_cur_pos; i++) {
+                    if (!strcmp(&big_data[que_offet], &big_data[simple_graph[i].url_offet])) {
+                        if (simple_graph[i].type == 1) {
+                            char str2[INET_ADDRSTRLEN];
+                            inet_ntop(AF_INET, &simple_graph[i].url_offet_or_ip, str2, INET_ADDRSTRLEN);
+                            printf("FINAL : %s\n", str2);
+                            exit_flag = 1;
+
+                            uint32_t start_subnet_ip_n = htonl(start_subnet_ip++);
+
+                            ip_ip_map_t add_elem;
+                            add_elem.ip_local = start_subnet_ip_n;
+                            add_elem.ip_global = simple_graph[i].url_offet_or_ip;
+
+                            array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, NULL);
+
+                            memcpy(ans_start_prt, que_url, que_url_len + 1);
+                            ans_start_prt += que_url_len + 1;
+
+                            uint16_t type = 1;
+                            uint16_t class = 1;
+                            uint16_t len = 4;
+
+                            dns_ans_t* new_ans = (dns_ans_t*)ans_start_prt;
+
+                            new_ans->type = htons(type);
+                            new_ans->class = htons(class);
+                            new_ans->ttl = simple_graph[i].ttl;
+                            new_ans->len = htons(len);
+                            new_ans->ip4 = start_subnet_ip_n;
+
+                            ans_start_prt += sizeof(dns_ans_t);
+
+                            break;
+                        } else {
+                            que_offet = simple_graph[i].url_offet_or_ip;
+                            printf("CNAME : %s %s\n", &big_data[simple_graph[i].url_offet], &big_data[simple_graph[i].url_offet_or_ip]);
+                            break;
+                        }
+                    }
+                }
+                if (exit_flag) {
+                    break;
+                }
+            }
+            packets_ring_buffer[ring_elem_num].packet_size = ans_start_prt - receive_msg;
+            printf("End ans\n\n");
         }
 
     end:
