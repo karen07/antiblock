@@ -124,7 +124,7 @@ void* urls_read(__attribute__((unused)) void* arg)
                 del_array_hashmap(urls_map_struct);
             }
 
-            urls_map_struct = init_array_hashmap(URLS_MAP_MAX_SIZE, 1.0, sizeof(uint32_t));
+            urls_map_struct = init_array_hashmap(urls_map_size, 1.0, sizeof(uint32_t));
             if (urls_map_struct == NULL) {
                 printf("No free memory for urls_map_struct\n");
                 exit(EXIT_FAILURE);

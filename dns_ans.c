@@ -121,17 +121,21 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
         }
         pthread_mutex_unlock(&packets_ring_buffer_mutex);
 
-        int32_t remain_div = packets_ring_buffer_start % packets_ring_buffer_size;
-        char* receive_msg = packets_ring_buffer[remain_div].packet;
-        int32_t receive_msg_len = packets_ring_buffer[remain_div].packet_size;
+        int32_t ring_elem_num = packets_ring_buffer_start % packets_ring_buffer_size;
+
+        char* receive_msg = packets_ring_buffer[ring_elem_num].packet;
+        int32_t receive_msg_len = packets_ring_buffer[ring_elem_num].packet_size;
+
+        char* cur_pos_ptr = receive_msg;
         char* receive_msg_end = receive_msg + receive_msg_len;
 
-        if (receive_msg_len <= (int32_t)sizeof(dns_header_t)) {
+        // DNS HEADER
+        if (cur_pos_ptr + sizeof(dns_header_t) > receive_msg_end) {
             stat.request_parsing_error++;
             goto end;
         }
 
-        dns_header_t* header = (dns_header_t*)receive_msg;
+        dns_header_t* header = (dns_header_t*)cur_pos_ptr;
 
         uint16_t flags = ntohs(header->flags);
         if ((flags & FIRST_BIT) == 0) {
@@ -149,75 +153,76 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             goto end;
         }
 
-        int32_t padding_len;
+        cur_pos_ptr += sizeof(dns_header_t);
+        // DNS HEADER
 
-        char url[URL_MAX_SIZE];
-        int32_t url_len = get_url_from_packet(receive_msg, receive_msg + sizeof(dns_header_t), receive_msg_end, url, &padding_len);
-        if (url_len == -1) {
+        // QUE URL
+        int32_t que_url_pad_len;
+        char que_url[URL_MAX_SIZE];
+        char* que_url_start = cur_pos_ptr;
+        int32_t que_url_len = get_url_from_packet(receive_msg, que_url_start, receive_msg_end, que_url, &que_url_pad_len);
+        if (que_url_len == -1) {
             stat.request_parsing_error++;
             goto end;
         }
 
-        char* hand_point = receive_msg + sizeof(dns_header_t) + padding_len;
+        int32_t block_que_url_flag __attribute__((unused)) = 0;
+        block_que_url_flag = check_url(que_url, que_url_len);
 
-        hand_point += sizeof(dns_que_t);
-        if (hand_point > receive_msg_end) {
+        cur_pos_ptr += que_url_pad_len;
+        // QUE URL
+
+        // QUE DATA
+        if (cur_pos_ptr + sizeof(dns_que_t) > receive_msg_end) {
             stat.request_parsing_error++;
             goto end;
         }
+
+        dns_que_t* que = (dns_que_t*)cur_pos_ptr;
+
+        uint16_t que_type __attribute__((unused)) = ntohs(que->type);
+
+        cur_pos_ptr += sizeof(dns_que_t);
+        // QUE DATA
 
         for (int32_t i = 0; i < ans_count; i++) {
+            // ANS URL
+            int32_t ans_url_pad_len;
             char ans_url[URL_MAX_SIZE];
-            int32_t ans_url_len = get_url_from_packet(receive_msg, hand_point, receive_msg_end, ans_url, &padding_len);
+            char* ans_url_start = cur_pos_ptr;
+            int32_t ans_url_len = get_url_from_packet(receive_msg, ans_url_start, receive_msg_end, ans_url, &ans_url_pad_len);
             if (ans_url_len == -1) {
                 stat.request_parsing_error++;
                 goto end;
             }
 
-            int32_t blocked_url_flag = 0;
-            blocked_url_flag = check_url(ans_url, ans_url_len);
+            int32_t block_ans_url_flag = 0;
+            block_ans_url_flag = check_url(ans_url, ans_url_len);
 
-            hand_point += padding_len;
+            cur_pos_ptr += ans_url_pad_len;
+            // ANS URL
 
-            if (hand_point + sizeof(dns_ans_t) - sizeof(uint32_t) > receive_msg_end) {
-                stat.request_parsing_error++;
-                goto end;
-            }
-            dns_ans_t* ans = (dns_ans_t*)hand_point;
-
-            uint16_t type = ntohs(ans->type);
-            uint32_t ttl = ntohl(ans->ttl);
-            time_t check_time = time(NULL) + ttl;
-
-            uint16_t len = ntohs(ans->len);
-            if (hand_point + sizeof(dns_ans_t) - sizeof(uint32_t) + len > receive_msg_end) {
+            // ANS DATA
+            if (cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t) > receive_msg_end) {
                 stat.request_parsing_error++;
                 goto end;
             }
 
-            if (type == 1) {
-                /*ttl_map_t add_elem;
-                add_elem.ip = ans->ip4;
-                add_elem.end_time = check_time;
+            dns_ans_t* ans = (dns_ans_t*)cur_pos_ptr;
 
-                ttl_map_t elem;
-                if (blocked_url_flag) {
-                    int32_t new_elem_flag = array_hashmap_add_elem(ttl_map_struct, &add_elem, &elem, ttl_on_collision);
-                    if (new_elem_flag == 1) {
-                        add_ip_to_route_table(add_elem.ip, add_elem.end_time, ans_url + 1);
-                    } else if (new_elem_flag == 0) {
-                        update_ip_in_route_table(elem.ip, elem.end_time, ans_url + 1);
-                    } else if (new_elem_flag == -1) {
-                        stat.ttl_map_error++;
-                    }
-                } else {
-                    int32_t find_res = array_hashmap_find_elem(ttl_map_struct, &add_elem, &elem);
-                    if (find_res == 1) {
-                        not_block_ip_in_route_table(elem.ip, elem.end_time, ans_url + 1);
-                    }
-                }*/
+            uint16_t ans_type = ntohs(ans->type);
+            uint32_t ans_ttl = ntohl(ans->ttl);
+            uint16_t ans_len = ntohs(ans->len);
 
-                if (blocked_url_flag) {
+            time_t check_time = time(NULL) + ans_ttl;
+
+            if (cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t) + ans_len > receive_msg_end) {
+                stat.request_parsing_error++;
+                goto end;
+            }
+
+            if (ans_type == 1) {
+                if (block_ans_url_flag) {
                     char str1[INET_ADDRSTRLEN];
                     uint32_t start_subnet_ip_n = htonl(start_subnet_ip++);
                     inet_ntop(AF_INET, &start_subnet_ip_n, str1, INET_ADDRSTRLEN);
@@ -235,40 +240,65 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
 
                     ans->ip4 = start_subnet_ip_n;
                 }
-            }
 
-            if (type == 5 && blocked_url_flag) {
-                char data_url[URL_MAX_SIZE];
-                int32_t data_url_len = get_url_from_packet(receive_msg,
-                    hand_point + sizeof(dns_ans_t) - sizeof(uint32_t), receive_msg_end, data_url, 0);
-
-                char* data_url_str = malloc(data_url_len + 1);
-                strcpy(data_url_str, data_url + 1);
-
-                cname_urls_map add_elem;
-                add_elem.url = data_url_str;
+                /*ttl_map_t add_elem;
+                add_elem.ip = ans->ip4;
                 add_elem.end_time = check_time;
 
-                printf("BLOCK CNAME:%s %s\n", data_url_str, ans_url + 1);
+                ttl_map_t elem;
+                if (block_ans_url_flag) {
+                    int32_t new_elem_flag = array_hashmap_add_elem(ttl_map_struct, &add_elem, &elem, ttl_on_collision);
+                    if (new_elem_flag == 1) {
+                        add_ip_to_route_table(add_elem.ip, add_elem.end_time, ans_url + 1);
+                    } else if (new_elem_flag == 0) {
+                        update_ip_in_route_table(elem.ip, elem.end_time, ans_url + 1);
+                    } else if (new_elem_flag == -1) {
+                        stat.ttl_map_error++;
+                    }
+                } else {
+                    int32_t find_res = array_hashmap_find_elem(ttl_map_struct, &add_elem, &elem);
+                    if (find_res == 1) {
+                        not_block_ip_in_route_table(elem.ip, elem.end_time, ans_url + 1);
+                    }
+                }*/
+            }
 
-                cname_urls_map elem;
-                int32_t new_elem_flag = array_hashmap_add_elem(cname_urls_map_struct, &add_elem, &elem, cname_url_on_collision);
-                if (new_elem_flag == 1) {
-                    add_url_cname(ans_url + 1, add_elem.end_time, add_elem.url);
-                } else if (new_elem_flag == 0) {
-                    update_url_cname(ans_url + 1, elem.end_time, elem.url);
-                } else if (new_elem_flag == -1) {
-                    stat.cname_url_map_error++;
-                    free(data_url_str);
+            if (ans_type == 5) {
+                if (block_ans_url_flag) {
+                    char data_url[URL_MAX_SIZE];
+                    char* cname_url_start = cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t);
+                    int32_t data_url_len = get_url_from_packet(receive_msg, cname_url_start, receive_msg_end, data_url, 0);
+
+                    char* data_url_str = malloc(data_url_len + 1);
+                    strcpy(data_url_str, data_url + 1);
+
+                    cname_urls_map add_elem;
+                    add_elem.url = data_url_str;
+                    add_elem.end_time = check_time;
+
+                    printf("BLOCK CNAME:%s %s\n", data_url_str, ans_url + 1);
+
+                    cname_urls_map elem;
+                    int32_t new_elem_flag = array_hashmap_add_elem(cname_urls_map_struct, &add_elem, &elem, cname_url_on_collision);
+                    if (new_elem_flag == 1) {
+                        add_url_cname(ans_url + 1, add_elem.end_time, add_elem.url);
+                    } else if (new_elem_flag == 0) {
+                        update_url_cname(ans_url + 1, elem.end_time, elem.url);
+                    } else if (new_elem_flag == -1) {
+                        stat.cname_url_map_error++;
+                        free(data_url_str);
+                    }
                 }
             }
 
-            hand_point += sizeof(dns_ans_t) - sizeof(uint32_t) + len;
+            cur_pos_ptr += sizeof(dns_ans_t) - sizeof(uint32_t) + ans_len;
+            // ANS DATA
         }
 
     end:
-        send_packet(remain_div);
-        packets_ring_buffer[remain_div].packet_size = 0;
+        send_packet(ring_elem_num);
+
+        packets_ring_buffer[ring_elem_num].packet_size = 0;
         packets_ring_buffer_start++;
     }
 
