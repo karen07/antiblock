@@ -176,6 +176,8 @@ int main(int argc, char* argv[])
         }
     }
 
+    printf("\nAntiblock started\n");
+
     init_stat_print_thread();
 
     init_route_socket();
