@@ -130,6 +130,8 @@ void* urls_read(__attribute__((unused)) void* arg)
                 exit(EXIT_FAILURE);
             }
 
+            printf("Readed %d urls\n", urls_map_size);
+
             array_hashmap_set_func(urls_map_struct, add_url_hash, add_url_cmp, find_url_hash, find_url_cmp);
 
             int32_t url_offset = 0;
@@ -144,7 +146,7 @@ void* urls_read(__attribute__((unused)) void* arg)
             }
         }
 
-        if (urls_web_file_size > 0) {
+        if (urls_web_file_size > 0 || !is_domains_file_url) {
             sleep(URLS_UPDATE_TIME);
         } else {
             sleep(URLS_ERROR_UPDATE_TIME);

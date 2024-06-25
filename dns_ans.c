@@ -67,7 +67,7 @@ int32_t get_url_from_packet(char* packet_start, char* hand_point, char* receive_
 
     if ((*hand_point & FIRST_TWO_BITS) == FIRST_TWO_BITS) {
         url_len--;
-        int new_len;
+        int32_t new_len;
         new_len = get_url_from_packet(packet_start, packet_start + *(hand_point + 1), receive_msg_end, &url[url_len], 0);
         if (new_len == -1) {
             return -1;
@@ -114,7 +114,7 @@ struct simple_graph {
     int32_t url_offet;
     uint16_t type;
     uint32_t ttl;
-    int32_t url_offet_or_ip;
+    int32_t cname_offet_or_ip;
 };
 
 void change_to_dns_string_format(char* str, int32_t str_len)
@@ -131,6 +131,9 @@ void change_to_dns_string_format(char* str, int32_t str_len)
 
 void* dns_ans_check(__attribute__((unused)) void* arg)
 {
+    int32_t block_que_url_flag = 0;
+    uint16_t que_type = 0;
+
     pthread_barrier_wait(&threads_barrier);
 
     while (1) {
@@ -147,6 +150,9 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
 
         char* cur_pos_ptr = receive_msg;
         char* receive_msg_end = receive_msg + receive_msg_len;
+
+        block_que_url_flag = 0;
+        que_type = 0;
 
         // DNS HEADER
         if (cur_pos_ptr + sizeof(dns_header_t) > receive_msg_end) {
@@ -185,8 +191,10 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             goto end;
         }
 
-        int32_t block_que_url_flag __attribute__((unused)) = 0;
         block_que_url_flag = check_url(que_url, que_url_len);
+        if (block_que_url_flag != 1) {
+            goto end;
+        }
 
         cur_pos_ptr += que_url_pad_len;
         // QUE URL
@@ -199,7 +207,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
 
         dns_que_t* que = (dns_que_t*)cur_pos_ptr;
 
-        uint16_t que_type __attribute__((unused)) = ntohs(que->type);
+        que_type = ntohs(que->type);
         if (que_type != 1) {
             goto end;
         }
@@ -243,7 +251,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             dns_ans_t* ans = (dns_ans_t*)cur_pos_ptr;
 
             uint16_t ans_type = ntohs(ans->type);
-            uint32_t ans_ttl __attribute__((unused)) = ntohl(ans->ttl);
+            uint32_t ans_ttl = ntohl(ans->ttl);
             uint16_t ans_len = ntohs(ans->len);
 
             // time_t check_time = time(NULL) + ans_ttl;
@@ -258,8 +266,8 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                 simple_graph[simple_graph_cur_pos].url_offet = big_data_cur_pos;
                 big_data_cur_pos += ans_url_len;
                 simple_graph[simple_graph_cur_pos].type = 1;
-                simple_graph[simple_graph_cur_pos].ttl = ans->ttl;
-                simple_graph[simple_graph_cur_pos].url_offet_or_ip = ans->ip4;
+                simple_graph[simple_graph_cur_pos].ttl = ans_ttl;
+                simple_graph[simple_graph_cur_pos].cname_offet_or_ip = ans->ip4;
                 simple_graph_cur_pos++;
 
                 /*if (block_ans_url_flag) {
@@ -305,9 +313,9 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                 simple_graph[simple_graph_cur_pos].url_offet = big_data_cur_pos;
                 big_data_cur_pos += ans_url_len;
                 simple_graph[simple_graph_cur_pos].type = 5;
-                simple_graph[simple_graph_cur_pos].ttl = ans->ttl;
+                simple_graph[simple_graph_cur_pos].ttl = ans_ttl;
                 strcpy(big_data + big_data_cur_pos, cname_url + 1);
-                simple_graph[simple_graph_cur_pos].url_offet_or_ip = big_data_cur_pos;
+                simple_graph[simple_graph_cur_pos].cname_offet_or_ip = big_data_cur_pos;
                 big_data_cur_pos += cname_url_len;
                 simple_graph_cur_pos++;
 
@@ -343,12 +351,9 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
         }
 
         if (block_que_url_flag) {
-            uint16_t ans_count_new = 1;
-            header->ans = htons(ans_count_new);
+            printf("\nStart %s\n", que_url + 1);
 
-            printf("\nStart ans %d : %s\n", que_type, que_url + 1);
-
-            int32_t que_offet = 0;
+            int32_t que_offet = -1;
 
             for (int i = 0; i < simple_graph_cur_pos; i++) {
                 if (!strcmp(que_url + 1, &big_data[simple_graph[i].url_offet])) {
@@ -357,73 +362,114 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                 }
             }
 
+            if (que_offet == -1) {
+                printf("No que in ans\n");
+                goto end;
+            }
+
+            printf("Ans:\n");
             for (int i = 0; i < simple_graph_cur_pos; i++) {
                 if (simple_graph[i].type == 1) {
                     char str2[INET_ADDRSTRLEN];
-                    inet_ntop(AF_INET, &simple_graph[i].url_offet_or_ip, str2, INET_ADDRSTRLEN);
-                    printf("A : %s %s\n", que_url + 1, str2);
+                    inet_ntop(AF_INET, &simple_graph[i].cname_offet_or_ip, str2, INET_ADDRSTRLEN);
+                    printf("A : %s %s %d\n", que_url + 1, str2, simple_graph[i].ttl);
                 } else {
-                    printf("CNAME : %s %s\n", &big_data[simple_graph[i].url_offet], &big_data[simple_graph[i].url_offet_or_ip]);
+                    printf("CNAME : %s %s %d\n", &big_data[simple_graph[i].url_offet], &big_data[simple_graph[i].cname_offet_or_ip], simple_graph[i].ttl);
                 }
             }
 
-            printf("Start ans %d : %s\n", que_type, que_url + 1);
+            char out_que_url[URL_MAX_SIZE];
+            strcpy(out_que_url, que_url);
+            change_to_dns_string_format(out_que_url, que_url_len);
 
-            change_to_dns_string_format(que_url, que_url_len);
+            uint32_t min_ttl = -1;
+            cur_pos_ptr = ans_start_prt;
 
+            int32_t A_find_flag = 0;
+            int32_t next_find_flag = 0;
+
+            printf("Walk on graph:\n");
             while (1) {
-                int exit_flag = 0;
+                A_find_flag = 0;
+                next_find_flag = 0;
                 for (int i = 0; i < simple_graph_cur_pos; i++) {
                     if (!strcmp(&big_data[que_offet], &big_data[simple_graph[i].url_offet])) {
+                        next_find_flag = 1;
+
+                        if (min_ttl > simple_graph[i].ttl) {
+                            min_ttl = simple_graph[i].ttl;
+                        }
+
                         if (simple_graph[i].type == 1) {
-                            char str2[INET_ADDRSTRLEN];
-                            inet_ntop(AF_INET, &simple_graph[i].url_offet_or_ip, str2, INET_ADDRSTRLEN);
-                            printf("FINAL : %s\n", str2);
-                            exit_flag = 1;
+                            A_find_flag = 1;
 
                             uint32_t start_subnet_ip_n = htonl(start_subnet_ip++);
 
                             ip_ip_map_t add_elem;
                             add_elem.ip_local = start_subnet_ip_n;
-                            add_elem.ip_global = simple_graph[i].url_offet_or_ip;
+                            add_elem.ip_global = simple_graph[i].cname_offet_or_ip;
 
                             array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, NULL);
 
-                            memcpy(ans_start_prt, que_url, que_url_len + 1);
-                            ans_start_prt += que_url_len + 1;
+                            memcpy(cur_pos_ptr, out_que_url, que_url_len + 1);
+                            cur_pos_ptr += que_url_len + 1;
 
                             uint16_t type = 1;
                             uint16_t class = 1;
+                            uint32_t ttl = 10;
                             uint16_t len = 4;
 
-                            dns_ans_t* new_ans = (dns_ans_t*)ans_start_prt;
+                            dns_ans_t* new_ans = (dns_ans_t*)cur_pos_ptr;
 
                             new_ans->type = htons(type);
                             new_ans->class = htons(class);
-                            new_ans->ttl = simple_graph[i].ttl;
+                            new_ans->ttl = htonl(ttl);
                             new_ans->len = htons(len);
                             new_ans->ip4 = start_subnet_ip_n;
 
-                            ans_start_prt += sizeof(dns_ans_t);
+                            cur_pos_ptr += sizeof(dns_ans_t);
+
+                            char str1[INET_ADDRSTRLEN];
+                            inet_ntop(AF_INET, &start_subnet_ip_n, str1, INET_ADDRSTRLEN);
+
+                            char str2[INET_ADDRSTRLEN];
+                            inet_ntop(AF_INET, &simple_graph[i].cname_offet_or_ip, str2, INET_ADDRSTRLEN);
+                            printf("FINAL : %s %s %s %d\n", que_url + 1, str2, str1, ttl);
 
                             break;
                         } else {
-                            que_offet = simple_graph[i].url_offet_or_ip;
-                            printf("CNAME : %s %s\n", &big_data[simple_graph[i].url_offet], &big_data[simple_graph[i].url_offet_or_ip]);
+                            que_offet = simple_graph[i].cname_offet_or_ip;
+                            printf("CNAME : %s %s\n", &big_data[simple_graph[i].url_offet], &big_data[simple_graph[i].cname_offet_or_ip]);
                             break;
                         }
                     }
                 }
-                if (exit_flag) {
+
+                if (A_find_flag || !next_find_flag) {
                     break;
                 }
             }
-            packets_ring_buffer[ring_elem_num].packet_size = ans_start_prt - receive_msg;
+
+            if (A_find_flag) {
+                packets_ring_buffer[ring_elem_num].packet_size = cur_pos_ptr - receive_msg;
+
+                uint16_t ans_count_new = 1;
+                header->ans = htons(ans_count_new);
+            } else {
+                printf("A not founded\n");
+            }
+
             printf("End ans\n\n");
         }
 
     end:
-        send_packet(ring_elem_num);
+        if (block_que_url_flag) {
+            if (que_type == 1) {
+                send_packet(ring_elem_num);
+            }
+        } else {
+            send_packet(ring_elem_num);
+        }
 
         packets_ring_buffer[ring_elem_num].packet_size = 0;
         packets_ring_buffer_start++;
