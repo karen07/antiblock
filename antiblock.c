@@ -15,6 +15,8 @@ int32_t is_stat_print;
 int32_t is_domains_file_url;
 int32_t is_domains_file_path;
 int32_t is_route_ip;
+int32_t is_tun_net;
+int32_t is_tun_name;
 int32_t is_dns_ip;
 int32_t is_log_or_stat_path;
 
@@ -24,9 +26,13 @@ char log_or_stat_folder[PATH_MAX - 100];
 
 char route_ip[IP4_STR_MAX_SIZE];
 char dns_ip[IP4_STR_MAX_SIZE];
+char tun_ip[IP4_STR_MAX_SIZE];
+
+char tun_name[IFNAMSIZ];
 
 int32_t dns_port;
 int32_t listen_port;
+int32_t tun_prefix;
 
 void print_help()
 {
@@ -39,7 +45,9 @@ void print_help()
            "-output /example              Log or statistics output folder\n"
            "-DNS_IP 0.0.0.0               DNS IP\n"
            "-DNS_port 00                  DNS port\n"
-           "-listen_port 0000             Listen port\n");
+           "-listen_port 0000             Listen port\n"
+           "-TUN_net 0.0.0.0/0            TUN net\n"
+           "-TUN_name NAT                 TUN name\n");
     exit(EXIT_FAILURE);
 }
 
@@ -118,14 +126,39 @@ int main(int argc, char* argv[])
             }
             continue;
         }
+        if (!strcmp(argv[i], "-TUN_net")) {
+            if (i != argc - 1) {
+                is_tun_net = 1;
+                char* slash_ptr = strchr(argv[i + 1], '/');
+                if (slash_ptr) {
+                    *slash_ptr = 0;
+                    sscanf(slash_ptr + 1, "%d", &tun_prefix);
+                    strcpy(tun_ip, argv[i + 1]);
+                }
+                i++;
+            }
+            continue;
+        }
+        if (!strcmp(argv[i], "-TUN_name")) {
+            if (i != argc - 1) {
+                is_tun_name = 1;
+                strcpy(tun_name, argv[i + 1]);
+                i++;
+            }
+            continue;
+        }
         printf("Unknown command %s\n", argv[i]);
         print_help();
     }
 
-    if (!is_route_ip) {
-        printf("Programm need route IP\n");
+    if (is_route_ip == is_tun_net) {
+        printf("Programm need route IP or TUN net\n");
         print_help();
     }
+
+    // if (is_tun_net | is_tun_name) {
+    //
+    // }
 
     if (!(is_domains_file_url || is_domains_file_path)) {
         printf("Programm need domains file url or domains file path\n");
@@ -180,7 +213,13 @@ int main(int argc, char* argv[])
 
     init_stat_print_thread();
 
-    init_route_socket();
+    if (is_route_ip) {
+        init_route_socket();
+    }
+
+    if (is_tun_net) {
+        init_tun_thread();
+    }
 
     init_urls_read_thread();
 
@@ -189,8 +228,6 @@ int main(int argc, char* argv[])
     init_dns_ans_check_thread();
 
     init_data_threads();
-
-    init_tun_thread();
 
     pthread_barrier_wait(&threads_barrier);
 

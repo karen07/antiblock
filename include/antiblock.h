@@ -37,6 +37,9 @@ extern char log_or_stat_folder[PATH_MAX - 100];
 
 extern char route_ip[IP4_STR_MAX_SIZE];
 extern char dns_ip[IP4_STR_MAX_SIZE];
+extern char tun_ip[IP4_STR_MAX_SIZE];
+
+extern char tun_name[IFNAMSIZ];
 
 extern int32_t dns_port;
 extern int32_t listen_port;
