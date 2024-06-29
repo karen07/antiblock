@@ -95,11 +95,9 @@ int32_t nat_cmp(const void* void_elem1, const void* void_elem2)
 void* tun(__attribute__((unused)) void* arg)
 {
     int tap_fd;
-    char tun_name[IFNAMSIZ];
     char buffer[4096];
     char pseudogram[4096];
 
-    strcpy(tun_name, "antiblock");
     tap_fd = tun_alloc(tun_name, IFF_TUN);
 
     if (tap_fd < 0) {
@@ -223,7 +221,7 @@ void* tun(__attribute__((unused)) void* arg)
 
 void init_tun_thread(void)
 {
-    start_subnet_ip = ntohl(inet_addr("10.7.1.2"));
+    start_subnet_ip = ntohl(inet_addr(tun_ip)) + 1;
 
     ip_ip_map_struct = init_array_hashmap(LOC_TO_GLOBIP_MAP_MAX_SIZE, 1.0, sizeof(ip_ip_map_t));
     if (ip_ip_map_struct == NULL) {
