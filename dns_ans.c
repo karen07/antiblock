@@ -129,6 +129,11 @@ void change_to_dns_string_format(char* str, int32_t str_len)
     }
 }
 
+int32_t ip_ip_on_collision(const void* void_elem1, const void* void_elem2)
+{
+    return 1;
+}
+
 void* dns_ans_check(__attribute__((unused)) void* arg)
 {
     int32_t block_que_url_flag = 0;
@@ -409,7 +414,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                             add_elem.ip_local = start_subnet_ip_n;
                             add_elem.ip_global = simple_graph[i].cname_offet_or_ip;
 
-                            array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, NULL);
+                            array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, ip_ip_on_collision);
 
                             memcpy(cur_pos_ptr, out_que_url, que_url_len + 1);
                             cur_pos_ptr += que_url_len + 1;
@@ -435,6 +440,10 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                             char str2[INET_ADDRSTRLEN];
                             inet_ntop(AF_INET, &simple_graph[i].cname_offet_or_ip, str2, INET_ADDRSTRLEN);
                             printf("FINAL : %s %s %s %d\n", que_url + 1, str2, str1, ttl);
+
+                            if (start_subnet_ip == end_subnet_ip) {
+                                start_subnet_ip = ntohl(inet_addr(tun_ip)) + 1;
+                            }
 
                             break;
                         } else {

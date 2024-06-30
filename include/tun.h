@@ -28,6 +28,7 @@ extern const array_hashmap_t* ip_ip_map_struct;
 extern const array_hashmap_t* nat_map_struct;
 
 extern uint32_t start_subnet_ip;
+extern uint32_t end_subnet_ip;
 
 int tun_alloc(char* dev, int flags);
 unsigned short checksum(const char* buf, unsigned size);

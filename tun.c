@@ -5,6 +5,7 @@ const array_hashmap_t* ip_ip_map_struct;
 const array_hashmap_t* nat_map_struct;
 
 uint32_t start_subnet_ip;
+uint32_t end_subnet_ip;
 
 int tun_alloc(char* dev, int flags)
 {
@@ -228,6 +229,10 @@ void* tun(__attribute__((unused)) void* arg)
 void init_tun_thread(void)
 {
     start_subnet_ip = ntohl(inet_addr(tun_ip)) + 1;
+
+    int32_t subnet_size = 1;
+    subnet_size <<= 32 - (tun_prefix + 1);
+    end_subnet_ip = start_subnet_ip + subnet_size - 3;
 
     ip_ip_map_struct = init_array_hashmap(LOC_TO_GLOBIP_MAP_MAX_SIZE, 1.0, sizeof(ip_ip_map_t));
     if (ip_ip_map_struct == NULL) {
