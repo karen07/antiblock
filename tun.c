@@ -151,7 +151,7 @@ void* tun(__attribute__((unused)) void* arg)
 
         int32_t iph_daddr_h = ntohl(iph->daddr);
         int32_t mask = 1;
-        mask <<= 32 - (tun_prefix + 1); 
+        mask <<= 32 - (tun_prefix + 1);
 
         if (iph_daddr_h & mask) {
             nat_map_t find_elem;
