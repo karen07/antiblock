@@ -33,5 +33,6 @@ extern uint32_t end_subnet_ip;
 int tun_alloc(char* dev, int flags);
 unsigned short checksum(const char* buf, unsigned size);
 int32_t ip_ip_cmp(const void* void_elem1, const void* void_elem2);
+int32_t ip_ip_on_collision(const void* void_elem1, const void* void_elem2);
 void* tun(void* arg);
 void init_tun_thread(void);

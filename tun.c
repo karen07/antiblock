@@ -75,6 +75,11 @@ int32_t ip_ip_cmp(const void* void_elem1, const void* void_elem2)
     }
 }
 
+int32_t ip_ip_on_collision(const void* void_elem1, const void* void_elem2)
+{
+    return 1;
+}
+
 uint32_t nat_hash(const void* void_elem)
 {
     const nat_map_t* elem = void_elem;

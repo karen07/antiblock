@@ -129,11 +129,6 @@ void change_to_dns_string_format(char* str, int32_t str_len)
     }
 }
 
-int32_t ip_ip_on_collision(const void* void_elem1, const void* void_elem2)
-{
-    return 1;
-}
-
 void* dns_ans_check(__attribute__((unused)) void* arg)
 {
     int32_t block_que_url_flag = 0;
