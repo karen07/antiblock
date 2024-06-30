@@ -43,3 +43,4 @@ extern char tun_name[IFNAMSIZ];
 
 extern int32_t dns_port;
 extern int32_t listen_port;
+extern int32_t tun_prefix;

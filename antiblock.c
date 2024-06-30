@@ -40,14 +40,14 @@ void print_help()
            "-log                          Show operations log\n"
            "-stat                         Show statistics data\n"
            "-url https://example.com      Domains file url\n"
-           "-file /example                Domains file path\n"
+           "-file /example.txt            Domains file path\n"
            "-route_IP 0.0.0.0             Route IP\n"
-           "-output /example              Log or statistics output folder\n"
+           "-output /example/             Log or statistics output folder\n"
            "-DNS_IP 0.0.0.0               DNS IP\n"
            "-DNS_port 00                  DNS port\n"
            "-listen_port 0000             Listen port\n"
            "-TUN_net 0.0.0.0/0            TUN net\n"
-           "-TUN_name NAT                 TUN name\n");
+           "-TUN_name example             TUN name\n");
     exit(EXIT_FAILURE);
 }
 
@@ -131,9 +131,10 @@ int main(int argc, char* argv[])
                 is_tun_net = 1;
                 char* slash_ptr = strchr(argv[i + 1], '/');
                 if (slash_ptr) {
-                    *slash_ptr = 0;
                     sscanf(slash_ptr + 1, "%d", &tun_prefix);
+                    *slash_ptr = 0;
                     strcpy(tun_ip, argv[i + 1]);
+                    *slash_ptr = '/';
                 }
                 i++;
             }

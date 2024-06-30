@@ -149,7 +149,11 @@ void* tun(__attribute__((unused)) void* arg)
             udph->check = 0;
         }
 
-        if (iph->daddr & 0b00000000100000000000000000000000) {
+        int32_t iph_daddr_h = ntohl(iph->daddr);
+        int32_t mask = 1;
+        mask <<= 32 - (tun_prefix + 1); 
+
+        if (iph_daddr_h & mask) {
             nat_map_t find_elem;
             find_elem.dst_ip = iph->saddr;
             find_elem.src_port = dst_port;
@@ -161,7 +165,8 @@ void* tun(__attribute__((unused)) void* arg)
                 continue;
             }
 
-            iph->saddr = iph->daddr & (~0b00000000100000000000000000000000);
+            iph_daddr_h &= ~mask;
+            iph->saddr = htonl(iph_daddr_h);
             iph->daddr = res_elem.src_ip;
         } else {
             ip_ip_map_t find_elem;
@@ -181,7 +186,8 @@ void* tun(__attribute__((unused)) void* arg)
 
             array_hashmap_add_elem(nat_map_struct, &add_elem_nat, NULL, NULL);
 
-            iph->saddr = iph->daddr | (0b00000000100000000000000000000000);
+            iph_daddr_h |= mask;
+            iph->saddr = htonl(iph_daddr_h);
             iph->daddr = res_elem.ip_global;
         }
 
