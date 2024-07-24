@@ -18,11 +18,23 @@ typedef struct ip_ip_map {
     uint32_t ip_global;
 } ip_ip_map_t;
 
-typedef struct nat_map {
+typedef struct nat_map_key {
+    uint32_t src_ip;
     uint32_t dst_ip;
     uint16_t src_port;
-    uint32_t src_ip;
-} __attribute__((packed)) nat_map_t;
+    uint16_t dst_port;
+    char proto;
+} __attribute__((packed)) nat_map_key_t;
+
+typedef struct nat_map_value {
+    uint32_t old_src_ip;
+    uint16_t old_src_port;
+} nat_map_value_t;
+
+typedef struct nat_map {
+    nat_map_key_t key;
+    nat_map_value_t value;
+} nat_map_t;
 
 extern const array_hashmap_t* ip_ip_map_struct;
 extern const array_hashmap_t* nat_map_struct;

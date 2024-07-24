@@ -83,7 +83,7 @@ int32_t ip_ip_on_collision(const void* void_elem1, const void* void_elem2)
 uint32_t nat_hash(const void* void_elem)
 {
     const nat_map_t* elem = void_elem;
-    return djb33_hash_len((const char*)elem, 6);
+    return djb33_hash_len((const char*)(&elem->key), sizeof(elem->key));
 }
 
 int32_t nat_cmp(const void* void_elem1, const void* void_elem2)
@@ -91,7 +91,7 @@ int32_t nat_cmp(const void* void_elem1, const void* void_elem2)
     const nat_map_t* elem1 = void_elem1;
     const nat_map_t* elem2 = void_elem2;
 
-    if ((elem1->dst_ip == elem2->dst_ip) && (elem1->src_port == elem2->src_port)) {
+    if (memcmp(&elem1->key, &elem2->key, sizeof(elem1->key)) == 0) {
         return 1;
     } else {
         return 0;
@@ -104,7 +104,7 @@ void* tun(__attribute__((unused)) void* arg)
     char buffer[4096];
     char pseudogram[4096];
 
-    tap_fd = tun_alloc(tun_name, IFF_TUN);
+    tap_fd = tun_alloc(tun_name, IFF_TUN | IFF_MULTI_QUEUE);
 
     if (tap_fd < 0) {
         printf("Can't allocate tun interface\n");
@@ -113,9 +113,9 @@ void* tun(__attribute__((unused)) void* arg)
 
     while (1) {
         int nread = read(tap_fd, buffer, sizeof(buffer));
-        if (nread < 0) {
-            printf("Can't read from interface\n");
-            exit(EXIT_FAILURE);
+
+        if (nread < 1) {
+            continue;
         }
 
         tun_header_t* tun_header = (tun_header_t*)buffer;
@@ -145,7 +145,6 @@ void* tun(__attribute__((unused)) void* arg)
 
             tcph->check = 0;
         }
-
         if (proto_L4 == IPPROTO_UDP) {
             struct udphdr* udph = (struct udphdr*)L4_start_pointer;
 
@@ -160,12 +159,15 @@ void* tun(__attribute__((unused)) void* arg)
         mask <<= 32 - (tun_prefix + 1);
 
         if (iph_daddr_h & mask) {
-            nat_map_t find_elem;
-            find_elem.dst_ip = iph->saddr;
-            find_elem.src_port = dst_port;
+            nat_map_t find_elem_nat;
+            find_elem_nat.key.src_ip = iph->daddr;
+            find_elem_nat.key.dst_ip = iph->saddr;
+            find_elem_nat.key.src_port = dst_port;
+            find_elem_nat.key.dst_port = src_port;
+            find_elem_nat.key.proto = proto_L4;
 
-            nat_map_t res_elem;
-            int32_t find_elem_flag = array_hashmap_find_elem(nat_map_struct, &find_elem, &res_elem);
+            nat_map_t res_elem_nat;
+            int32_t find_elem_flag = array_hashmap_find_elem(nat_map_struct, &find_elem_nat, &res_elem_nat);
 
             if (find_elem_flag != 1) {
                 continue;
@@ -173,28 +175,50 @@ void* tun(__attribute__((unused)) void* arg)
 
             iph_daddr_h &= ~mask;
             iph->saddr = htonl(iph_daddr_h);
-            iph->daddr = res_elem.src_ip;
+            iph->daddr = res_elem_nat.value.old_src_ip;
+            dst_port = res_elem_nat.value.old_src_port;
         } else {
-            ip_ip_map_t find_elem;
-            find_elem.ip_local = iph->daddr;
+            ip_ip_map_t find_elem_ip_ip;
+            find_elem_ip_ip.ip_local = iph->daddr;
 
-            ip_ip_map_t res_elem;
-            int32_t find_elem_flag = array_hashmap_find_elem(ip_ip_map_struct, &find_elem, &res_elem);
+            ip_ip_map_t res_elem_ip_ip;
+            int32_t find_elem_flag = array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
 
             if (find_elem_flag != 1) {
                 continue;
             }
 
+            iph_daddr_h |= mask;
+
+            uint16_t start_new_srt_port = 30000;
+
             nat_map_t add_elem_nat;
-            add_elem_nat.dst_ip = res_elem.ip_global;
-            add_elem_nat.src_port = src_port;
-            add_elem_nat.src_ip = iph->saddr;
+            add_elem_nat.key.src_ip = htonl(iph_daddr_h);
+            add_elem_nat.key.dst_ip = res_elem_ip_ip.ip_global;
+            add_elem_nat.key.src_port = htons(start_new_srt_port);
+            add_elem_nat.key.dst_port = dst_port;
+            add_elem_nat.key.proto = proto_L4;
+            add_elem_nat.value.old_src_ip = iph->saddr;
+            add_elem_nat.value.old_src_port = src_port;
 
             array_hashmap_add_elem(nat_map_struct, &add_elem_nat, NULL, NULL);
 
-            iph_daddr_h |= mask;
-            iph->saddr = htonl(iph_daddr_h);
-            iph->daddr = res_elem.ip_global;
+            iph->saddr = add_elem_nat.key.src_ip;
+            iph->daddr = add_elem_nat.key.dst_ip;
+            src_port = add_elem_nat.key.src_port;
+        }
+
+        if (proto_L4 == IPPROTO_TCP) {
+            struct tcphdr* tcph = (struct tcphdr*)L4_start_pointer;
+
+            tcph->source = src_port;
+            tcph->dest = dst_port;
+        }
+        if (proto_L4 == IPPROTO_UDP) {
+            struct udphdr* udph = (struct udphdr*)L4_start_pointer;
+
+            udph->source = src_port;
+            udph->dest = dst_port;
         }
 
         iph->check = 0;
