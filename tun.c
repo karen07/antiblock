@@ -269,7 +269,7 @@ void* tun(__attribute__((unused)) void* arg)
 
 void init_tun_thread(void)
 {
-    start_subnet_ip = ntohl(inet_addr(tun_ip)) + 1;
+    start_subnet_ip = ntohl(tun_ip) + 1;
 
     int32_t subnet_size = 1;
     subnet_size <<= 32 - (tun_prefix + 1);

@@ -26,21 +26,26 @@ extern pthread_barrier_t threads_barrier;
 
 extern int32_t is_log_print;
 extern int32_t is_stat_print;
-extern int32_t is_domains_file_url;
-extern int32_t is_domains_file_path;
-extern int32_t is_route_ip;
-extern int32_t is_log_or_stat_path;
 
+extern int32_t is_domains_file_url;
 extern char domains_file_url[PATH_MAX];
+
+extern int32_t is_domains_file_path;
 extern char domains_file_path[PATH_MAX - 100];
+
+extern int32_t is_log_or_stat_folder;
 extern char log_or_stat_folder[PATH_MAX - 100];
 
-extern char route_ip[IP4_STR_MAX_SIZE];
-extern char dns_ip[IP4_STR_MAX_SIZE];
-extern char tun_ip[IP4_STR_MAX_SIZE];
-
+extern int32_t is_tun_name;
 extern char tun_name[IFNAMSIZ];
 
-extern int32_t dns_port;
-extern int32_t listen_port;
-extern int32_t tun_prefix;
+extern uint32_t route_ip;
+
+extern uint32_t tun_ip;
+extern uint32_t tun_prefix;
+
+extern uint32_t dns_ip;
+extern uint16_t dns_port;
+
+extern uint32_t listen_ip;
+extern uint16_t listen_port;

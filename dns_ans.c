@@ -437,7 +437,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                             printf("FINAL : %s %s %s %d\n", que_url + 1, str2, str1, ttl);
 
                             if (start_subnet_ip == end_subnet_ip) {
-                                start_subnet_ip = ntohl(inet_addr(tun_ip)) + 1;
+                                start_subnet_ip = ntohl(tun_ip) + 1;
                             }
 
                             break;
