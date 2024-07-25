@@ -14,7 +14,7 @@ void* DNS_data(__attribute__((unused)) void* arg)
 
     repeater_DNS_addr.sin_family = AF_INET;
     repeater_DNS_addr.sin_port = htons(listen_port + 1);
-    repeater_DNS_addr.sin_addr.s_addr = inet_addr(REPEATER_DNS_IP);
+    repeater_DNS_addr.sin_addr.s_addr = listen_ip;
 
     uint32_t receive_DNS_addr_length = sizeof(receive_DNS_addr);
 
@@ -137,11 +137,11 @@ void* client_data(__attribute__((unused)) void* arg)
 
     repeater_client_addr.sin_family = AF_INET;
     repeater_client_addr.sin_port = htons(listen_port);
-    repeater_client_addr.sin_addr.s_addr = inet_addr(REPEATER_CLIENT_IP);
+    repeater_client_addr.sin_addr.s_addr = listen_ip;
 
     dns_addr.sin_family = AF_INET;
     dns_addr.sin_port = htons(dns_port);
-    dns_addr.sin_addr.s_addr = inet_addr(dns_ip);
+    dns_addr.sin_addr.s_addr = dns_ip;
 
     uint32_t receive_client_addr_length = sizeof(receive_client_addr);
 
