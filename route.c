@@ -181,6 +181,8 @@ void del_ip_from_route_table(uint32_t ip, time_t check_time)
 
 void init_route_socket(void)
 {
+    printf("Function init route started\n");
+
     route_socket = socket(AF_INET, SOCK_DGRAM, 0);
     if (route_socket < 0) {
         printf("Can't create route_socket :%s\n", strerror(errno));

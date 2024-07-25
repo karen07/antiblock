@@ -56,17 +56,22 @@ void print_help()
 
 int main(int argc, char* argv[])
 {
+    printf("\nAntiblock started\n");
+
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-log")) {
+            printf("Log enabled\n");
             is_log_print = 1;
             continue;
         }
         if (!strcmp(argv[i], "-stat")) {
+            printf("Stat enabled\n");
             is_stat_print = 1;
             continue;
         }
         if (!strcmp(argv[i], "-url")) {
             if (i != argc - 1) {
+                printf("Get urls from url %s\n", argv[i + 1]);
                 if (strlen(argv[i + 1]) < PATH_MAX) {
                     is_domains_file_url = 1;
                     strcpy(domains_file_url, argv[i + 1]);
@@ -77,6 +82,7 @@ int main(int argc, char* argv[])
         }
         if (!strcmp(argv[i], "-file")) {
             if (i != argc - 1) {
+                printf("Get urls from file %s\n", argv[i + 1]);
                 if (strlen(argv[i + 1]) < PATH_MAX - 100) {
                     is_domains_file_path = 1;
                     strcpy(domains_file_path, argv[i + 1]);
@@ -87,6 +93,7 @@ int main(int argc, char* argv[])
         }
         if (!strcmp(argv[i], "-output")) {
             if (i != argc - 1) {
+                printf("Output log or stat to %s\n", argv[i + 1]);
                 if (strlen(argv[i + 1]) < PATH_MAX - 100) {
                     is_log_or_stat_folder = 1;
                     strcpy(log_or_stat_folder, argv[i + 1]);
@@ -97,6 +104,7 @@ int main(int argc, char* argv[])
         }
         if (!strcmp(argv[i], "-route_IP")) {
             if (i != argc - 1) {
+                printf("Route IP %s\n", argv[i + 1]);
                 if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
                     route_ip = inet_addr(argv[i + 1]);
                 }
@@ -106,6 +114,7 @@ int main(int argc, char* argv[])
         }
         if (!strcmp(argv[i], "-DNS_IP")) {
             if (i != argc - 1) {
+                printf("DNS IP %s\n", argv[i + 1]);
                 if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
                     dns_ip = inet_addr(argv[i + 1]);
                 }
@@ -115,6 +124,7 @@ int main(int argc, char* argv[])
         }
         if (!strcmp(argv[i], "-DNS_port")) {
             if (i != argc - 1) {
+                printf("DNS port %s\n", argv[i + 1]);
                 sscanf(argv[i + 1], "%hu", &dns_port);
                 i++;
             }
@@ -122,6 +132,7 @@ int main(int argc, char* argv[])
         }
         if (!strcmp(argv[i], "-listen_IP")) {
             if (i != argc - 1) {
+                printf("Listen IP %s\n", argv[i + 1]);
                 if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
                     listen_ip = inet_addr(argv[i + 1]);
                 }
@@ -131,6 +142,7 @@ int main(int argc, char* argv[])
         }
         if (!strcmp(argv[i], "-listen_port")) {
             if (i != argc - 1) {
+                printf("Listen port %s\n", argv[i + 1]);
                 sscanf(argv[i + 1], "%hu", &listen_port);
                 i++;
             }
@@ -138,6 +150,7 @@ int main(int argc, char* argv[])
         }
         if (!strcmp(argv[i], "-TUN_net")) {
             if (i != argc - 1) {
+                printf("TUN net %s\n", argv[i + 1]);
                 char* slash_ptr = strchr(argv[i + 1], '/');
                 if (slash_ptr) {
                     sscanf(slash_ptr + 1, "%u", &tun_prefix);
@@ -153,6 +166,7 @@ int main(int argc, char* argv[])
         }
         if (!strcmp(argv[i], "-TUN_name")) {
             if (i != argc - 1) {
+                printf("TUN name %s\n", argv[i + 1]);
                 is_tun_name = 1;
                 strcpy(tun_name, argv[i + 1]);
                 i++;
@@ -224,7 +238,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    printf("\nAntiblock started\n");
+    printf("\n");
 
     init_stat_print_thread();
 

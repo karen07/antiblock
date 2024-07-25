@@ -8,6 +8,8 @@ void* stat_print(__attribute__((unused)) void* arg)
 {
     pthread_barrier_wait(&threads_barrier);
 
+    printf("Thread stat print started\n");
+
     while (1) {
         ftruncate(fileno(stat_fd), 0);
         fseek(stat_fd, 0, SEEK_SET);
