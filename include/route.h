@@ -11,3 +11,5 @@ void update_ip_in_route_table(uint32_t ip, time_t check_time, char* url);
 void not_block_ip_in_route_table(uint32_t ip, time_t check_time, char* url);
 void del_ip_from_route_table(uint32_t ip, time_t check_time);
 void init_route_socket(void);
+
+#define DATE_STR_MAX_SIZE 200

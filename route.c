@@ -77,7 +77,7 @@ void add_ip_to_route_table(uint32_t ip, time_t check_time, char* url)
     stat.now_in_route_table++;
 
     if (log_fd) {
-        char ip_str[IP4_STR_MAX_SIZE];
+        char ip_str[INET_ADDRSTRLEN];
         sprintf(ip_str, "%s", inet_ntoa(rec_ip));
 
         char now_time_str[DATE_STR_MAX_SIZE];
@@ -100,7 +100,7 @@ void update_ip_in_route_table(uint32_t ip, time_t check_time, char* url)
         struct in_addr rec_ip;
         rec_ip.s_addr = ip;
 
-        char ip_str[IP4_STR_MAX_SIZE];
+        char ip_str[INET_ADDRSTRLEN];
         sprintf(ip_str, "%s", inet_ntoa(rec_ip));
 
         char now_time_str[DATE_STR_MAX_SIZE];
@@ -125,7 +125,7 @@ void not_block_ip_in_route_table(uint32_t ip, time_t check_time, char* url)
     stat.route_not_block_ip_count++;
 
     if (log_fd) {
-        char ip_str[IP4_STR_MAX_SIZE];
+        char ip_str[INET_ADDRSTRLEN];
         sprintf(ip_str, "%s", inet_ntoa(rec_ip));
 
         char now_time_str[DATE_STR_MAX_SIZE];
@@ -162,7 +162,7 @@ void del_ip_from_route_table(uint32_t ip, time_t check_time)
     stat.now_in_route_table--;
 
     if (log_fd) {
-        char ip_str[IP4_STR_MAX_SIZE];
+        char ip_str[INET_ADDRSTRLEN];
         sprintf(ip_str, "%s", inet_ntoa(rec_ip));
 
         char now_time_str[DATE_STR_MAX_SIZE];

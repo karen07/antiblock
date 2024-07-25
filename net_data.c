@@ -69,7 +69,7 @@ void* DNS_data(__attribute__((unused)) void* arg)
         uint16_t id = ntohs(header->id);
         uint16_t flags = ntohs(header->flags);
 
-        if ((flags & FIRST_BIT) == 0) {
+        if ((flags & FIRST_BIT_UINT16) == 0) {
             continue;
         }
 
@@ -189,7 +189,7 @@ void* client_data(__attribute__((unused)) void* arg)
         uint16_t id = ntohs(header->id);
         uint16_t flags = ntohs(header->flags);
 
-        if (flags & FIRST_BIT) {
+        if (flags & FIRST_BIT_UINT16) {
             continue;
         }
 

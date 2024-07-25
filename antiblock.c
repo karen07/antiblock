@@ -97,7 +97,7 @@ int main(int argc, char* argv[])
         }
         if (!strcmp(argv[i], "-route_IP")) {
             if (i != argc - 1) {
-                if (strlen(argv[i + 1]) < IP4_STR_MAX_SIZE) {
+                if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
                     route_ip = inet_addr(argv[i + 1]);
                 }
                 i++;
@@ -106,7 +106,7 @@ int main(int argc, char* argv[])
         }
         if (!strcmp(argv[i], "-DNS_IP")) {
             if (i != argc - 1) {
-                if (strlen(argv[i + 1]) < IP4_STR_MAX_SIZE) {
+                if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
                     dns_ip = inet_addr(argv[i + 1]);
                 }
                 i++;
@@ -122,7 +122,7 @@ int main(int argc, char* argv[])
         }
         if (!strcmp(argv[i], "-listen_IP")) {
             if (i != argc - 1) {
-                if (strlen(argv[i + 1]) < IP4_STR_MAX_SIZE) {
+                if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
                     listen_ip = inet_addr(argv[i + 1]);
                 }
                 i++;
@@ -142,7 +142,7 @@ int main(int argc, char* argv[])
                 if (slash_ptr) {
                     sscanf(slash_ptr + 1, "%u", &tun_prefix);
                     *slash_ptr = 0;
-                    if (strlen(argv[i + 1]) < IP4_STR_MAX_SIZE) {
+                    if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
                         tun_ip = inet_addr(argv[i + 1]);
                     }
                     *slash_ptr = '/';
@@ -168,7 +168,7 @@ int main(int argc, char* argv[])
         print_help();
     }
 
-    //Check TUN_name, tun_prefix
+    // Check TUN_name, tun_prefix
 
     if (!(is_domains_file_url || is_domains_file_path)) {
         printf("Programm need domains file url or domains file path\n");
