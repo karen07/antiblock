@@ -48,7 +48,7 @@ int32_t get_url_from_packet(char* packet_start, char* hand_point, char* receive_
     int32_t url_len = 0;
     url[url_len++] = '.';
 
-    while ((*hand_point != 0) && ((*hand_point & FIRST_TWO_BITS) != FIRST_TWO_BITS)) {
+    while ((*hand_point != 0) && ((*hand_point & FIRST_TWO_BITS_UINT8) != FIRST_TWO_BITS_UINT8)) {
         uint32_t part_len = *hand_point++;
         if (hand_point + part_len > receive_msg_end) {
             return -1;
@@ -65,7 +65,7 @@ int32_t get_url_from_packet(char* packet_start, char* hand_point, char* receive_
         *first_len = url_len + 1;
     }
 
-    if ((*hand_point & FIRST_TWO_BITS) == FIRST_TWO_BITS) {
+    if ((*hand_point & FIRST_TWO_BITS_UINT8) == FIRST_TWO_BITS_UINT8) {
         url_len--;
         int32_t new_len;
         new_len = get_url_from_packet(packet_start, packet_start + *(hand_point + 1), receive_msg_end, &url[url_len], 0);
@@ -163,7 +163,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
         dns_header_t* header = (dns_header_t*)cur_pos_ptr;
 
         uint16_t flags = ntohs(header->flags);
-        if ((flags & FIRST_BIT) == 0) {
+        if ((flags & FIRST_BIT_UINT16) == 0) {
             stat.request_parsing_error++;
             goto end;
         }
