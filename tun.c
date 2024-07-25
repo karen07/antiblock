@@ -167,9 +167,8 @@ void* tun(__attribute__((unused)) void* arg)
             find_elem_nat.key.proto = proto_L4;
 
             nat_map_t res_elem_nat;
-            int32_t find_elem_flag = array_hashmap_find_elem(nat_map_struct, &find_elem_nat, &res_elem_nat);
-
-            if (find_elem_flag != 1) {
+            int32_t find_elem_nat_flag = array_hashmap_find_elem(nat_map_struct, &find_elem_nat, &res_elem_nat);
+            if (find_elem_nat_flag != 1) {
                 continue;
             }
 
@@ -182,26 +181,39 @@ void* tun(__attribute__((unused)) void* arg)
             find_elem_ip_ip.ip_local = iph->daddr;
 
             ip_ip_map_t res_elem_ip_ip;
-            int32_t find_elem_flag = array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
-
-            if (find_elem_flag != 1) {
+            int32_t find_elem_ip_ip_flag = array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
+            if (find_elem_ip_ip_flag != 1) {
                 continue;
             }
 
+            uint16_t start_new_srt_port = ntohs(src_port);
+            int32_t correct_new_srt_port = 1;
+            nat_map_t add_elem_nat;
             iph_daddr_h |= mask;
 
-            uint16_t start_new_srt_port = 30000;
+            while (correct_new_srt_port) {
+                add_elem_nat.key.src_ip = htonl(iph_daddr_h);
+                add_elem_nat.key.dst_ip = res_elem_ip_ip.ip_global;
+                add_elem_nat.key.src_port = htons(start_new_srt_port);
+                add_elem_nat.key.dst_port = dst_port;
+                add_elem_nat.key.proto = proto_L4;
+                add_elem_nat.value.old_src_ip = iph->saddr;
+                add_elem_nat.value.old_src_port = src_port;
 
-            nat_map_t add_elem_nat;
-            add_elem_nat.key.src_ip = htonl(iph_daddr_h);
-            add_elem_nat.key.dst_ip = res_elem_ip_ip.ip_global;
-            add_elem_nat.key.src_port = htons(start_new_srt_port);
-            add_elem_nat.key.dst_port = dst_port;
-            add_elem_nat.key.proto = proto_L4;
-            add_elem_nat.value.old_src_ip = iph->saddr;
-            add_elem_nat.value.old_src_port = src_port;
-
-            array_hashmap_add_elem(nat_map_struct, &add_elem_nat, NULL, NULL);
+                nat_map_t res_elem_nat;
+                int32_t add_elem_nat_flag = array_hashmap_add_elem(nat_map_struct, &add_elem_nat, &res_elem_nat, NULL);
+                if (add_elem_nat_flag == 1) {
+                    correct_new_srt_port = 0;
+                }
+                if (add_elem_nat_flag == 0) {
+                    if ((add_elem_nat.value.old_src_ip != res_elem_nat.value.old_src_ip) || (add_elem_nat.value.old_src_port != res_elem_nat.value.old_src_port)) {
+                        printf("KARENKAREN!!!!!!!!!!!!!!! %u %u %u %u\n", add_elem_nat.value.old_src_ip, res_elem_nat.value.old_src_ip, add_elem_nat.value.old_src_port, res_elem_nat.value.old_src_port);
+                    } else {
+                        correct_new_srt_port = 0;
+                    }
+                }
+                start_new_srt_port++;
+            }
 
             iph->saddr = add_elem_nat.key.src_ip;
             iph->daddr = add_elem_nat.key.dst_ip;
