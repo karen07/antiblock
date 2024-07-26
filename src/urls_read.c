@@ -136,7 +136,7 @@ void* urls_read(__attribute__((unused)) void* arg)
                 exit(EXIT_FAILURE);
             }
 
-            printf("Readed domains from file %d from url %d\n", file_urls_map_size, urls_map_size);
+            printf("Readed domains from file %d from url %d\n", file_urls_map_size, urls_map_size - file_urls_map_size);
 
             array_hashmap_set_func(urls_map_struct, add_url_hash, add_url_cmp, find_url_hash, find_url_cmp);
 
