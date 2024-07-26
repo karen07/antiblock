@@ -64,6 +64,8 @@ void* ttl_check(__attribute__((unused)) void* arg)
 {
     pthread_barrier_wait(&threads_barrier);
 
+    printf("Thread ttl check started\n");
+
     while (1) {
         now_ttl_check = time(NULL);
 

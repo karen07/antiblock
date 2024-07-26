@@ -59,6 +59,8 @@ void* urls_read(__attribute__((unused)) void* arg)
 {
     pthread_barrier_wait(&threads_barrier);
 
+    printf("Thread urls read started\n");
+
     struct memory chunk;
     memset(&chunk, 0, sizeof(chunk));
 
