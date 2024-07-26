@@ -14,7 +14,7 @@ int tun_alloc(char* dev, int flags)
     char* clonedev = "/dev/net/tun";
 
     if ((fd = open(clonedev, O_RDWR)) < 0) {
-        perror("Opening /dev/net/tun");
+        printf("Opening /dev/net/tun error\n");
         return fd;
     }
 
@@ -27,7 +27,7 @@ int tun_alloc(char* dev, int flags)
     }
 
     if ((err = ioctl(fd, TUNSETIFF, (void*)&ifr)) < 0) {
-        perror("ioctl(TUNSETIFF)");
+        printf("ioctl(TUNSETIFF) error\n");
         close(fd);
         return err;
     }
@@ -100,6 +100,8 @@ int32_t nat_cmp(const void* void_elem1, const void* void_elem2)
 
 void* tun(__attribute__((unused)) void* arg)
 {
+    printf("Thread tun started\n");
+
     int tap_fd;
     char buffer[4096];
     char pseudogram[4096];
@@ -110,6 +112,16 @@ void* tun(__attribute__((unused)) void* arg)
         printf("Can't allocate tun interface\n");
         exit(EXIT_FAILURE);
     }
+
+    struct in_addr start_subnet_ip_addr;
+    start_subnet_ip_addr.s_addr = htonl(start_subnet_ip);
+
+    struct in_addr end_subnet_ip_addr;
+    end_subnet_ip_addr.s_addr = htonl(end_subnet_ip);
+
+    printf("Tun dev %s allocated", tun_name);
+    printf(" %s-", inet_ntoa(start_subnet_ip_addr));
+    printf("%s\n", inet_ntoa(end_subnet_ip_addr));
 
     while (1) {
         int nread = read(tap_fd, buffer, sizeof(buffer));
