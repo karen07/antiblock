@@ -115,10 +115,14 @@ void* urls_read(__attribute__((unused)) void* arg)
 
         if (chunk.size > 0) {
             int32_t urls_map_size = 0;
+            int32_t file_urls_map_size = 0;
             for (int32_t i = 0; i < chunk.size; i++) {
                 if (urls[i] == '\n') {
                     urls[i] = 0;
                     urls_map_size++;
+                    if (i >= urls_web_file_size) {
+                        file_urls_map_size++;
+                    }
                 }
             }
 
@@ -132,7 +136,7 @@ void* urls_read(__attribute__((unused)) void* arg)
                 exit(EXIT_FAILURE);
             }
 
-            printf("Readed %d urls\n", urls_map_size);
+            printf("Readed domains from file %d from url %d\n", file_urls_map_size, urls_map_size);
 
             array_hashmap_set_func(urls_map_struct, add_url_hash, add_url_cmp, find_url_hash, find_url_cmp);
 
