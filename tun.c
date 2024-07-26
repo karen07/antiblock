@@ -1,5 +1,6 @@
 #include "tun.h"
 #include "hash.h"
+#include "stat.h"
 
 const array_hashmap_t* ip_ip_map_struct;
 const array_hashmap_t* nat_map_struct;
@@ -166,6 +167,17 @@ void* tun(__attribute__((unused)) void* arg)
             udph->check = 0;
         }
 
+        struct in_addr src_ip_old;
+        src_ip_old.s_addr = iph->saddr;
+
+        struct in_addr dst_ip_old;
+        dst_ip_old.s_addr = iph->daddr;
+
+        uint16_t src_port_old = src_port;
+        uint16_t dst_port_old = dst_port;
+
+        int32_t in_out_flag = 0;
+
         int32_t iph_daddr_h = ntohl(iph->daddr);
         int32_t mask = 1;
         mask <<= 32 - (tun_prefix + 1);
@@ -188,6 +200,8 @@ void* tun(__attribute__((unused)) void* arg)
             iph->saddr = htonl(iph_daddr_h);
             iph->daddr = res_elem_nat.value.old_src_ip;
             dst_port = res_elem_nat.value.old_src_port;
+
+            in_out_flag = 0;
         } else {
             ip_ip_map_t find_elem_ip_ip;
             find_elem_ip_ip.ip_local = iph->daddr;
@@ -218,9 +232,7 @@ void* tun(__attribute__((unused)) void* arg)
                     correct_new_srt_port = 0;
                 }
                 if (add_elem_nat_flag == 0) {
-                    if ((add_elem_nat.value.old_src_ip != res_elem_nat.value.old_src_ip) || (add_elem_nat.value.old_src_port != res_elem_nat.value.old_src_port)) {
-                        printf("KARENKAREN!!!!!!!!!!!!!!! %u %u %u %u\n", add_elem_nat.value.old_src_ip, res_elem_nat.value.old_src_ip, add_elem_nat.value.old_src_port, res_elem_nat.value.old_src_port);
-                    } else {
+                    if ((add_elem_nat.value.old_src_ip == res_elem_nat.value.old_src_ip) && (add_elem_nat.value.old_src_port == res_elem_nat.value.old_src_port)) {
                         correct_new_srt_port = 0;
                     }
                 }
@@ -230,6 +242,35 @@ void* tun(__attribute__((unused)) void* arg)
             iph->saddr = add_elem_nat.key.src_ip;
             iph->daddr = add_elem_nat.key.dst_ip;
             src_port = add_elem_nat.key.src_port;
+
+            in_out_flag = 1;
+        }
+
+        if (log_fd) {
+            struct in_addr s_ip_new;
+            s_ip_new.s_addr = iph->saddr;
+
+            struct in_addr d_ip_new;
+            d_ip_new.s_addr = iph->daddr;
+
+            if (in_out_flag) {
+                fprintf(log_fd, "NAT OUT: %s ", inet_ntoa(src_ip_old));
+            } else {
+                fprintf(log_fd, "NAT IN : %s ", inet_ntoa(src_ip_old));
+            }
+
+            fprintf(log_fd, "%s ", inet_ntoa(dst_ip_old));
+            fprintf(log_fd, "%u ", ntohs(src_port_old));
+            fprintf(log_fd, "%u", ntohs(dst_port_old));
+
+            fprintf(log_fd, " - ");
+
+            fprintf(log_fd, "%s ", inet_ntoa(s_ip_new));
+            fprintf(log_fd, "%s ", inet_ntoa(d_ip_new));
+            fprintf(log_fd, "%u ", ntohs(src_port));
+            fprintf(log_fd, "%u ", ntohs(dst_port));
+
+            fprintf(log_fd, "%d\n", nread);
         }
 
         if (proto_L4 == IPPROTO_TCP) {
