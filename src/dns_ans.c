@@ -291,12 +291,12 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             }
 
             if (ans_type == 5) {
+                char cname_url[URL_MAX_SIZE];
+                char* cname_url_start = cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t);
+                int32_t cname_url_len = get_url_from_packet(receive_msg, cname_url_start, receive_msg_end, cname_url, 0);
+
                 if (tun_ip) {
                     if (block_que_url_flag && (que_type == 1)) {
-                        char cname_url[URL_MAX_SIZE];
-                        char* cname_url_start = cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t);
-                        int32_t cname_url_len = get_url_from_packet(receive_msg, cname_url_start, receive_msg_end, cname_url, 0);
-
                         strcpy(big_data + big_data_cur_pos, ans_url + 1);
                         simple_graph[simple_graph_cur_pos].url_offet = big_data_cur_pos;
                         big_data_cur_pos += ans_url_len;
@@ -309,12 +309,8 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                     }
                 } else {
                     if (block_ans_url_flag) {
-                        char data_url[URL_MAX_SIZE];
-                        char* cname_url_start = cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t);
-                        int32_t data_url_len = get_url_from_packet(receive_msg, cname_url_start, receive_msg_end, data_url, 0);
-
-                        char* data_url_str = malloc(data_url_len + 1);
-                        strcpy(data_url_str, data_url + 1);
+                        char* data_url_str = malloc(cname_url_len + 1);
+                        strcpy(data_url_str, cname_url + 1);
 
                         cname_urls_map add_elem;
                         add_elem.url = data_url_str;

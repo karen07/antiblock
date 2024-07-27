@@ -41,7 +41,7 @@ int main(void)
 
     dns_addr.sin_family = AF_INET;
     dns_addr.sin_port = htons(5053);
-    dns_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    dns_addr.sin_addr.s_addr = inet_addr("192.168.1.1");
 
     int repeater_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (repeater_socket < 0) {
@@ -95,7 +95,7 @@ int main(void)
         end_name->type = htons(1);
         end_name->class = htons(1);
 
-        usleep(500);
+        usleep(2000);
 
         if (sendto(repeater_socket, packet, 12 + k + 5, 0, (struct sockaddr*)&dns_addr, sizeof(dns_addr)) < 0) {
             printf("Error:Can't send %s\n", strerror(errno));

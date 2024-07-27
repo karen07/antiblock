@@ -76,7 +76,7 @@ int32_t ip_ip_cmp(const void* void_elem1, const void* void_elem2)
     }
 }
 
-int32_t ip_ip_on_collision(const void* void_elem1, const void* void_elem2)
+int32_t ip_ip_on_collision(__attribute__((unused)) const void* void_elem1, __attribute__((unused)) const void* void_elem2)
 {
     return 1;
 }
