@@ -192,9 +192,6 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
         }
 
         block_que_url_flag = check_url(que_url, que_url_len);
-        if (block_que_url_flag != 1) {
-            goto end;
-        }
 
         cur_pos_ptr += que_url_pad_len;
         // QUE URL
@@ -208,9 +205,6 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
         dns_que_t* que = (dns_que_t*)cur_pos_ptr;
 
         que_type = ntohs(que->type);
-        if (que_type != 1) {
-            goto end;
-        }
 
         cur_pos_ptr += sizeof(dns_que_t);
         // QUE DATA
@@ -263,13 +257,15 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
 
             if (ans_type == 1) {
                 if (tun_ip) {
-                    strcpy(big_data + big_data_cur_pos, ans_url + 1);
-                    simple_graph[simple_graph_cur_pos].url_offet = big_data_cur_pos;
-                    big_data_cur_pos += ans_url_len;
-                    simple_graph[simple_graph_cur_pos].type = 1;
-                    simple_graph[simple_graph_cur_pos].ttl = ans_ttl;
-                    simple_graph[simple_graph_cur_pos].cname_offet_or_ip = ans->ip4;
-                    simple_graph_cur_pos++;
+                    if (block_que_url_flag && (que_type == 1)) {
+                        strcpy(big_data + big_data_cur_pos, ans_url + 1);
+                        simple_graph[simple_graph_cur_pos].url_offet = big_data_cur_pos;
+                        big_data_cur_pos += ans_url_len;
+                        simple_graph[simple_graph_cur_pos].type = 1;
+                        simple_graph[simple_graph_cur_pos].ttl = ans_ttl;
+                        simple_graph[simple_graph_cur_pos].cname_offet_or_ip = ans->ip4;
+                        simple_graph_cur_pos++;
+                    }
                 } else {
                     ttl_map_t add_elem;
                     add_elem.ip = ans->ip4;
@@ -296,19 +292,21 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
 
             if (ans_type == 5) {
                 if (tun_ip) {
-                    char cname_url[URL_MAX_SIZE];
-                    char* cname_url_start = cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t);
-                    int32_t cname_url_len = get_url_from_packet(receive_msg, cname_url_start, receive_msg_end, cname_url, 0);
+                    if (block_que_url_flag && (que_type == 1)) {
+                        char cname_url[URL_MAX_SIZE];
+                        char* cname_url_start = cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t);
+                        int32_t cname_url_len = get_url_from_packet(receive_msg, cname_url_start, receive_msg_end, cname_url, 0);
 
-                    strcpy(big_data + big_data_cur_pos, ans_url + 1);
-                    simple_graph[simple_graph_cur_pos].url_offet = big_data_cur_pos;
-                    big_data_cur_pos += ans_url_len;
-                    simple_graph[simple_graph_cur_pos].type = 5;
-                    simple_graph[simple_graph_cur_pos].ttl = ans_ttl;
-                    strcpy(big_data + big_data_cur_pos, cname_url + 1);
-                    simple_graph[simple_graph_cur_pos].cname_offet_or_ip = big_data_cur_pos;
-                    big_data_cur_pos += cname_url_len;
-                    simple_graph_cur_pos++;
+                        strcpy(big_data + big_data_cur_pos, ans_url + 1);
+                        simple_graph[simple_graph_cur_pos].url_offet = big_data_cur_pos;
+                        big_data_cur_pos += ans_url_len;
+                        simple_graph[simple_graph_cur_pos].type = 5;
+                        simple_graph[simple_graph_cur_pos].ttl = ans_ttl;
+                        strcpy(big_data + big_data_cur_pos, cname_url + 1);
+                        simple_graph[simple_graph_cur_pos].cname_offet_or_ip = big_data_cur_pos;
+                        big_data_cur_pos += cname_url_len;
+                        simple_graph_cur_pos++;
+                    }
                 } else {
                     if (block_ans_url_flag) {
                         char data_url[URL_MAX_SIZE];
@@ -321,7 +319,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                         cname_urls_map add_elem;
                         add_elem.url = data_url_str;
                         add_elem.end_time = check_time;
-                        
+
                         cname_urls_map elem;
                         int32_t new_elem_flag = array_hashmap_add_elem(cname_urls_map_struct, &add_elem, &elem, cname_url_on_collision);
                         if (new_elem_flag == 1) {
@@ -340,7 +338,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             // ANS DATA
         }
 
-        if (block_que_url_flag && tun_ip) {
+        if (tun_ip && block_que_url_flag && (que_type == 1)) {
             int32_t que_offet = -1;
 
             for (int i = 0; i < simple_graph_cur_pos; i++) {
@@ -430,8 +428,12 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
         }
 
     end:
-        if (block_que_url_flag && tun_ip) {
-            if (que_type == 1) {
+        if (tun_ip) {
+            if (block_que_url_flag) {
+                if (que_type == 1) {
+                    send_packet(ring_elem_num);
+                }
+            } else {
                 send_packet(ring_elem_num);
             }
         } else {
