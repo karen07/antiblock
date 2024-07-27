@@ -116,7 +116,7 @@ void* urls_read(__attribute__((unused)) void* arg)
         if (chunk.size > 0) {
             int32_t urls_map_size = 0;
             int32_t file_urls_map_size = 0;
-            for (int32_t i = 0; i < chunk.size; i++) {
+            for (int32_t i = 0; i < (int32_t)chunk.size; i++) {
                 if (urls[i] == '\n') {
                     urls[i] = 0;
                     urls_map_size++;

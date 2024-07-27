@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.6)
 project(antiblock)
-add_compile_options(-Wall -Werror)
+add_compile_options(-Wall -Wextra -Werror)
 add_subdirectory(hashmap)
 include_directories(include hashmap/include) 
 file(GLOB SRC "src/*.c")

@@ -199,11 +199,6 @@ int main(int argc, char* argv[])
         print_help();
     }
 
-    if (dns_port > USHRT_MAX) {
-        printf("Programm need DNS port under 65535\n");
-        print_help();
-    }
-
     if (listen_ip == 0) {
         printf("Programm need listen IP\n");
         print_help();
@@ -211,11 +206,6 @@ int main(int argc, char* argv[])
 
     if (listen_port == 0) {
         printf("Programm need listen port\n");
-        print_help();
-    }
-
-    if (listen_port > USHRT_MAX) {
-        printf("Programm need listen port under 65535\n");
         print_help();
     }
 
