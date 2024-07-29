@@ -230,7 +230,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                 goto end;
             }
 
-            int32_t block_ans_url_flag __attribute__((unused)) = 0;
+            int32_t block_ans_url_flag = 0;
             block_ans_url_flag = check_url(ans_url, ans_url_len);
 
             cur_pos_ptr += ans_url_pad_len;
