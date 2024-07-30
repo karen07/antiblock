@@ -246,31 +246,36 @@ void* tun(__attribute__((unused)) void* arg)
             in_out_flag = 1;
         }
 
-        if (log_fd) {
+        if (log_fd && 0) {
             struct in_addr s_ip_new;
             s_ip_new.s_addr = iph->saddr;
 
             struct in_addr d_ip_new;
             d_ip_new.s_addr = iph->daddr;
 
+            char log_out_str[1000];
+
             if (in_out_flag) {
-                fprintf(log_fd, "NAT OUT: %s ", inet_ntoa(src_ip_old));
+                sprintf(log_out_str, "NAT OUT: %s ", inet_ntoa(src_ip_old));
             } else {
-                fprintf(log_fd, "NAT IN : %s ", inet_ntoa(src_ip_old));
+                sprintf(log_out_str, "NAT IN : %s ", inet_ntoa(src_ip_old));
             }
 
-            fprintf(log_fd, "%s ", inet_ntoa(dst_ip_old));
-            fprintf(log_fd, "%u ", ntohs(src_port_old));
-            fprintf(log_fd, "%u", ntohs(dst_port_old));
+            sprintf(log_out_str + strlen(log_out_str), "%s ", inet_ntoa(dst_ip_old));
+            sprintf(log_out_str + strlen(log_out_str), "%u ", ntohs(src_port_old));
+            sprintf(log_out_str + strlen(log_out_str), "%u", ntohs(dst_port_old));
 
-            fprintf(log_fd, " - ");
+            sprintf(log_out_str + strlen(log_out_str), " - ");
 
-            fprintf(log_fd, "%s ", inet_ntoa(s_ip_new));
-            fprintf(log_fd, "%s ", inet_ntoa(d_ip_new));
-            fprintf(log_fd, "%u ", ntohs(src_port));
-            fprintf(log_fd, "%u ", ntohs(dst_port));
+            sprintf(log_out_str + strlen(log_out_str), "%s ", inet_ntoa(s_ip_new));
+            sprintf(log_out_str + strlen(log_out_str), "%s ", inet_ntoa(d_ip_new));
+            sprintf(log_out_str + strlen(log_out_str), "%u ", ntohs(src_port));
+            sprintf(log_out_str + strlen(log_out_str), "%u ", ntohs(dst_port));
 
-            fprintf(log_fd, "%d\n", nread);
+            sprintf(log_out_str + strlen(log_out_str), "%d\n", nread);
+
+            fprintf(log_fd, "%s", log_out_str);
+            fflush(log_fd);
         }
 
         if (proto_L4 == IPPROTO_TCP) {

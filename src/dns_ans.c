@@ -82,6 +82,10 @@ int32_t get_url_from_packet(char* packet_start, char* hand_point, char* receive_
 
 int32_t check_url(char* url, int32_t url_len)
 {
+    if (!strcmp(url, ".redirector.googlevideo.com")) {
+        return 0;
+    }
+
     char* dot_pos = NULL;
     int32_t dot_count = 0;
     for (int32_t i = url_len; i >= 0; i--) {
@@ -397,6 +401,23 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                             new_ans->ip4 = start_subnet_ip_n;
 
                             cur_pos_ptr += sizeof(dns_ans_t);
+
+                            if (log_fd) {
+                                struct in_addr new_ip;
+                                new_ip.s_addr = start_subnet_ip_n;
+
+                                struct in_addr old_ip;
+                                old_ip.s_addr = simple_graph[i].cname_offet_or_ip;
+
+                                char log_out_str[2000];
+
+                                sprintf(log_out_str, "URL: %s ", que_url + 1);
+                                sprintf(log_out_str + strlen(log_out_str), "%s ", inet_ntoa(new_ip));
+                                sprintf(log_out_str + strlen(log_out_str), "%s\n", inet_ntoa(old_ip));
+
+                                fprintf(log_fd, "%s", log_out_str);
+                                fflush(log_fd);
+                            }
 
                             if (start_subnet_ip == end_subnet_ip) {
                                 start_subnet_ip = ntohl(tun_ip) + 1;
