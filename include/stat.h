@@ -23,8 +23,8 @@ typedef struct statistics {
 } statistics_t;
 
 extern statistics_t stat;
-extern FILE* log_fd;
-extern FILE* stat_fd;
+extern FILE *log_fd;
+extern FILE *stat_fd;
 
-void* stat_print(void* arg);
+void *stat_print(void *arg);
 void init_stat_print_thread(void);

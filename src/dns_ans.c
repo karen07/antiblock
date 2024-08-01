@@ -13,14 +13,14 @@ pthread_cond_t packets_ring_buffer_step;
 int32_t packets_ring_buffer_size;
 int32_t packets_ring_buffer_start;
 int32_t packets_ring_buffer_end;
-packet_t* packets_ring_buffer;
+packet_t *packets_ring_buffer;
 
-const array_hashmap_t* cname_urls_map_struct;
+const array_hashmap_t *cname_urls_map_struct;
 
-int32_t cname_url_on_collision(const void* void_elem1, const void* void_elem2)
+int32_t cname_url_on_collision(const void *void_elem1, const void *void_elem2)
 {
-    const cname_urls_map* elem1 = void_elem1;
-    const cname_urls_map* elem2 = void_elem2;
+    const cname_urls_map *elem1 = void_elem1;
+    const cname_urls_map *elem2 = void_elem2;
 
     if (elem1->end_time > elem2->end_time) {
         return 1;
@@ -29,21 +29,22 @@ int32_t cname_url_on_collision(const void* void_elem1, const void* void_elem2)
     }
 }
 
-uint32_t cname_url_hash(const void* void_elem)
+uint32_t cname_url_hash(const void *void_elem)
 {
-    const cname_urls_map* elem = void_elem;
+    const cname_urls_map *elem = void_elem;
     return djb33_hash_len(elem->url, -1);
 }
 
-int32_t cname_url_cmp(const void* void_elem1, const void* void_elem2)
+int32_t cname_url_cmp(const void *void_elem1, const void *void_elem2)
 {
-    const cname_urls_map* elem1 = void_elem1;
-    const cname_urls_map* elem2 = void_elem2;
+    const cname_urls_map *elem1 = void_elem1;
+    const cname_urls_map *elem2 = void_elem2;
 
     return !strcmp(elem1->url, elem2->url);
 }
 
-int32_t get_url_from_packet(char* packet_start, char* hand_point, char* receive_msg_end, char* url, int32_t* first_len)
+int32_t get_url_from_packet(char *packet_start, char *hand_point, char *receive_msg_end, char *url,
+                            int32_t *first_len)
 {
     int32_t url_len = 0;
     url[url_len++] = '.';
@@ -68,7 +69,8 @@ int32_t get_url_from_packet(char* packet_start, char* hand_point, char* receive_
     if ((*hand_point & FIRST_TWO_BITS_UINT8) == FIRST_TWO_BITS_UINT8) {
         url_len--;
         int32_t new_len;
-        new_len = get_url_from_packet(packet_start, packet_start + *(hand_point + 1), receive_msg_end, &url[url_len], 0);
+        new_len = get_url_from_packet(packet_start, packet_start + *(hand_point + 1),
+                                      receive_msg_end, &url[url_len], 0);
         if (new_len == -1) {
             return -1;
         }
@@ -80,13 +82,13 @@ int32_t get_url_from_packet(char* packet_start, char* hand_point, char* receive_
     return url_len;
 }
 
-int32_t check_url(char* url, int32_t url_len)
+int32_t check_url(char *url, int32_t url_len)
 {
     if (!strcmp(url, ".redirector.googlevideo.com")) {
         return 0;
     }
 
-    char* dot_pos = NULL;
+    char *dot_pos = NULL;
     int32_t dot_count = 0;
     for (int32_t i = url_len; i >= 0; i--) {
         if (url[i] == '.') {
@@ -121,7 +123,7 @@ struct simple_graph {
     int32_t cname_offet_or_ip;
 };
 
-void change_to_dns_string_format(char* str, int32_t str_len)
+void change_to_dns_string_format(char *str, int32_t str_len)
 {
     int32_t current_pos = str_len;
 
@@ -133,7 +135,7 @@ void change_to_dns_string_format(char* str, int32_t str_len)
     }
 }
 
-void* dns_ans_check(__attribute__((unused)) void* arg)
+void *dns_ans_check(__attribute__((unused)) void *arg)
 {
     int32_t block_que_url_flag = 0;
     uint16_t que_type = 0;
@@ -149,11 +151,11 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
 
         int32_t ring_elem_num = packets_ring_buffer_start % packets_ring_buffer_size;
 
-        char* receive_msg = packets_ring_buffer[ring_elem_num].packet;
+        char *receive_msg = packets_ring_buffer[ring_elem_num].packet;
         int32_t receive_msg_len = packets_ring_buffer[ring_elem_num].packet_size;
 
-        char* cur_pos_ptr = receive_msg;
-        char* receive_msg_end = receive_msg + receive_msg_len;
+        char *cur_pos_ptr = receive_msg;
+        char *receive_msg_end = receive_msg + receive_msg_len;
 
         block_que_url_flag = 0;
         que_type = 0;
@@ -164,7 +166,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             goto end;
         }
 
-        dns_header_t* header = (dns_header_t*)cur_pos_ptr;
+        dns_header_t *header = (dns_header_t *)cur_pos_ptr;
 
         uint16_t flags = ntohs(header->flags);
         if ((flags & FIRST_BIT_UINT16) == 0) {
@@ -188,8 +190,9 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
         // QUE URL
         int32_t que_url_pad_len;
         char que_url[URL_MAX_SIZE];
-        char* que_url_start = cur_pos_ptr;
-        int32_t que_url_len = get_url_from_packet(receive_msg, que_url_start, receive_msg_end, que_url, &que_url_pad_len);
+        char *que_url_start = cur_pos_ptr;
+        int32_t que_url_len = get_url_from_packet(receive_msg, que_url_start, receive_msg_end,
+                                                  que_url, &que_url_pad_len);
         if (que_url_len == -1) {
             stat.request_parsing_error++;
             goto end;
@@ -206,7 +209,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             goto end;
         }
 
-        dns_que_t* que = (dns_que_t*)cur_pos_ptr;
+        dns_que_t *que = (dns_que_t *)cur_pos_ptr;
 
         que_type = ntohs(que->type);
 
@@ -214,7 +217,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
         // QUE DATA
 
         // GRAPH
-        char* ans_start_prt = cur_pos_ptr;
+        char *ans_start_prt = cur_pos_ptr;
 
         char big_data[10000];
         int32_t big_data_cur_pos = 0;
@@ -227,8 +230,9 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             // ANS URL
             int32_t ans_url_pad_len;
             char ans_url[URL_MAX_SIZE];
-            char* ans_url_start = cur_pos_ptr;
-            int32_t ans_url_len = get_url_from_packet(receive_msg, ans_url_start, receive_msg_end, ans_url, &ans_url_pad_len);
+            char *ans_url_start = cur_pos_ptr;
+            int32_t ans_url_len = get_url_from_packet(receive_msg, ans_url_start, receive_msg_end,
+                                                      ans_url, &ans_url_pad_len);
             if (ans_url_len == -1) {
                 stat.request_parsing_error++;
                 goto end;
@@ -246,7 +250,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                 goto end;
             }
 
-            dns_ans_t* ans = (dns_ans_t*)cur_pos_ptr;
+            dns_ans_t *ans = (dns_ans_t *)cur_pos_ptr;
 
             uint16_t ans_type = ntohs(ans->type);
             uint32_t ans_ttl = ntohl(ans->ttl);
@@ -277,7 +281,8 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
 
                     ttl_map_t elem;
                     if (block_ans_url_flag) {
-                        int32_t new_elem_flag = array_hashmap_add_elem(ttl_map_struct, &add_elem, &elem, ttl_on_collision);
+                        int32_t new_elem_flag = array_hashmap_add_elem(ttl_map_struct, &add_elem,
+                                                                       &elem, ttl_on_collision);
                         if (new_elem_flag == 1) {
                             add_ip_to_route_table(add_elem.ip, add_elem.end_time, ans_url + 1);
                         } else if (new_elem_flag == 0) {
@@ -286,7 +291,8 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                             stat.ttl_map_error++;
                         }
                     } else {
-                        int32_t find_res = array_hashmap_find_elem(ttl_map_struct, &add_elem, &elem);
+                        int32_t find_res =
+                            array_hashmap_find_elem(ttl_map_struct, &add_elem, &elem);
                         if (find_res == 1) {
                             not_block_ip_in_route_table(elem.ip, elem.end_time, ans_url + 1);
                         }
@@ -296,8 +302,9 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
 
             if (ans_type == 5) {
                 char cname_url[URL_MAX_SIZE];
-                char* cname_url_start = cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t);
-                int32_t cname_url_len = get_url_from_packet(receive_msg, cname_url_start, receive_msg_end, cname_url, 0);
+                char *cname_url_start = cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t);
+                int32_t cname_url_len = get_url_from_packet(receive_msg, cname_url_start,
+                                                            receive_msg_end, cname_url, 0);
 
                 if (tun_ip) {
                     if (block_que_url_flag && (que_type == 1)) {
@@ -313,7 +320,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                     }
                 } else {
                     if (block_ans_url_flag) {
-                        char* data_url_str = malloc(cname_url_len + 1);
+                        char *data_url_str = malloc(cname_url_len + 1);
                         strcpy(data_url_str, cname_url + 1);
 
                         cname_urls_map add_elem;
@@ -321,7 +328,8 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                         add_elem.end_time = check_time;
 
                         cname_urls_map elem;
-                        int32_t new_elem_flag = array_hashmap_add_elem(cname_urls_map_struct, &add_elem, &elem, cname_url_on_collision);
+                        int32_t new_elem_flag = array_hashmap_add_elem(
+                            cname_urls_map_struct, &add_elem, &elem, cname_url_on_collision);
                         if (new_elem_flag == 1) {
                             add_url_cname(ans_url + 1, add_elem.end_time, add_elem.url);
                         } else if (new_elem_flag == 0) {
@@ -382,7 +390,8 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                             add_elem.ip_local = start_subnet_ip_n;
                             add_elem.ip_global = simple_graph[i].cname_offet_or_ip;
 
-                            array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, ip_ip_on_collision);
+                            array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL,
+                                                   ip_ip_on_collision);
 
                             memcpy(cur_pos_ptr, out_que_url, que_url_len + 1);
                             cur_pos_ptr += que_url_len + 1;
@@ -392,7 +401,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                             uint32_t ttl = 10;
                             uint16_t len = 4;
 
-                            dns_ans_t* new_ans = (dns_ans_t*)cur_pos_ptr;
+                            dns_ans_t *new_ans = (dns_ans_t *)cur_pos_ptr;
 
                             new_ans->type = htons(type);
                             new_ans->class = htons(class);
@@ -412,8 +421,10 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
                                 char log_out_str[2000];
 
                                 sprintf(log_out_str, "URL: %s ", que_url + 1);
-                                sprintf(log_out_str + strlen(log_out_str), "%s ", inet_ntoa(new_ip));
-                                sprintf(log_out_str + strlen(log_out_str), "%s\n", inet_ntoa(old_ip));
+                                sprintf(log_out_str + strlen(log_out_str), "%s ",
+                                        inet_ntoa(new_ip));
+                                sprintf(log_out_str + strlen(log_out_str), "%s\n",
+                                        inet_ntoa(old_ip));
 
                                 fprintf(log_fd, "%s", log_out_str);
                                 fflush(log_fd);
@@ -444,7 +455,7 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
             }
         }
 
-    end:
+end:
         if (tun_ip) {
             if (block_que_url_flag) {
                 if (que_type == 1) {
@@ -466,13 +477,15 @@ void* dns_ans_check(__attribute__((unused)) void* arg)
 
 void init_dns_ans_check_thread(void)
 {
-    cname_urls_map_struct = init_array_hashmap(CNAME_URLS_MAP_MAX_SIZE, 1.0, sizeof(cname_urls_map));
+    cname_urls_map_struct =
+        init_array_hashmap(CNAME_URLS_MAP_MAX_SIZE, 1.0, sizeof(cname_urls_map));
     if (cname_urls_map_struct == NULL) {
         printf("No free memory for cname_urls_map_struct\n");
         exit(EXIT_FAILURE);
     }
 
-    array_hashmap_set_func(cname_urls_map_struct, cname_url_hash, cname_url_cmp, cname_url_hash, cname_url_cmp);
+    array_hashmap_set_func(cname_urls_map_struct, cname_url_hash, cname_url_cmp, cname_url_hash,
+                           cname_url_cmp);
 
     packets_ring_buffer_size = PACKETS_RING_BUFFER_MAX_SIZE;
 

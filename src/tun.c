@@ -2,17 +2,17 @@
 #include "hash.h"
 #include "stat.h"
 
-const array_hashmap_t* ip_ip_map_struct;
-const array_hashmap_t* nat_map_struct;
+const array_hashmap_t *ip_ip_map_struct;
+const array_hashmap_t *nat_map_struct;
 
 uint32_t start_subnet_ip;
 uint32_t end_subnet_ip;
 
-int tun_alloc(char* dev, int flags)
+int tun_alloc(char *dev, int flags)
 {
     struct ifreq ifr;
     int fd, err;
-    char* clonedev = "/dev/net/tun";
+    char *clonedev = "/dev/net/tun";
 
     if ((fd = open(clonedev, O_RDWR)) < 0) {
         printf("Opening /dev/net/tun error\n");
@@ -27,7 +27,7 @@ int tun_alloc(char* dev, int flags)
         strncpy(ifr.ifr_name, dev, IFNAMSIZ);
     }
 
-    if ((err = ioctl(fd, TUNSETIFF, (void*)&ifr)) < 0) {
+    if ((err = ioctl(fd, TUNSETIFF, (void *)&ifr)) < 0) {
         printf("ioctl(TUNSETIFF) error\n");
         close(fd);
         return err;
@@ -38,12 +38,12 @@ int tun_alloc(char* dev, int flags)
     return fd;
 }
 
-unsigned short checksum(const char* buf, unsigned size)
+unsigned short checksum(const char *buf, unsigned size)
 {
     unsigned sum = 0, i;
 
     for (i = 0; i < size - 1; i += 2) {
-        unsigned short word16 = *(unsigned short*)&buf[i];
+        unsigned short word16 = *(unsigned short *)&buf[i];
         sum += word16;
     }
 
@@ -58,16 +58,16 @@ unsigned short checksum(const char* buf, unsigned size)
     return ~sum;
 }
 
-uint32_t ip_ip_hash(const void* void_elem)
+uint32_t ip_ip_hash(const void *void_elem)
 {
-    const ip_ip_map_t* elem = void_elem;
+    const ip_ip_map_t *elem = void_elem;
     return elem->ip_local;
 }
 
-int32_t ip_ip_cmp(const void* void_elem1, const void* void_elem2)
+int32_t ip_ip_cmp(const void *void_elem1, const void *void_elem2)
 {
-    const ip_ip_map_t* elem1 = void_elem1;
-    const ip_ip_map_t* elem2 = void_elem2;
+    const ip_ip_map_t *elem1 = void_elem1;
+    const ip_ip_map_t *elem2 = void_elem2;
 
     if (elem1->ip_local == elem2->ip_local) {
         return 1;
@@ -76,21 +76,22 @@ int32_t ip_ip_cmp(const void* void_elem1, const void* void_elem2)
     }
 }
 
-int32_t ip_ip_on_collision(__attribute__((unused)) const void* void_elem1, __attribute__((unused)) const void* void_elem2)
+int32_t ip_ip_on_collision(__attribute__((unused)) const void *void_elem1,
+                           __attribute__((unused)) const void *void_elem2)
 {
     return 1;
 }
 
-uint32_t nat_hash(const void* void_elem)
+uint32_t nat_hash(const void *void_elem)
 {
-    const nat_map_t* elem = void_elem;
-    return djb33_hash_len((const char*)(&elem->key), sizeof(elem->key));
+    const nat_map_t *elem = void_elem;
+    return djb33_hash_len((const char *)(&elem->key), sizeof(elem->key));
 }
 
-int32_t nat_cmp(const void* void_elem1, const void* void_elem2)
+int32_t nat_cmp(const void *void_elem1, const void *void_elem2)
 {
-    const nat_map_t* elem1 = void_elem1;
-    const nat_map_t* elem2 = void_elem2;
+    const nat_map_t *elem1 = void_elem1;
+    const nat_map_t *elem2 = void_elem2;
 
     if (memcmp(&elem1->key, &elem2->key, sizeof(elem1->key)) == 0) {
         return 1;
@@ -99,7 +100,7 @@ int32_t nat_cmp(const void* void_elem1, const void* void_elem2)
     }
 }
 
-void* tun(__attribute__((unused)) void* arg)
+void *tun(__attribute__((unused)) void *arg)
 {
     printf("Thread tun started\n");
 
@@ -131,15 +132,15 @@ void* tun(__attribute__((unused)) void* arg)
             continue;
         }
 
-        tun_header_t* tun_header = (tun_header_t*)buffer;
+        tun_header_t *tun_header = (tun_header_t *)buffer;
 
         int proto_L3 = ntohs(tun_header->proto);
         if (proto_L3 != ETH_P_IP) {
             continue;
         }
 
-        char* L3_start_pointer = buffer + sizeof(tun_header_t);
-        struct iphdr* iph = (struct iphdr*)L3_start_pointer;
+        char *L3_start_pointer = buffer + sizeof(tun_header_t);
+        struct iphdr *iph = (struct iphdr *)L3_start_pointer;
 
         char proto_L4 = iph->protocol;
         if ((proto_L4 != IPPROTO_TCP) && (proto_L4 != IPPROTO_UDP)) {
@@ -149,9 +150,9 @@ void* tun(__attribute__((unused)) void* arg)
         uint16_t src_port;
         uint16_t dst_port;
 
-        char* L4_start_pointer = L3_start_pointer + sizeof(struct iphdr);
+        char *L4_start_pointer = L3_start_pointer + sizeof(struct iphdr);
         if (proto_L4 == IPPROTO_TCP) {
-            struct tcphdr* tcph = (struct tcphdr*)L4_start_pointer;
+            struct tcphdr *tcph = (struct tcphdr *)L4_start_pointer;
 
             src_port = tcph->source;
             dst_port = tcph->dest;
@@ -159,7 +160,7 @@ void* tun(__attribute__((unused)) void* arg)
             tcph->check = 0;
         }
         if (proto_L4 == IPPROTO_UDP) {
-            struct udphdr* udph = (struct udphdr*)L4_start_pointer;
+            struct udphdr *udph = (struct udphdr *)L4_start_pointer;
 
             src_port = udph->source;
             dst_port = udph->dest;
@@ -191,7 +192,8 @@ void* tun(__attribute__((unused)) void* arg)
             find_elem_nat.key.proto = proto_L4;
 
             nat_map_t res_elem_nat;
-            int32_t find_elem_nat_flag = array_hashmap_find_elem(nat_map_struct, &find_elem_nat, &res_elem_nat);
+            int32_t find_elem_nat_flag =
+                array_hashmap_find_elem(nat_map_struct, &find_elem_nat, &res_elem_nat);
             if (find_elem_nat_flag != 1) {
                 continue;
             }
@@ -207,7 +209,8 @@ void* tun(__attribute__((unused)) void* arg)
             find_elem_ip_ip.ip_local = iph->daddr;
 
             ip_ip_map_t res_elem_ip_ip;
-            int32_t find_elem_ip_ip_flag = array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
+            int32_t find_elem_ip_ip_flag =
+                array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
             if (find_elem_ip_ip_flag != 1) {
                 continue;
             }
@@ -227,12 +230,14 @@ void* tun(__attribute__((unused)) void* arg)
                 add_elem_nat.value.old_src_port = src_port;
 
                 nat_map_t res_elem_nat;
-                int32_t add_elem_nat_flag = array_hashmap_add_elem(nat_map_struct, &add_elem_nat, &res_elem_nat, NULL);
+                int32_t add_elem_nat_flag =
+                    array_hashmap_add_elem(nat_map_struct, &add_elem_nat, &res_elem_nat, NULL);
                 if (add_elem_nat_flag == 1) {
                     correct_new_srt_port = 0;
                 }
                 if (add_elem_nat_flag == 0) {
-                    if ((add_elem_nat.value.old_src_ip == res_elem_nat.value.old_src_ip) && (add_elem_nat.value.old_src_port == res_elem_nat.value.old_src_port)) {
+                    if ((add_elem_nat.value.old_src_ip == res_elem_nat.value.old_src_ip) &&
+                        (add_elem_nat.value.old_src_port == res_elem_nat.value.old_src_port)) {
                         correct_new_srt_port = 0;
                     }
                 }
@@ -279,13 +284,13 @@ void* tun(__attribute__((unused)) void* arg)
         }
 
         if (proto_L4 == IPPROTO_TCP) {
-            struct tcphdr* tcph = (struct tcphdr*)L4_start_pointer;
+            struct tcphdr *tcph = (struct tcphdr *)L4_start_pointer;
 
             tcph->source = src_port;
             tcph->dest = dst_port;
         }
         if (proto_L4 == IPPROTO_UDP) {
-            struct udphdr* udph = (struct udphdr*)L4_start_pointer;
+            struct udphdr *udph = (struct udphdr *)L4_start_pointer;
 
             udph->source = src_port;
             udph->dest = dst_port;
@@ -301,20 +306,20 @@ void* tun(__attribute__((unused)) void* arg)
         psh.protocol = htons(proto_L4);
         psh.length = htons(L4_len);
 
-        memcpy(pseudogram, (char*)&psh, sizeof(pseudo_header_t));
+        memcpy(pseudogram, (char *)&psh, sizeof(pseudo_header_t));
         memcpy(pseudogram + sizeof(pseudo_header_t), L4_start_pointer, L4_len);
 
         int psize = sizeof(pseudo_header_t) + L4_len;
-        uint16_t checksum_value = checksum((const char*)pseudogram, psize);
+        uint16_t checksum_value = checksum((const char *)pseudogram, psize);
 
         if (proto_L4 == IPPROTO_TCP) {
-            struct tcphdr* tcph = (struct tcphdr*)L4_start_pointer;
+            struct tcphdr *tcph = (struct tcphdr *)L4_start_pointer;
 
             tcph->check = checksum_value;
         }
 
         if (proto_L4 == IPPROTO_UDP) {
-            struct udphdr* udph = (struct udphdr*)L4_start_pointer;
+            struct udphdr *udph = (struct udphdr *)L4_start_pointer;
 
             udph->check = checksum_value;
         }

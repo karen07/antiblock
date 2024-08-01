@@ -3,12 +3,12 @@
 #include "route.h"
 #include "stat.h"
 
-const array_hashmap_t* ttl_map_struct;
+const array_hashmap_t *ttl_map_struct;
 time_t now_ttl_check;
 
-int32_t cname_url_decide(const void* void_elem)
+int32_t cname_url_decide(const void *void_elem)
 {
-    const cname_urls_map* elem = void_elem;
+    const cname_urls_map *elem = void_elem;
 
     if (now_ttl_check > elem->end_time) {
         del_url_cname(elem->url, elem->end_time);
@@ -18,9 +18,9 @@ int32_t cname_url_decide(const void* void_elem)
     }
 }
 
-int32_t ttl_decide(const void* void_elem)
+int32_t ttl_decide(const void *void_elem)
 {
-    const ttl_map_t* elem = void_elem;
+    const ttl_map_t *elem = void_elem;
 
     if (now_ttl_check > elem->end_time) {
         del_ip_from_route_table(elem->ip, elem->end_time);
@@ -30,10 +30,10 @@ int32_t ttl_decide(const void* void_elem)
     }
 }
 
-int32_t ttl_on_collision(const void* void_elem1, const void* void_elem2)
+int32_t ttl_on_collision(const void *void_elem1, const void *void_elem2)
 {
-    const ttl_map_t* elem1 = void_elem1;
-    const ttl_map_t* elem2 = void_elem2;
+    const ttl_map_t *elem1 = void_elem1;
+    const ttl_map_t *elem2 = void_elem2;
 
     if (elem1->end_time > elem2->end_time) {
         return 1;
@@ -42,16 +42,16 @@ int32_t ttl_on_collision(const void* void_elem1, const void* void_elem2)
     }
 }
 
-uint32_t ttl_hash(const void* void_elem)
+uint32_t ttl_hash(const void *void_elem)
 {
-    const ttl_map_t* elem = void_elem;
+    const ttl_map_t *elem = void_elem;
     return elem->ip;
 }
 
-int32_t ttl_cmp(const void* void_elem1, const void* void_elem2)
+int32_t ttl_cmp(const void *void_elem1, const void *void_elem2)
 {
-    const ttl_map_t* elem1 = void_elem1;
-    const ttl_map_t* elem2 = void_elem2;
+    const ttl_map_t *elem1 = void_elem1;
+    const ttl_map_t *elem2 = void_elem2;
 
     if (elem1->ip == elem2->ip) {
         return 1;
@@ -60,7 +60,7 @@ int32_t ttl_cmp(const void* void_elem1, const void* void_elem2)
     }
 }
 
-void* ttl_check(__attribute__((unused)) void* arg)
+void *ttl_check(__attribute__((unused)) void *arg)
 {
     pthread_barrier_wait(&threads_barrier);
 
