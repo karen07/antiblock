@@ -2,48 +2,48 @@
 #include "hash.h"
 #include <curl/curl.h>
 
-char* urls;
-const array_hashmap_t* urls_map_struct;
+char *urls;
+const array_hashmap_t *urls_map_struct;
 
-uint32_t add_url_hash(const void* void_elem)
+uint32_t add_url_hash(const void *void_elem)
 {
-    const uint32_t* elem = void_elem;
+    const uint32_t *elem = void_elem;
     return djb33_hash_len(&urls[*elem], -1);
 }
 
-int32_t add_url_cmp(const void* void_elem1, const void* void_elem2)
+int32_t add_url_cmp(const void *void_elem1, const void *void_elem2)
 {
-    const uint32_t* elem1 = void_elem1;
-    const uint32_t* elem2 = void_elem2;
+    const uint32_t *elem1 = void_elem1;
+    const uint32_t *elem2 = void_elem2;
 
     return !strcmp(&urls[*elem1], &urls[*elem2]);
 }
 
-uint32_t find_url_hash(const void* void_elem)
+uint32_t find_url_hash(const void *void_elem)
 {
-    const char* elem = void_elem;
+    const char *elem = void_elem;
     return djb33_hash_len(elem, -1);
 }
 
-int32_t find_url_cmp(const void* void_elem1, const void* void_elem2)
+int32_t find_url_cmp(const void *void_elem1, const void *void_elem2)
 {
-    const char* elem1 = void_elem1;
-    const uint32_t* elem2 = void_elem2;
+    const char *elem1 = void_elem1;
+    const uint32_t *elem2 = void_elem2;
 
     return !strcmp(elem1, &urls[*elem2]);
 }
 
 struct memory {
-    char* response;
+    char *response;
     size_t size;
 };
 
-static size_t cb(void* data, size_t size, size_t nmemb, void* clientp)
+static size_t cb(void *data, size_t size, size_t nmemb, void *clientp)
 {
     size_t realsize = size * nmemb;
-    struct memory* mem = (struct memory*)clientp;
+    struct memory *mem = (struct memory *)clientp;
 
-    char* ptr = realloc(mem->response, mem->size + realsize + 1);
+    char *ptr = realloc(mem->response, mem->size + realsize + 1);
     if (!ptr)
         return 0;
 
@@ -55,7 +55,7 @@ static size_t cb(void* data, size_t size, size_t nmemb, void* clientp)
     return realsize;
 }
 
-void* urls_read(__attribute__((unused)) void* arg)
+void *urls_read(__attribute__((unused)) void *arg)
 {
     pthread_barrier_wait(&threads_barrier);
 
@@ -72,13 +72,13 @@ void* urls_read(__attribute__((unused)) void* arg)
 
         if (is_domains_file_url) {
             curl_global_init(CURL_GLOBAL_DEFAULT);
-            CURL* curl = curl_easy_init();
+            CURL *curl = curl_easy_init();
             if (curl) {
                 curl_easy_setopt(curl, CURLOPT_URL, domains_file_url);
                 curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
                 curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
                 curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
-                curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)&chunk);
+                curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
                 curl_easy_perform(curl);
                 curl_easy_cleanup(curl);
             }
@@ -88,7 +88,7 @@ void* urls_read(__attribute__((unused)) void* arg)
         int64_t urls_web_file_size = chunk.size;
 
         if (is_domains_file_path) {
-            FILE* urls_fd = fopen(domains_file_path, "r");
+            FILE *urls_fd = fopen(domains_file_path, "r");
             if (urls_fd == NULL) {
                 printf("Can't open url file\n");
                 exit(EXIT_FAILURE);
@@ -96,7 +96,7 @@ void* urls_read(__attribute__((unused)) void* arg)
             fseek(urls_fd, 0, SEEK_END);
             int64_t urls_file_size_add = ftell(urls_fd);
             fseek(urls_fd, 0, SEEK_SET);
-            char* ptr = realloc(chunk.response, chunk.size + urls_file_size_add + 1);
+            char *ptr = realloc(chunk.response, chunk.size + urls_file_size_add + 1);
             if (!ptr) {
                 printf("No free memory for urls_file\n");
                 exit(EXIT_FAILURE);
@@ -136,9 +136,11 @@ void* urls_read(__attribute__((unused)) void* arg)
                 exit(EXIT_FAILURE);
             }
 
-            printf("Readed domains from file %d from url %d\n", file_urls_map_size, urls_map_size - file_urls_map_size);
+            printf("Readed domains from file %d from url %d\n", file_urls_map_size,
+                   urls_map_size - file_urls_map_size);
 
-            array_hashmap_set_func(urls_map_struct, add_url_hash, add_url_cmp, find_url_hash, find_url_cmp);
+            array_hashmap_set_func(urls_map_struct, add_url_hash, add_url_cmp, find_url_hash,
+                                   find_url_cmp);
 
             int32_t url_offset = 0;
             for (int32_t i = 0; i < urls_map_size; i++) {

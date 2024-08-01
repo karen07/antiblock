@@ -54,7 +54,7 @@ void print_help()
     exit(EXIT_FAILURE);
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
     printf("\nAntiblock started\n");
 
@@ -151,7 +151,7 @@ int main(int argc, char* argv[])
         if (!strcmp(argv[i], "-TUN_net")) {
             if (i != argc - 1) {
                 printf("TUN net %s\n", argv[i + 1]);
-                char* slash_ptr = strchr(argv[i + 1], '/');
+                char *slash_ptr = strchr(argv[i + 1], '/');
                 if (slash_ptr) {
                     sscanf(slash_ptr + 1, "%u", &tun_prefix);
                     *slash_ptr = 0;

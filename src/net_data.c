@@ -4,11 +4,11 @@
 #include "hash.h"
 #include "stat.h"
 
-id_map_t* id_map;
+id_map_t *id_map;
 int32_t repeater_DNS_socket;
 int32_t repeater_client_socket;
 
-void* DNS_data(__attribute__((unused)) void* arg)
+void *DNS_data(__attribute__((unused)) void *arg)
 {
     struct sockaddr_in repeater_DNS_addr, receive_DNS_addr;
 
@@ -26,9 +26,8 @@ void* DNS_data(__attribute__((unused)) void* arg)
         exit(EXIT_FAILURE);
     }
 
-    if (bind(repeater_DNS_socket, (struct sockaddr*)&repeater_DNS_addr,
-            sizeof(repeater_DNS_addr))
-        < 0) {
+    if (bind(repeater_DNS_socket, (struct sockaddr *)&repeater_DNS_addr,
+             sizeof(repeater_DNS_addr)) < 0) {
         printf("Can't bind to the port for listen from DNS :%s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
@@ -38,10 +37,11 @@ void* DNS_data(__attribute__((unused)) void* arg)
 
     pthread_barrier_wait(&threads_barrier);
 
-    char* receive_msg;
+    char *receive_msg;
     int32_t receive_msg_len = 0;
     while (1) {
-        while (poll(&fd_DNS, 1, POLL_SLEEP_TIME) < 1) { }
+        while (poll(&fd_DNS, 1, POLL_SLEEP_TIME) < 1) {
+        }
 
         if ((fd_DNS.revents & POLLIN) == 0) {
             continue;
@@ -58,13 +58,13 @@ void* DNS_data(__attribute__((unused)) void* arg)
 
         receive_msg = packets_ring_buffer[remain_div].packet;
         receive_msg_len = recvfrom(repeater_DNS_socket, receive_msg, PACKET_MAX_SIZE, 0,
-            (struct sockaddr*)&receive_DNS_addr, &receive_DNS_addr_length);
+                                   (struct sockaddr *)&receive_DNS_addr, &receive_DNS_addr_length);
 
         if (receive_msg_len < (int32_t)sizeof(dns_header_t)) {
             continue;
         }
 
-        dns_header_t* header = (dns_header_t*)receive_msg;
+        dns_header_t *header = (dns_header_t *)receive_msg;
 
         uint16_t id = ntohs(header->id);
         uint16_t flags = ntohs(header->flags);
@@ -82,7 +82,7 @@ void* DNS_data(__attribute__((unused)) void* arg)
             continue;
         }
 
-        char* url_start = &receive_msg[sizeof(dns_header_t)];
+        char *url_start = &receive_msg[sizeof(dns_header_t)];
         uint32_t url_hash = djb33_hash_len(url_start, receive_msg_len - sizeof(dns_header_t));
         if (url_hash != id_map[id].url_hash) {
             stat.from_dns_error++;
@@ -105,13 +105,13 @@ void* DNS_data(__attribute__((unused)) void* arg)
 void send_packet(int32_t packets_num)
 {
     struct sockaddr_in client_addr;
-    char* receive_msg;
+    char *receive_msg;
     int32_t receive_msg_len = 0;
 
     receive_msg = packets_ring_buffer[packets_num].packet;
     receive_msg_len = packets_ring_buffer[packets_num].packet_size;
 
-    dns_header_t* header = (dns_header_t*)receive_msg;
+    dns_header_t *header = (dns_header_t *)receive_msg;
 
     uint16_t id = ntohs(header->id);
 
@@ -124,14 +124,13 @@ void send_packet(int32_t packets_num)
     id_map[id].url_hash = 0;
 
     if (sendto(repeater_client_socket, receive_msg, receive_msg_len, 0,
-            (struct sockaddr*)&client_addr, sizeof(client_addr))
-        < 0) {
+               (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
         stat.send_to_client_error++;
         printf("Can't send to client %s\n", strerror(errno));
     }
 }
 
-void* client_data(__attribute__((unused)) void* arg)
+void *client_data(__attribute__((unused)) void *arg)
 {
     struct sockaddr_in repeater_client_addr, dns_addr, receive_client_addr;
 
@@ -151,9 +150,8 @@ void* client_data(__attribute__((unused)) void* arg)
         exit(EXIT_FAILURE);
     }
 
-    if (bind(repeater_client_socket, (struct sockaddr*)&repeater_client_addr,
-            sizeof(repeater_client_addr))
-        < 0) {
+    if (bind(repeater_client_socket, (struct sockaddr *)&repeater_client_addr,
+             sizeof(repeater_client_addr)) < 0) {
         printf("Can't bind to the port for listen from client :%s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
@@ -169,7 +167,8 @@ void* client_data(__attribute__((unused)) void* arg)
     packet_t receive_msg;
 
     while (1) {
-        while (poll(&fd_in, 1, POLL_SLEEP_TIME) < 1) { }
+        while (poll(&fd_in, 1, POLL_SLEEP_TIME) < 1) {
+        }
 
         if ((fd_in.revents & POLLIN) == 0) {
             continue;
@@ -177,14 +176,15 @@ void* client_data(__attribute__((unused)) void* arg)
 
         fd_in.revents = 0;
 
-        receive_msg.packet_size = recvfrom(repeater_client_socket, receive_msg.packet, PACKET_MAX_SIZE, 0,
-            (struct sockaddr*)&receive_client_addr, &receive_client_addr_length);
+        receive_msg.packet_size =
+            recvfrom(repeater_client_socket, receive_msg.packet, PACKET_MAX_SIZE, 0,
+                     (struct sockaddr *)&receive_client_addr, &receive_client_addr_length);
 
         if (receive_msg.packet_size < (int32_t)sizeof(dns_header_t)) {
             continue;
         }
 
-        dns_header_t* header = (dns_header_t*)receive_msg.packet;
+        dns_header_t *header = (dns_header_t *)receive_msg.packet;
 
         uint16_t id = ntohs(header->id);
         uint16_t flags = ntohs(header->flags);
@@ -207,8 +207,9 @@ void* client_data(__attribute__((unused)) void* arg)
 
         header->id = htons(new_id);
 
-        char* url_start = &receive_msg.packet[sizeof(dns_header_t)];
-        id_map[new_id].url_hash = djb33_hash_len(url_start, receive_msg.packet_size - sizeof(dns_header_t));
+        char *url_start = &receive_msg.packet[sizeof(dns_header_t)];
+        id_map[new_id].url_hash =
+            djb33_hash_len(url_start, receive_msg.packet_size - sizeof(dns_header_t));
         id_map[new_id].ip = receive_client_addr.sin_addr.s_addr;
         id_map[new_id].port = receive_client_addr.sin_port;
         id_map[new_id].client_id = id;
@@ -219,8 +220,7 @@ void* client_data(__attribute__((unused)) void* arg)
         new_id = (new_id + 1) % ID_MAP_MAX_SIZE;
 
         if (sendto(repeater_DNS_socket, receive_msg.packet, receive_msg.packet_size, 0,
-                (struct sockaddr*)&dns_addr, sizeof(dns_addr))
-            < 0) {
+                   (struct sockaddr *)&dns_addr, sizeof(dns_addr)) < 0) {
             stat.send_to_dns_error++;
             printf("Can't send to DNS :%s\n", strerror(errno));
         }

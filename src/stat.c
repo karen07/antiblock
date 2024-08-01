@@ -1,10 +1,10 @@
 #include "stat.h"
 
 statistics_t stat;
-FILE* log_fd;
-FILE* stat_fd;
+FILE *log_fd;
+FILE *stat_fd;
 
-void* stat_print(__attribute__((unused)) void* arg)
+void *stat_print(__attribute__((unused)) void *arg)
 {
     pthread_barrier_wait(&threads_barrier);
 
@@ -15,9 +15,9 @@ void* stat_print(__attribute__((unused)) void* arg)
         fseek(stat_fd, 0, SEEK_SET);
 
         time_t now = time(NULL);
-        struct tm* tm_struct = localtime(&now);
-        fprintf(stat_fd, "Statistics %d:%d:%d\n",
-            tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+        struct tm *tm_struct = localtime(&now);
+        fprintf(stat_fd, "Statistics %d:%d:%d\n", tm_struct->tm_hour, tm_struct->tm_min,
+                tm_struct->tm_sec);
 
         fprintf(stat_fd, "Recive from client: %d\n", stat.rec_from_client);
         fprintf(stat_fd, "Recive from dns: %d\n", stat.rec_from_dns);

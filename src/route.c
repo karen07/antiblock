@@ -4,14 +4,14 @@
 int32_t route_socket;
 struct rtentry route;
 
-void add_url_cname(char* ans_url, time_t check_time, char* data_url)
+void add_url_cname(char *ans_url, time_t check_time, char *data_url)
 {
     stat.now_cname_url_count++;
 
     if (log_fd) {
         char now_time_str[DATE_STR_MAX_SIZE];
         time_t now = time(NULL);
-        struct tm* tm_struct = localtime(&now);
+        struct tm *tm_struct = localtime(&now);
         sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
         char time_str[DATE_STR_MAX_SIZE];
@@ -23,12 +23,12 @@ void add_url_cname(char* ans_url, time_t check_time, char* data_url)
     }
 }
 
-void update_url_cname(char* ans_url, time_t check_time, char* data_url)
+void update_url_cname(char *ans_url, time_t check_time, char *data_url)
 {
     if (log_fd) {
         char now_time_str[DATE_STR_MAX_SIZE];
         time_t now = time(NULL);
-        struct tm* tm_struct = localtime(&now);
+        struct tm *tm_struct = localtime(&now);
         sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
         char time_str[DATE_STR_MAX_SIZE];
@@ -40,14 +40,14 @@ void update_url_cname(char* ans_url, time_t check_time, char* data_url)
     }
 }
 
-void del_url_cname(char* data_url, time_t check_time)
+void del_url_cname(char *data_url, time_t check_time)
 {
     stat.now_cname_url_count--;
 
     if (log_fd) {
         char now_time_str[DATE_STR_MAX_SIZE];
         time_t now = time(NULL);
-        struct tm* tm_struct = localtime(&now);
+        struct tm *tm_struct = localtime(&now);
         sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
         char time_str[DATE_STR_MAX_SIZE];
@@ -61,12 +61,12 @@ void del_url_cname(char* data_url, time_t check_time)
     free(data_url);
 }
 
-void add_ip_to_route_table(uint32_t ip, time_t check_time, char* url)
+void add_ip_to_route_table(uint32_t ip, time_t check_time, char *url)
 {
     struct in_addr rec_ip;
     rec_ip.s_addr = ip;
 
-    struct sockaddr_in* route_addr = (struct sockaddr_in*)&route.rt_dst;
+    struct sockaddr_in *route_addr = (struct sockaddr_in *)&route.rt_dst;
     route_addr->sin_family = AF_INET;
     route_addr->sin_addr.s_addr = rec_ip.s_addr;
 
@@ -82,7 +82,7 @@ void add_ip_to_route_table(uint32_t ip, time_t check_time, char* url)
 
         char now_time_str[DATE_STR_MAX_SIZE];
         time_t now = time(NULL);
-        struct tm* tm_struct = localtime(&now);
+        struct tm *tm_struct = localtime(&now);
         sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
         char time_str[DATE_STR_MAX_SIZE];
@@ -94,7 +94,7 @@ void add_ip_to_route_table(uint32_t ip, time_t check_time, char* url)
     }
 }
 
-void update_ip_in_route_table(uint32_t ip, time_t check_time, char* url)
+void update_ip_in_route_table(uint32_t ip, time_t check_time, char *url)
 {
     if (log_fd) {
         struct in_addr rec_ip;
@@ -105,7 +105,7 @@ void update_ip_in_route_table(uint32_t ip, time_t check_time, char* url)
 
         char now_time_str[DATE_STR_MAX_SIZE];
         time_t now = time(NULL);
-        struct tm* tm_struct = localtime(&now);
+        struct tm *tm_struct = localtime(&now);
         sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
         char time_str[DATE_STR_MAX_SIZE];
@@ -117,7 +117,7 @@ void update_ip_in_route_table(uint32_t ip, time_t check_time, char* url)
     }
 }
 
-void not_block_ip_in_route_table(uint32_t ip, time_t check_time, char* url)
+void not_block_ip_in_route_table(uint32_t ip, time_t check_time, char *url)
 {
     struct in_addr rec_ip;
     rec_ip.s_addr = ip;
@@ -130,7 +130,7 @@ void not_block_ip_in_route_table(uint32_t ip, time_t check_time, char* url)
 
         char now_time_str[DATE_STR_MAX_SIZE];
         time_t now = time(NULL);
-        struct tm* tm_struct = localtime(&now);
+        struct tm *tm_struct = localtime(&now);
         sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
         char time_str[DATE_STR_MAX_SIZE];
@@ -147,7 +147,7 @@ void del_ip_from_route_table(uint32_t ip, time_t check_time)
     struct in_addr rec_ip;
     rec_ip.s_addr = ip;
 
-    struct sockaddr_in* route_addr = (struct sockaddr_in*)&route.rt_dst;
+    struct sockaddr_in *route_addr = (struct sockaddr_in *)&route.rt_dst;
     route_addr->sin_family = AF_INET;
     route_addr->sin_addr.s_addr = rec_ip.s_addr;
 
@@ -167,7 +167,7 @@ void del_ip_from_route_table(uint32_t ip, time_t check_time)
 
         char now_time_str[DATE_STR_MAX_SIZE];
         time_t now = time(NULL);
-        struct tm* tm_struct = localtime(&now);
+        struct tm *tm_struct = localtime(&now);
         sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
 
         char time_str[DATE_STR_MAX_SIZE];
@@ -189,22 +189,22 @@ void init_route_socket(void)
         exit(EXIT_FAILURE);
     }
 
-    char* VPN_MASK = "255.255.255.255";
+    char *VPN_MASK = "255.255.255.255";
 
     memset(&route, 0, sizeof(route));
 
-    struct sockaddr_in* route_addr;
-    route_addr = (struct sockaddr_in*)&route.rt_gateway;
+    struct sockaddr_in *route_addr;
+    route_addr = (struct sockaddr_in *)&route.rt_gateway;
     route_addr->sin_family = AF_INET;
     route_addr->sin_addr.s_addr = route_ip;
 
-    route_addr = (struct sockaddr_in*)&route.rt_genmask;
+    route_addr = (struct sockaddr_in *)&route.rt_genmask;
     route_addr->sin_family = AF_INET;
     route_addr->sin_addr.s_addr = inet_addr(VPN_MASK);
 
     route.rt_flags = RTF_UP | RTF_GATEWAY;
 
-    FILE* route_fd = fopen("/proc/net/route", "r");
+    FILE *route_fd = fopen("/proc/net/route", "r");
     if (route_fd == NULL) {
         printf("Can't open /proc/net/route\n");
         exit(EXIT_FAILURE);
@@ -224,10 +224,8 @@ void init_route_socket(void)
     uint32_t window;
     uint32_t irtt;
 
-    while (fscanf(route_fd, "%s %x %x %x %x %x %x %x %x %x %x",
-               iface, &dest_ip, &gate_ip, &flags,
-               &refcnt, &use, &metric, &mask, &mtu, &window, &irtt)
-        != EOF) {
+    while (fscanf(route_fd, "%s %x %x %x %x %x %x %x %x %x %x", iface, &dest_ip, &gate_ip, &flags,
+                  &refcnt, &use, &metric, &mask, &mtu, &window, &irtt) != EOF) {
         if ((gate_ip == route_ip) && (mask == inet_addr(VPN_MASK))) {
             del_ip_from_route_table(dest_ip, 0);
         }
