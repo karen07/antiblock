@@ -84,10 +84,6 @@ int32_t get_url_from_packet(char *packet_start, char *hand_point, char *receive_
 
 int32_t check_url(char *url, int32_t url_len)
 {
-    if (!strcmp(url, ".redirector.googlevideo.com")) {
-        return 0;
-    }
-
     char *dot_pos = NULL;
     int32_t dot_count = 0;
     for (int32_t i = url_len; i >= 0; i--) {
