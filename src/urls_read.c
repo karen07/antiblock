@@ -126,10 +126,6 @@ void *urls_read(__attribute__((unused)) void *arg)
                 }
             }
 
-            if (urls_map_struct) {
-                del_array_hashmap(urls_map_struct);
-            }
-
             urls_map_struct = init_array_hashmap(urls_map_size, 1.0, sizeof(uint32_t));
             if (urls_map_struct == NULL) {
                 printf("No free memory for urls_map_struct\n");
@@ -158,6 +154,13 @@ void *urls_read(__attribute__((unused)) void *arg)
             sleep(URLS_UPDATE_TIME);
         } else {
             sleep(URLS_ERROR_UPDATE_TIME);
+        }
+
+        if (urls_map_struct) {
+            const array_hashmap_t *tmp_urls_map_struct = urls_map_struct;
+            urls_map_struct = NULL;
+            sleep(1);
+            del_array_hashmap(tmp_urls_map_struct);
         }
     }
 
