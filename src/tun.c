@@ -280,7 +280,6 @@ void *tun(__attribute__((unused)) void *arg)
             sprintf(log_out_str + strlen(log_out_str), "%d\n", nread);
 
             fprintf(log_fd, "%s", log_out_str);
-            fflush(log_fd);
         }
 
         if (proto_L4 == IPPROTO_TCP) {
