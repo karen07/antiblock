@@ -35,6 +35,7 @@ void *stat_print(__attribute__((unused)) void *arg)
         fprintf(stat_fd, "Cname url map overflow: %d\n", stat.cname_url_map_error);
 
         fflush(stat_fd);
+        fflush(log_fd);
 
         sleep(STAT_PRINT_TIME);
     }

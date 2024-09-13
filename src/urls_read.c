@@ -1,5 +1,6 @@
 #include "urls_read.h"
 #include "hash.h"
+#include "stat.h"
 #include <curl/curl.h>
 
 char *urls;
@@ -142,6 +143,10 @@ void *urls_read(__attribute__((unused)) void *arg)
             for (int32_t i = 0; i < urls_map_size; i++) {
                 if (!memcmp(&urls[url_offset], "www.", 4)) {
                     url_offset += 4;
+                }
+
+                if (log_fd) {
+                    fprintf(log_fd, "start:%s\n", &urls[url_offset]);
                 }
 
                 array_hashmap_add_elem(urls_map_struct, &url_offset, NULL, NULL);

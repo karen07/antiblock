@@ -212,15 +212,9 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
         cur_pos_ptr += sizeof(dns_que_t);
         // QUE DATA
 
-        // GRAPH
-        char *ans_start_prt = cur_pos_ptr;
-
-        char big_data[10000];
-        int32_t big_data_cur_pos = 0;
-
-        struct simple_graph simple_graph[100];
-        int32_t simple_graph_cur_pos = 0;
-        // GRAPH
+        if (log_fd) {
+            fprintf(log_fd, "que_url %d:%s\n", que_type, que_url + 1);
+        }
 
         for (int32_t i = 0; i < ans_count; i++) {
             // ANS URL
@@ -259,16 +253,46 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
                 goto end;
             }
 
+            if (log_fd) {
+                fprintf(log_fd, "    ans_url %d:%s\n", ans_type, ans_url + 1);
+            }
+
             if (ans_type == 1) {
+                if (log_fd) {
+                    struct in_addr new_ip;
+                    new_ip.s_addr = ans->ip4;
+
+                    fprintf(log_fd, "        ip:%s\n", inet_ntoa(new_ip));
+                }
+
                 if (tun_ip) {
-                    if (block_que_url_flag && (que_type == 1)) {
-                        strcpy(big_data + big_data_cur_pos, ans_url + 1);
-                        simple_graph[simple_graph_cur_pos].url_offet = big_data_cur_pos;
-                        big_data_cur_pos += ans_url_len;
-                        simple_graph[simple_graph_cur_pos].type = 1;
-                        simple_graph[simple_graph_cur_pos].ttl = ans_ttl;
-                        simple_graph[simple_graph_cur_pos].cname_offet_or_ip = ans->ip4;
-                        simple_graph_cur_pos++;
+                    if (block_que_url_flag) {
+                        uint32_t start_subnet_ip_n = htonl(start_subnet_ip++);
+
+                        ip_ip_map_t add_elem;
+                        add_elem.ip_local = start_subnet_ip_n;
+                        add_elem.ip_global = ans->ip4;
+
+                        array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL,
+                                               ip_ip_on_collision);
+
+                        ans->ip4 = start_subnet_ip_n;
+
+                        if (log_fd) {
+                            struct in_addr new_ip;
+                            new_ip.s_addr = add_elem.ip_local;
+
+                            struct in_addr old_ip;
+                            old_ip.s_addr = add_elem.ip_global;
+
+                            char log_out_str[2000];
+
+                            sprintf(log_out_str, "%s ", que_url + 1);
+                            sprintf(log_out_str + strlen(log_out_str), "%s ", inet_ntoa(new_ip));
+                            sprintf(log_out_str + strlen(log_out_str), "%s\n", inet_ntoa(old_ip));
+
+                            fprintf(log_fd, "blocked:%s", log_out_str);
+                        }
                     }
                 } else {
                     ttl_map_t add_elem;
@@ -302,17 +326,18 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
                 int32_t cname_url_len = get_url_from_packet(receive_msg, cname_url_start,
                                                             receive_msg_end, cname_url, 0);
 
+                int32_t block_cname_url_flag = 0;
+                block_cname_url_flag = check_url(cname_url, cname_url_len);
+
+                if (log_fd) {
+                    fprintf(log_fd, "        cname_url:%s\n", cname_url + 1);
+                    if (block_ans_url_flag != block_cname_url_flag) {
+                        fprintf(log_fd, "        cname_url have diffent block_cname_url_flag\n");
+                    }
+                }
+
                 if (tun_ip) {
-                    if (block_que_url_flag && (que_type == 1)) {
-                        strcpy(big_data + big_data_cur_pos, ans_url + 1);
-                        simple_graph[simple_graph_cur_pos].url_offet = big_data_cur_pos;
-                        big_data_cur_pos += ans_url_len;
-                        simple_graph[simple_graph_cur_pos].type = 5;
-                        simple_graph[simple_graph_cur_pos].ttl = ans_ttl;
-                        strcpy(big_data + big_data_cur_pos, cname_url + 1);
-                        simple_graph[simple_graph_cur_pos].cname_offet_or_ip = big_data_cur_pos;
-                        big_data_cur_pos += cname_url_len;
-                        simple_graph_cur_pos++;
+                    if (block_que_url_flag) {
                     }
                 } else {
                     if (block_ans_url_flag) {
@@ -341,128 +366,10 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
             cur_pos_ptr += sizeof(dns_ans_t) - sizeof(uint32_t) + ans_len;
             // ANS DATA
         }
-
-        if (tun_ip && block_que_url_flag && (que_type == 1)) {
-            int32_t que_offet = -1;
-
-            for (int i = 0; i < simple_graph_cur_pos; i++) {
-                if (!strcmp(que_url + 1, &big_data[simple_graph[i].url_offet])) {
-                    que_offet = simple_graph[i].url_offet;
-                    break;
-                }
-            }
-
-            if (que_offet == -1) {
-                goto end;
-            }
-
-            char out_que_url[URL_MAX_SIZE];
-            strcpy(out_que_url, que_url);
-            change_to_dns_string_format(out_que_url, que_url_len);
-
-            uint32_t min_ttl = -1;
-            cur_pos_ptr = ans_start_prt;
-
-            int32_t A_find_flag = 0;
-            int32_t next_find_flag = 0;
-
-            while (1) {
-                A_find_flag = 0;
-                next_find_flag = 0;
-                for (int i = 0; i < simple_graph_cur_pos; i++) {
-                    if (!strcmp(&big_data[que_offet], &big_data[simple_graph[i].url_offet])) {
-                        next_find_flag = 1;
-
-                        if (min_ttl > simple_graph[i].ttl) {
-                            min_ttl = simple_graph[i].ttl;
-                        }
-
-                        if (simple_graph[i].type == 1) {
-                            A_find_flag = 1;
-
-                            uint32_t start_subnet_ip_n = htonl(start_subnet_ip++);
-
-                            ip_ip_map_t add_elem;
-                            add_elem.ip_local = start_subnet_ip_n;
-                            add_elem.ip_global = simple_graph[i].cname_offet_or_ip;
-
-                            array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL,
-                                                   ip_ip_on_collision);
-
-                            memcpy(cur_pos_ptr, out_que_url, que_url_len + 1);
-                            cur_pos_ptr += que_url_len + 1;
-
-                            uint16_t type = 1;
-                            uint16_t class = 1;
-                            uint32_t ttl = 10;
-                            uint16_t len = 4;
-
-                            dns_ans_t *new_ans = (dns_ans_t *)cur_pos_ptr;
-
-                            new_ans->type = htons(type);
-                            new_ans->class = htons(class);
-                            new_ans->ttl = htonl(ttl);
-                            new_ans->len = htons(len);
-                            new_ans->ip4 = start_subnet_ip_n;
-
-                            cur_pos_ptr += sizeof(dns_ans_t);
-
-                            if (log_fd) {
-                                struct in_addr new_ip;
-                                new_ip.s_addr = start_subnet_ip_n;
-
-                                struct in_addr old_ip;
-                                old_ip.s_addr = simple_graph[i].cname_offet_or_ip;
-
-                                char log_out_str[2000];
-
-                                sprintf(log_out_str, "URL: %s ", que_url + 1);
-                                sprintf(log_out_str + strlen(log_out_str), "%s ",
-                                        inet_ntoa(new_ip));
-                                sprintf(log_out_str + strlen(log_out_str), "%s\n",
-                                        inet_ntoa(old_ip));
-
-                                fprintf(log_fd, "%s", log_out_str);
-                                fflush(log_fd);
-                            }
-
-                            if (start_subnet_ip == end_subnet_ip) {
-                                start_subnet_ip = ntohl(tun_ip) + 1;
-                            }
-
-                            break;
-                        } else {
-                            que_offet = simple_graph[i].cname_offet_or_ip;
-                            break;
-                        }
-                    }
-                }
-
-                if (A_find_flag || !next_find_flag) {
-                    break;
-                }
-            }
-
-            if (A_find_flag) {
-                packets_ring_buffer[ring_elem_num].packet_size = cur_pos_ptr - receive_msg;
-
-                uint16_t ans_count_new = 1;
-                header->ans = htons(ans_count_new);
-            }
-        }
-
 end:
-        if (tun_ip) {
-            if (block_que_url_flag) {
-                if (que_type == 1) {
-                    send_packet(ring_elem_num);
-                }
-            } else {
-                send_packet(ring_elem_num);
-            }
-        } else {
-            send_packet(ring_elem_num);
-        }
+        send_packet(ring_elem_num);
+
+        fprintf(log_fd, "\n");
 
         packets_ring_buffer[ring_elem_num].packet_size = 0;
         packets_ring_buffer_start++;
