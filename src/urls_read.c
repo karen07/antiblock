@@ -139,6 +139,10 @@ void *urls_read(__attribute__((unused)) void *arg)
             array_hashmap_set_func(urls_map_struct, add_url_hash, add_url_cmp, find_url_hash,
                                    find_url_cmp);
 
+            if (log_fd) {
+                fprintf(log_fd, "Blocked urls:\n");
+            }
+
             int32_t url_offset = 0;
             for (int32_t i = 0; i < urls_map_size; i++) {
                 if (!memcmp(&urls[url_offset], "www.", 4)) {
@@ -146,12 +150,16 @@ void *urls_read(__attribute__((unused)) void *arg)
                 }
 
                 if (log_fd) {
-                    fprintf(log_fd, "start:%s\n", &urls[url_offset]);
+                    fprintf(log_fd, "%s\n", &urls[url_offset]);
                 }
 
                 array_hashmap_add_elem(urls_map_struct, &url_offset, NULL, NULL);
 
                 url_offset = strchr(&urls[url_offset + 1], 0) - urls + 1;
+            }
+
+            if (log_fd) {
+                fprintf(log_fd, "\n");
             }
         }
 

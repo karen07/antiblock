@@ -213,7 +213,7 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
         // QUE DATA
 
         if (log_fd) {
-            fprintf(log_fd, "que_url %d:%s\n", que_type, que_url + 1);
+            fprintf(log_fd, "Que_url %d: %s\n", que_type, que_url + 1);
         }
 
         for (int32_t i = 0; i < ans_count; i++) {
@@ -254,7 +254,7 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
             }
 
             if (log_fd) {
-                fprintf(log_fd, "    ans_url %d:%s\n", ans_type, ans_url + 1);
+                fprintf(log_fd, "    Ans_url %d: %s ", ans_type, ans_url + 1);
             }
 
             if (ans_type == 1) {
@@ -262,11 +262,11 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
                     struct in_addr new_ip;
                     new_ip.s_addr = ans->ip4;
 
-                    fprintf(log_fd, "        ip:%s\n", inet_ntoa(new_ip));
+                    fprintf(log_fd, "%s\n", inet_ntoa(new_ip));
                 }
 
                 if (tun_ip) {
-                    if (block_que_url_flag) {
+                    if (block_que_url_flag || block_ans_url_flag) {
                         uint32_t start_subnet_ip_n = htonl(start_subnet_ip++);
 
                         ip_ip_map_t add_elem;
@@ -285,13 +285,8 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
                             struct in_addr old_ip;
                             old_ip.s_addr = add_elem.ip_global;
 
-                            char log_out_str[2000];
-
-                            sprintf(log_out_str, "%s ", que_url + 1);
-                            sprintf(log_out_str + strlen(log_out_str), "%s ", inet_ntoa(new_ip));
-                            sprintf(log_out_str + strlen(log_out_str), "%s\n", inet_ntoa(old_ip));
-
-                            fprintf(log_fd, "blocked:%s", log_out_str);
+                            fprintf(log_fd, "    Blocked_IP: %s %s %s\n", ans_url + 1,
+                                    inet_ntoa(old_ip), inet_ntoa(new_ip));
                         }
                     }
                 } else {
@@ -300,7 +295,7 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
                     add_elem.end_time = check_time;
 
                     ttl_map_t elem;
-                    if (block_ans_url_flag) {
+                    if (block_que_url_flag || block_ans_url_flag) {
                         int32_t new_elem_flag = array_hashmap_add_elem(ttl_map_struct, &add_elem,
                                                                        &elem, ttl_on_collision);
                         if (new_elem_flag == 1) {
@@ -330,17 +325,17 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
                 block_cname_url_flag = check_url(cname_url, cname_url_len);
 
                 if (log_fd) {
-                    fprintf(log_fd, "        cname_url:%s\n", cname_url + 1);
+                    fprintf(log_fd, "%s\n", cname_url + 1);
                     if (block_ans_url_flag != block_cname_url_flag) {
-                        fprintf(log_fd, "        cname_url have diffent block_cname_url_flag\n");
+                        fprintf(log_fd, "    Blocked_Cname: %s %s\n", ans_url + 1, cname_url + 1);
                     }
                 }
 
                 if (tun_ip) {
-                    if (block_que_url_flag) {
+                    if (block_que_url_flag || block_ans_url_flag) {
                     }
                 } else {
-                    if (block_ans_url_flag) {
+                    if (block_que_url_flag || block_ans_url_flag) {
                         char *data_url_str = malloc(cname_url_len + 1);
                         strcpy(data_url_str, cname_url + 1);
 
@@ -363,13 +358,19 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
                 }
             }
 
+            if (ans_type != 1 && ans_type != 5) {
+                if (log_fd) {
+                    fprintf(log_fd, "\n");
+                }
+            }
+
             cur_pos_ptr += sizeof(dns_ans_t) - sizeof(uint32_t) + ans_len;
             // ANS DATA
         }
-end:
-        send_packet(ring_elem_num);
 
         fprintf(log_fd, "\n");
+end:
+        send_packet(ring_elem_num);
 
         packets_ring_buffer[ring_elem_num].packet_size = 0;
         packets_ring_buffer_start++;
