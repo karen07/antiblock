@@ -285,8 +285,9 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
                             struct in_addr old_ip;
                             old_ip.s_addr = add_elem.ip_global;
 
-                            fprintf(log_fd, "    Blocked_IP: %s %s %s\n", ans_url + 1,
-                                    inet_ntoa(old_ip), inet_ntoa(new_ip));
+                            fprintf(log_fd, "    Blocked_IP: %s", ans_url + 1);
+                            fprintf(log_fd, " %s", inet_ntoa(old_ip));
+                            fprintf(log_fd, " %s\n", inet_ntoa(new_ip));
                         }
                     }
                 } else {
