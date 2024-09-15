@@ -1,11 +1,8 @@
 #include "antiblock.h"
 
 typedef struct id_map {
-    uint64_t send_time;
     uint32_t ip;
-    uint32_t url_hash;
     uint16_t port;
-    uint16_t client_id;
 } __attribute__((packed)) id_map_t;
 
 extern id_map_t *id_map;

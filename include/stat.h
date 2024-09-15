@@ -20,6 +20,18 @@ typedef struct statistics {
     int32_t cname_url_map_error;
 
     int32_t request_parsing_error;
+
+    int32_t nat_sended_to_client_error;
+    int32_t nat_sended_to_client;
+
+    int32_t nat_sended_to_dev_error;
+    int32_t nat_sended_to_dev;
+
+    int32_t latency_sended_to_dev_sum;
+    int32_t latency_sended_to_dev_count;
+
+    int32_t latency_sended_to_client_sum;
+    int32_t latency_sended_to_client_count;
 } statistics_t;
 
 extern statistics_t stat;
