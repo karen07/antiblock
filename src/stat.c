@@ -16,8 +16,9 @@ void *stat_print(__attribute__((unused)) void *arg)
 
         time_t now = time(NULL);
         struct tm *tm_struct = localtime(&now);
-        fprintf(stat_fd, "Statistics %d:%d:%d\n", tm_struct->tm_hour, tm_struct->tm_min,
-                tm_struct->tm_sec);
+        fprintf(stat_fd, "Statistics %02d.%02d.%04d %02d:%02d:%02d\n", tm_struct->tm_mday,
+                tm_struct->tm_mon + 1, tm_struct->tm_year + 1900, tm_struct->tm_hour,
+                tm_struct->tm_min, tm_struct->tm_sec);
 
         fprintf(stat_fd, "Recive from client: %d\n", stat.rec_from_client);
         fprintf(stat_fd, "Recive from dns: %d\n", stat.rec_from_dns);
@@ -34,8 +35,29 @@ void *stat_print(__attribute__((unused)) void *arg)
         fprintf(stat_fd, "TTL map overflow: %d\n", stat.ttl_map_error);
         fprintf(stat_fd, "Cname url map overflow: %d\n", stat.cname_url_map_error);
 
+        fprintf(stat_fd, "\n");
+
+        fprintf(stat_fd, "NAT sended to dev error: %d\n", stat.nat_sended_to_dev_error);
+        fprintf(stat_fd, "NAT sended to dev: %d\n", stat.nat_sended_to_dev);
+        fprintf(stat_fd, "NAT sended to client error: %d\n", stat.nat_sended_to_client_error);
+        fprintf(stat_fd, "NAT sended to client: %d\n", stat.nat_sended_to_client);
+        fprintf(stat_fd, "Average sended to dev latency: %lf\n",
+                (1.0 * stat.latency_sended_to_dev_sum) / stat.latency_sended_to_dev_count);
+        fprintf(stat_fd, "Average sended to client latency: %lf\n",
+                (1.0 * stat.latency_sended_to_client_sum) / stat.latency_sended_to_client_count);
+        fprintf(stat_fd, "NAT RX: %d\n", stat.nat_sended_to_dev + stat.nat_sended_to_client);
+        fprintf(stat_fd, "NAT TX: %d\n",
+                stat.nat_sended_to_dev + stat.nat_sended_to_dev_error + stat.nat_sended_to_client +
+                    stat.nat_sended_to_client_error);
+
         fflush(stat_fd);
         fflush(log_fd);
+
+        stat.latency_sended_to_dev_sum = 0;
+        stat.latency_sended_to_dev_count = 0;
+
+        stat.latency_sended_to_client_sum = 0;
+        stat.latency_sended_to_client_count = 0;
 
         sleep(STAT_PRINT_TIME);
     }

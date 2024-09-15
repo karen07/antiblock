@@ -112,30 +112,8 @@ int32_t check_url(char *url, int32_t url_len)
     return 0;
 }
 
-struct simple_graph {
-    int32_t url_offet;
-    uint16_t type;
-    uint32_t ttl;
-    int32_t cname_offet_or_ip;
-};
-
-void change_to_dns_string_format(char *str, int32_t str_len)
-{
-    int32_t current_pos = str_len;
-
-    for (int i = str_len; i >= 0; i--) {
-        if (str[i] == '.') {
-            str[i] = current_pos - i - 1;
-            current_pos = i;
-        }
-    }
-}
-
 void *dns_ans_check(__attribute__((unused)) void *arg)
 {
-    int32_t block_que_url_flag = 0;
-    uint16_t que_type = 0;
-
     pthread_barrier_wait(&threads_barrier);
 
     while (1) {
@@ -152,9 +130,6 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
 
         char *cur_pos_ptr = receive_msg;
         char *receive_msg_end = receive_msg + receive_msg_len;
-
-        block_que_url_flag = 0;
-        que_type = 0;
 
         // DNS HEADER
         if (cur_pos_ptr + sizeof(dns_header_t) > receive_msg_end) {
@@ -194,7 +169,7 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
             goto end;
         }
 
-        block_que_url_flag = check_url(que_url, que_url_len);
+        __attribute__((unused)) int32_t block_que_url_flag = check_url(que_url, que_url_len);
 
         cur_pos_ptr += que_url_pad_len;
         // QUE URL
@@ -207,12 +182,17 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
 
         dns_que_t *que = (dns_que_t *)cur_pos_ptr;
 
-        que_type = ntohs(que->type);
+        uint16_t que_type = ntohs(que->type);
 
         cur_pos_ptr += sizeof(dns_que_t);
         // QUE DATA
 
         if (log_fd) {
+            time_t now = time(NULL);
+            struct tm *tm_struct = localtime(&now);
+            fprintf(log_fd, "%02d.%02d.%04d %02d:%02d:%02d\n", tm_struct->tm_mday,
+                    tm_struct->tm_mon + 1, tm_struct->tm_year + 1900, tm_struct->tm_hour,
+                    tm_struct->tm_min, tm_struct->tm_sec);
             fprintf(log_fd, "Que_url %d: %s\n", que_type, que_url + 1);
         }
 
@@ -266,7 +246,7 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
                 }
 
                 if (tun_ip) {
-                    if (block_que_url_flag || block_ans_url_flag) {
+                    if (block_ans_url_flag) {
                         uint32_t start_subnet_ip_n = htonl(start_subnet_ip++);
 
                         ip_ip_map_t add_elem;
@@ -296,7 +276,7 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
                     add_elem.end_time = check_time;
 
                     ttl_map_t elem;
-                    if (block_que_url_flag || block_ans_url_flag) {
+                    if (block_ans_url_flag) {
                         int32_t new_elem_flag = array_hashmap_add_elem(ttl_map_struct, &add_elem,
                                                                        &elem, ttl_on_collision);
                         if (new_elem_flag == 1) {
@@ -327,16 +307,16 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
 
                 if (log_fd) {
                     fprintf(log_fd, "%s\n", cname_url + 1);
-                    if (block_ans_url_flag != block_cname_url_flag) {
-                        fprintf(log_fd, "    Blocked_Cname: %s %s\n", ans_url + 1, cname_url + 1);
+                    if (block_ans_url_flag == 1 && block_cname_url_flag == 0) {
+                        fprintf(log_fd, "    Blocked_Cname: %s\n", cname_url + 1);
                     }
                 }
 
                 if (tun_ip) {
-                    if (block_que_url_flag || block_ans_url_flag) {
+                    if (block_ans_url_flag) {
                     }
                 } else {
-                    if (block_que_url_flag || block_ans_url_flag) {
+                    if (block_ans_url_flag) {
                         char *data_url_str = malloc(cname_url_len + 1);
                         strcpy(data_url_str, cname_url + 1);
 

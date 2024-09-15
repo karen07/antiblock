@@ -35,6 +35,12 @@ int tun_alloc(char *dev, int flags)
 
     strcpy(dev, ifr.ifr_name);
 
+    //int status = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
+
+    //if (status == -1) {
+    //    printf("Set O_NONBLOCK error\n");
+    //}
+
     return fd;
 }
 
@@ -125,8 +131,14 @@ void *tun(__attribute__((unused)) void *arg)
     printf(" %s-", inet_ntoa(start_subnet_ip_addr));
     printf("%s\n", inet_ntoa(end_subnet_ip_addr));
 
+    uint32_t nat_icmp_client_ip = 0;
+
     while (1) {
         int nread = read(tap_fd, buffer, sizeof(buffer));
+
+        struct timeval now_timeval;
+        gettimeofday(&now_timeval, NULL);
+        uint64_t now_us_start = now_timeval.tv_sec * 1000000 + now_timeval.tv_usec;
 
         if (nread < 1) {
             continue;
@@ -143,7 +155,56 @@ void *tun(__attribute__((unused)) void *arg)
         struct iphdr *iph = (struct iphdr *)L3_start_pointer;
 
         char proto_L4 = iph->protocol;
-        if ((proto_L4 != IPPROTO_TCP) && (proto_L4 != IPPROTO_UDP)) {
+        if ((proto_L4 != IPPROTO_TCP) && (proto_L4 != IPPROTO_UDP) && (proto_L4 != IPPROTO_ICMP)) {
+            if (log_fd) {
+                fprintf(log_fd, "NAT_proto_L4 %d\n", proto_L4);
+            }
+            continue;
+        }
+
+        if (proto_L4 == IPPROTO_ICMP) {
+            int32_t iph_daddr_h = ntohl(iph->daddr);
+            int32_t mask = 1;
+            mask <<= 32 - (tun_prefix + 1);
+
+            if (iph_daddr_h & mask) {
+                iph_daddr_h &= ~mask;
+
+                iph->saddr = htonl(iph_daddr_h);
+                iph->daddr = nat_icmp_client_ip;
+            } else {
+                ip_ip_map_t find_elem_ip_ip;
+                find_elem_ip_ip.ip_local = iph->daddr;
+
+                ip_ip_map_t res_elem_ip_ip;
+                int32_t find_elem_ip_ip_flag =
+                    array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
+                if (find_elem_ip_ip_flag != 1) {
+                    stat.nat_sended_to_dev_error++;
+
+                    struct in_addr s_ip_new;
+                    s_ip_new.s_addr = iph->daddr;
+
+                    if (log_fd) {
+                        fprintf(log_fd, "NAT_sended_to_dev_error %s\n", inet_ntoa(s_ip_new));
+                    }
+
+                    continue;
+                }
+
+                iph_daddr_h |= mask;
+
+                nat_icmp_client_ip = iph->saddr;
+
+                iph->saddr = htonl(iph_daddr_h);
+                iph->daddr = res_elem_ip_ip.ip_global;
+            }
+
+            iph->check = 0;
+            iph->check = checksum(L3_start_pointer, iph->ihl << 2);
+
+            write(tap_fd, buffer, nread);
+
             continue;
         }
 
@@ -195,6 +256,8 @@ void *tun(__attribute__((unused)) void *arg)
             int32_t find_elem_nat_flag =
                 array_hashmap_find_elem(nat_map_struct, &find_elem_nat, &res_elem_nat);
             if (find_elem_nat_flag != 1) {
+                stat.nat_sended_to_client_error++;
+
                 continue;
             }
 
@@ -204,6 +267,8 @@ void *tun(__attribute__((unused)) void *arg)
             dst_port = res_elem_nat.value.old_src_port;
 
             in_out_flag = 0;
+
+            stat.nat_sended_to_client++;
         } else {
             ip_ip_map_t find_elem_ip_ip;
             find_elem_ip_ip.ip_local = iph->daddr;
@@ -212,6 +277,15 @@ void *tun(__attribute__((unused)) void *arg)
             int32_t find_elem_ip_ip_flag =
                 array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
             if (find_elem_ip_ip_flag != 1) {
+                stat.nat_sended_to_dev_error++;
+
+                struct in_addr s_ip_new;
+                s_ip_new.s_addr = iph->daddr;
+
+                if (log_fd) {
+                    fprintf(log_fd, "NAT_sended_to_dev_error %s\n", inet_ntoa(s_ip_new));
+                }
+
                 continue;
             }
 
@@ -249,6 +323,8 @@ void *tun(__attribute__((unused)) void *arg)
             src_port = add_elem_nat.key.src_port;
 
             in_out_flag = 1;
+
+            stat.nat_sended_to_dev++;
         }
 
         if (log_fd && 0) {
@@ -261,9 +337,9 @@ void *tun(__attribute__((unused)) void *arg)
             char log_out_str[1000];
 
             if (in_out_flag) {
-                sprintf(log_out_str, "NAT OUT: %s ", inet_ntoa(src_ip_old));
+                sprintf(log_out_str, "NAT_sended_to_dev: %s ", inet_ntoa(src_ip_old));
             } else {
-                sprintf(log_out_str, "NAT IN : %s ", inet_ntoa(src_ip_old));
+                sprintf(log_out_str, "NAT_sended_to_client: %s ", inet_ntoa(src_ip_old));
             }
 
             sprintf(log_out_str + strlen(log_out_str), "%s ", inet_ntoa(dst_ip_old));
@@ -324,6 +400,17 @@ void *tun(__attribute__((unused)) void *arg)
         }
 
         iph->check = checksum(L3_start_pointer, iph->ihl << 2);
+
+        gettimeofday(&now_timeval, NULL);
+        uint64_t now_us_end = now_timeval.tv_sec * 1000000 + now_timeval.tv_usec;
+
+        if (in_out_flag) {
+            stat.latency_sended_to_dev_sum += now_us_end - now_us_start;
+            stat.latency_sended_to_dev_count++;
+        } else {
+            stat.latency_sended_to_client_sum += now_us_end - now_us_start;
+            stat.latency_sended_to_client_count++;
+        }
 
         write(tap_fd, buffer, nread);
     }
