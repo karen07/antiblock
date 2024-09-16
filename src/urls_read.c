@@ -3,13 +3,13 @@
 #include "stat.h"
 #include <curl/curl.h>
 
-char *urls;
+struct memory urls;
 const array_hashmap_t *urls_map_struct;
 
 uint32_t add_url_hash(const void *void_elem)
 {
     const uint32_t *elem = void_elem;
-    return djb33_hash_len(&urls[*elem], -1);
+    return djb33_hash_len(&urls.data[*elem], -1);
 }
 
 int32_t add_url_cmp(const void *void_elem1, const void *void_elem2)
@@ -17,7 +17,7 @@ int32_t add_url_cmp(const void *void_elem1, const void *void_elem2)
     const uint32_t *elem1 = void_elem1;
     const uint32_t *elem2 = void_elem2;
 
-    return !strcmp(&urls[*elem1], &urls[*elem2]);
+    return !strcmp(&urls.data[*elem1], &urls.data[*elem2]);
 }
 
 uint32_t find_url_hash(const void *void_elem)
@@ -31,27 +31,22 @@ int32_t find_url_cmp(const void *void_elem1, const void *void_elem2)
     const char *elem1 = void_elem1;
     const uint32_t *elem2 = void_elem2;
 
-    return !strcmp(elem1, &urls[*elem2]);
+    return !strcmp(elem1, &urls.data[*elem2]);
 }
-
-struct memory {
-    char *response;
-    size_t size;
-};
 
 static size_t cb(void *data, size_t size, size_t nmemb, void *clientp)
 {
     size_t realsize = size * nmemb;
     struct memory *mem = (struct memory *)clientp;
 
-    char *ptr = realloc(mem->response, mem->size + realsize + 1);
+    char *ptr = realloc(mem->data, mem->size + realsize + 1);
     if (!ptr)
         return 0;
 
-    mem->response = ptr;
-    memcpy(&(mem->response[mem->size]), data, realsize);
+    mem->data = ptr;
+    memcpy(&(mem->data[mem->size]), data, realsize);
     mem->size += realsize;
-    mem->response[mem->size] = 0;
+    mem->data[mem->size] = 0;
 
     return realsize;
 }
@@ -62,13 +57,12 @@ void *urls_read(__attribute__((unused)) void *arg)
 
     printf("Thread urls read started\n");
 
-    struct memory chunk;
-    memset(&chunk, 0, sizeof(chunk));
+    memset(&urls, 0, sizeof(urls));
 
     while (1) {
-        if (chunk.response != NULL) {
-            free(chunk.response);
-            memset(&chunk, 0, sizeof(chunk));
+        if (urls.data != NULL) {
+            free(urls.data);
+            memset(&urls, 0, sizeof(urls));
         }
 
         if (is_domains_file_url) {
@@ -79,14 +73,14 @@ void *urls_read(__attribute__((unused)) void *arg)
                 curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
                 curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
                 curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
-                curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
+                curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&urls);
                 curl_easy_perform(curl);
                 curl_easy_cleanup(curl);
             }
             curl_global_cleanup();
         }
 
-        int64_t urls_web_file_size = chunk.size;
+        int64_t urls_web_file_size = urls.size;
 
         if (is_domains_file_path) {
             FILE *urls_fd = fopen(domains_file_path, "r");
@@ -97,29 +91,34 @@ void *urls_read(__attribute__((unused)) void *arg)
             fseek(urls_fd, 0, SEEK_END);
             int64_t urls_file_size_add = ftell(urls_fd);
             fseek(urls_fd, 0, SEEK_SET);
-            char *ptr = realloc(chunk.response, chunk.size + urls_file_size_add + 1);
+            char *ptr = realloc(urls.data, urls.size + urls_file_size_add + 1);
             if (!ptr) {
                 printf("No free memory for urls_file\n");
                 exit(EXIT_FAILURE);
             }
-            chunk.response = ptr;
-            if (fread(&(chunk.response[chunk.size]), urls_file_size_add, 1, urls_fd) != 1) {
+            urls.data = ptr;
+            if (fread(&(urls.data[urls.size]), urls_file_size_add, 1, urls_fd) != 1) {
                 printf("Can't read url file\n");
                 exit(EXIT_FAILURE);
             }
-            chunk.size += urls_file_size_add;
-            chunk.response[chunk.size] = 0;
+            urls.size += urls_file_size_add;
+            urls.data[urls.size] = 0;
             fclose(urls_fd);
         }
 
-        urls = chunk.response;
+        char *ptr = realloc(urls.data, urls.size + CNAME_URLS_MAP_MAX_SIZE);
+        if (!ptr) {
+            printf("No free memory for cname_urls\n");
+            exit(EXIT_FAILURE);
+        }
+        urls.data = ptr;
 
-        if (chunk.size > 0) {
+        if (urls.size > 0) {
             int32_t urls_map_size = 0;
             int32_t file_urls_map_size = 0;
-            for (int32_t i = 0; i < (int32_t)chunk.size; i++) {
-                if (urls[i] == '\n') {
-                    urls[i] = 0;
+            for (int32_t i = 0; i < (int32_t)urls.size; i++) {
+                if (urls.data[i] == '\n') {
+                    urls.data[i] = 0;
                     urls_map_size++;
                     if (i >= urls_web_file_size) {
                         file_urls_map_size++;
@@ -145,17 +144,17 @@ void *urls_read(__attribute__((unused)) void *arg)
 
             int32_t url_offset = 0;
             for (int32_t i = 0; i < urls_map_size; i++) {
-                if (!memcmp(&urls[url_offset], "www.", 4)) {
+                if (!memcmp(&urls.data[url_offset], "www.", 4)) {
                     url_offset += 4;
                 }
 
                 if (log_fd) {
-                    fprintf(log_fd, "%s\n", &urls[url_offset]);
+                    fprintf(log_fd, "%s\n", &urls.data[url_offset]);
                 }
 
                 array_hashmap_add_elem(urls_map_struct, &url_offset, NULL, NULL);
 
-                url_offset = strchr(&urls[url_offset + 1], 0) - urls + 1;
+                url_offset = strchr(&urls.data[url_offset + 1], 0) - urls.data + 1;
             }
 
             if (log_fd) {
