@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
 {
     printf("\nAntiblock started\n");
 
-    for (int i = 1; i < argc; i++) {
+    for (int32_t i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-log")) {
             printf("Log enabled\n");
             is_log_print = 1;
@@ -177,7 +177,7 @@ int main(int argc, char *argv[])
         print_help();
     }
 
-    if ((route_ip == 0) == (tun_ip == 0)) {
+    if (route_ip == tun_ip) {
         printf("Programm need route IP or TUN net\n");
         print_help();
     }
@@ -189,22 +189,22 @@ int main(int argc, char *argv[])
         print_help();
     }
 
-    if (dns_ip == 0) {
+    if (!dns_ip) {
         printf("Programm need DNS IP\n");
         print_help();
     }
 
-    if (dns_port == 0) {
+    if (!dns_port) {
         printf("Programm need DNS port\n");
         print_help();
     }
 
-    if (listen_ip == 0) {
+    if (!listen_ip) {
         printf("Programm need listen IP\n");
         print_help();
     }
 
-    if (listen_port == 0) {
+    if (!listen_port) {
         printf("Programm need listen port\n");
         print_help();
     }
@@ -216,33 +216,38 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (is_stat_print) {
-        if (pthread_barrier_init(&threads_barrier, NULL, 7)) {
-            printf("Can't create threads_barrier\n");
-            exit(EXIT_FAILURE);
-        }
-    } else {
-        if (pthread_barrier_init(&threads_barrier, NULL, 6)) {
-            printf("Can't create threads_barrier\n");
-            exit(EXIT_FAILURE);
-        }
+    int32_t threads_barrier_count = 7;
+
+    if (!is_stat_print) {
+        threads_barrier_count--;
+    }
+
+    if (tun_ip) {
+        threads_barrier_count--;
+    }
+
+    if (pthread_barrier_init(&threads_barrier, NULL, threads_barrier_count)) {
+        printf("Can't create threads_barrier\n");
+        exit(EXIT_FAILURE);
     }
 
     printf("\n");
 
     init_stat_print_thread();
 
-    if (route_ip != 0) {
+    if (route_ip) {
         init_route_socket();
     }
 
-    if (tun_ip != 0) {
+    if (tun_ip) {
         init_tun_thread();
     }
 
     init_urls_read_thread();
 
-    init_ttl_check_thread();
+    if (route_ip) {
+        init_ttl_check_thread();
+    }
 
     init_dns_ans_check_thread();
 

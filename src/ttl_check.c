@@ -6,18 +6,6 @@
 const array_hashmap_t *ttl_map_struct;
 time_t now_ttl_check;
 
-int32_t cname_url_decide(const void *void_elem)
-{
-    const cname_urls_map *elem = void_elem;
-
-    if (now_ttl_check > elem->end_time) {
-        del_url_cname(elem->url, elem->end_time);
-        return 1;
-    } else {
-        return 0;
-    }
-}
-
 int32_t ttl_decide(const void *void_elem)
 {
     const ttl_map_t *elem = void_elem;
@@ -70,7 +58,6 @@ void *ttl_check(__attribute__((unused)) void *arg)
         now_ttl_check = time(NULL);
 
         array_hashmap_del_elem_by_func(ttl_map_struct, ttl_decide);
-        array_hashmap_del_elem_by_func(cname_urls_map_struct, cname_url_decide);
 
         sleep(TTL_CHECK_TIME);
     }

@@ -4,60 +4,6 @@
 int32_t route_socket;
 struct rtentry route;
 
-void add_url_cname(char *ans_url, time_t check_time, char *data_url)
-{
-    stat.now_cname_url_count++;
-
-    if (log_fd) {
-        char now_time_str[DATE_STR_MAX_SIZE];
-        time_t now = time(NULL);
-        struct tm *tm_struct = localtime(&now);
-        sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
-
-        char time_str[DATE_STR_MAX_SIZE];
-        tm_struct = localtime(&check_time);
-        sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
-
-        fprintf(log_fd, "%s,add url,%s,%s,%s\n", now_time_str, ans_url, data_url, time_str);
-    }
-}
-
-void update_url_cname(char *ans_url, time_t check_time, char *data_url)
-{
-    if (log_fd) {
-        char now_time_str[DATE_STR_MAX_SIZE];
-        time_t now = time(NULL);
-        struct tm *tm_struct = localtime(&now);
-        sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
-
-        char time_str[DATE_STR_MAX_SIZE];
-        tm_struct = localtime(&check_time);
-        sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
-
-        fprintf(log_fd, "%s,copy url,%s,%s,%s\n", now_time_str, ans_url, data_url, time_str);
-    }
-}
-
-void del_url_cname(char *data_url, time_t check_time)
-{
-    stat.now_cname_url_count--;
-
-    if (log_fd) {
-        char now_time_str[DATE_STR_MAX_SIZE];
-        time_t now = time(NULL);
-        struct tm *tm_struct = localtime(&now);
-        sprintf(now_time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
-
-        char time_str[DATE_STR_MAX_SIZE];
-        tm_struct = localtime(&check_time);
-        sprintf(time_str, "%d:%d:%d", tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
-
-        fprintf(log_fd, "%s,del url,,%s,%s\n", now_time_str, data_url, time_str);
-    }
-
-    free(data_url);
-}
-
 void add_ip_to_route_table(uint32_t ip, time_t check_time, char *url)
 {
     struct in_addr rec_ip;

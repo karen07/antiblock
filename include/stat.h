@@ -5,7 +5,6 @@ typedef struct statistics {
     int32_t rec_from_dns;
 
     int32_t now_in_route_table;
-    int32_t now_cname_url_count;
 
     int32_t send_to_client_error;
     int32_t send_to_dns_error;
@@ -17,7 +16,6 @@ typedef struct statistics {
     int32_t route_not_block_ip_count;
 
     int32_t packets_ring_buffer_error;
-    int32_t cname_url_map_error;
 
     int32_t request_parsing_error;
 

@@ -6,7 +6,12 @@ typedef struct urls_map {
     int32_t next_pos;
 } urls_map_t;
 
-extern char *urls;
+struct memory {
+    char *data;
+    size_t size;
+};
+
+extern struct memory urls;
 extern const array_hashmap_t *urls_map_struct;
 
 uint32_t add_url_hash(const void *void_elem);

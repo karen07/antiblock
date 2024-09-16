@@ -8,10 +8,10 @@ const array_hashmap_t *nat_map_struct;
 uint32_t start_subnet_ip;
 uint32_t end_subnet_ip;
 
-int tun_alloc(char *dev, int flags)
+int32_t tun_alloc(char *dev, int32_t flags)
 {
     struct ifreq ifr;
-    int fd, err;
+    int32_t fd, err;
     char *clonedev = "/dev/net/tun";
 
     if ((fd = open(clonedev, O_RDWR)) < 0) {
@@ -35,7 +35,7 @@ int tun_alloc(char *dev, int flags)
 
     strcpy(dev, ifr.ifr_name);
 
-    //int status = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
+    //int32_t status = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
 
     //if (status == -1) {
     //    printf("Set O_NONBLOCK error\n");
@@ -44,17 +44,17 @@ int tun_alloc(char *dev, int flags)
     return fd;
 }
 
-unsigned short checksum(const char *buf, unsigned size)
+uint16_t checksum(const char *buf, uint32_t size)
 {
-    unsigned sum = 0, i;
+    uint32_t sum = 0, i;
 
     for (i = 0; i < size - 1; i += 2) {
-        unsigned short word16 = *(unsigned short *)&buf[i];
+        uint16_t word16 = *(uint16_t *)&buf[i];
         sum += word16;
     }
 
     if (size & 1) {
-        unsigned short word16 = (unsigned char)buf[i];
+        uint16_t word16 = (uint8_t)buf[i];
         sum += word16;
     }
 
@@ -110,7 +110,7 @@ void *tun(__attribute__((unused)) void *arg)
 {
     printf("Thread tun started\n");
 
-    int tap_fd;
+    int32_t tap_fd;
     char buffer[4096];
     char pseudogram[4096];
 
@@ -134,7 +134,7 @@ void *tun(__attribute__((unused)) void *arg)
     uint32_t nat_icmp_client_ip = 0;
 
     while (1) {
-        int nread = read(tap_fd, buffer, sizeof(buffer));
+        int32_t nread = read(tap_fd, buffer, sizeof(buffer));
 
         struct timeval now_timeval;
         gettimeofday(&now_timeval, NULL);
@@ -146,7 +146,7 @@ void *tun(__attribute__((unused)) void *arg)
 
         tun_header_t *tun_header = (tun_header_t *)buffer;
 
-        int proto_L3 = ntohs(tun_header->proto);
+        int32_t proto_L3 = ntohs(tun_header->proto);
         if (proto_L3 != ETH_P_IP) {
             continue;
         }
@@ -384,7 +384,7 @@ void *tun(__attribute__((unused)) void *arg)
         memcpy(pseudogram, (char *)&psh, sizeof(pseudo_header_t));
         memcpy(pseudogram + sizeof(pseudo_header_t), L4_start_pointer, L4_len);
 
-        int psize = sizeof(pseudo_header_t) + L4_len;
+        int32_t psize = sizeof(pseudo_header_t) + L4_len;
         uint16_t checksum_value = checksum((const char *)pseudogram, psize);
 
         if (proto_L4 == IPPROTO_TCP) {

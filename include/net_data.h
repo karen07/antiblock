@@ -12,4 +12,4 @@ extern int32_t repeater_client_socket;
 void *DNS_data(void *arg);
 void *client_data(void *arg);
 void init_data_threads(void);
-void send_packet(int packets_num);
+void send_packet(int32_t packets_num);
