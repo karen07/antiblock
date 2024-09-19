@@ -213,6 +213,10 @@ void *dns_ans_check(__attribute__((unused)) void *arg)
                     if (block_ans_url_flag) {
                         uint32_t start_subnet_ip_n = htonl(start_subnet_ip++);
 
+                        if (start_subnet_ip == end_subnet_ip) {
+                            start_subnet_ip = ntohl(tun_ip) + 1;
+                        }
+
                         ip_ip_map_t add_elem;
                         add_elem.ip_local = start_subnet_ip_n;
                         add_elem.ip_global = ans->ip4;
