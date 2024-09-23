@@ -57,7 +57,7 @@ static size_t cb(void *data, size_t size, size_t nmemb, void *clientp)
     return realsize;
 }
 
-void urls_read(void)
+int64_t urls_read(void)
 {
     if (urls_map_struct) {
         const array_hashmap_t *tmp_urls_map_struct = urls_map_struct;
@@ -155,4 +155,6 @@ void urls_read(void)
             url_offset = strchr(&urls.data[url_offset + 1], 0) - urls.data + 1;
         }
     }
+
+    return urls_web_file_size;
 }

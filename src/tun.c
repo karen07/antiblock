@@ -114,7 +114,7 @@ static int32_t nat_cmp(const void *void_elem1, const void *void_elem2)
 
 static void *tun(__attribute__((unused)) void *arg)
 {
-    printf("Thread tun started\n");
+    printf("Thread TUN started\n");
 
     int32_t tap_fd;
     char buffer[4096];
@@ -123,7 +123,7 @@ static void *tun(__attribute__((unused)) void *arg)
     tap_fd = tun_alloc(tun_name, IFF_TUN | IFF_MULTI_QUEUE);
 
     if (tap_fd < 0) {
-        printf("Can't allocate tun interface\n");
+        printf("Can't allocate TUN interface\n");
         exit(EXIT_FAILURE);
     }
 
@@ -133,7 +133,7 @@ static void *tun(__attribute__((unused)) void *arg)
     struct in_addr end_subnet_ip_addr;
     end_subnet_ip_addr.s_addr = htonl(end_subnet_ip);
 
-    printf("Tun dev %s allocated", tun_name);
+    printf("TUN dev %s allocated", tun_name);
     printf(" %s-", inet_ntoa(start_subnet_ip_addr));
     printf("%s\n", inet_ntoa(end_subnet_ip_addr));
 
@@ -277,6 +277,7 @@ static void *tun(__attribute__((unused)) void *arg)
             in_out_flag = 0;
 
             stat.nat_sended_to_client++;
+            stat.nat_sended_to_client_size += nread;
         } else {
             ip_ip_map_t find_elem_ip_ip;
             find_elem_ip_ip.ip_local = iph->daddr;
@@ -333,6 +334,7 @@ static void *tun(__attribute__((unused)) void *arg)
             in_out_flag = 1;
 
             stat.nat_sended_to_dev++;
+            stat.nat_sended_to_dev_size += nread;
         }
 
         if (log_fd && 0) {
@@ -426,11 +428,12 @@ static void *tun(__attribute__((unused)) void *arg)
 
 void init_tun_thread(void)
 {
-    start_subnet_ip = ntohl(tun_ip) + 1;
+    uint32_t netMask = (0xFFFFFFFF << (32 - (tun_prefix + 1)) & 0xFFFFFFFF);
+    start_subnet_ip = (ntohl(tun_ip) & netMask) + 2;
 
     int32_t subnet_size = 1;
     subnet_size <<= 32 - (tun_prefix + 1);
-    end_subnet_ip = start_subnet_ip + subnet_size - 3;
+    end_subnet_ip = start_subnet_ip + subnet_size - 4;
 
     ip_ip_map_struct = init_array_hashmap(subnet_size, 1.0, sizeof(ip_ip_map_t));
     if (ip_ip_map_struct == NULL) {
