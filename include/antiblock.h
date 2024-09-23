@@ -1,27 +1,22 @@
-#include "config.h"
-#include "const.h"
-#include <arpa/inet.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <limits.h>
-#include <linux/if.h>
-#include <linux/if_ether.h>
-#include <linux/if_tun.h>
-#include <linux/ip.h>
-#include <linux/limits.h>
-#include <linux/tcp.h>
-#include <linux/udp.h>
-#include <net/route.h>
-#include <poll.h>
 #include <pthread.h>
 #include <stdint.h>
+#include <linux/limits.h>
+#include <linux/if.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/ioctl.h>
-#include <sys/socket.h>
-#include <sys/time.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdbool.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
+#include <errno.h>
+#include <linux/if_tun.h>
+#include <limits.h>
+#include <sys/time.h>
+#include <linux/ip.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
+#include "array_hashmap.h"
 
 extern pthread_barrier_t threads_barrier;
 
@@ -39,8 +34,6 @@ extern char log_or_stat_folder[PATH_MAX - 100];
 
 extern int32_t is_tun_name;
 extern char tun_name[IFNAMSIZ];
-
-extern uint32_t route_ip;
 
 extern uint32_t tun_ip;
 extern uint32_t tun_prefix;

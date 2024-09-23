@@ -1,16 +1,22 @@
-#include "net_data.h"
-#include "DNS.h"
+#include "antiblock.h"
+#include "config.h"
+#include "const.h"
 #include "dns_ans.h"
 #include "hash.h"
+#include "net_data.h"
 #include "stat.h"
+#include "tun.h"
+#include "urls_read.h"
 
 id_map_t *id_map;
 int32_t repeater_DNS_socket;
 int32_t repeater_client_socket;
 
-void *DNS_data(__attribute__((unused)) void *arg)
+static void *DNS_data(__attribute__((unused)) void *arg)
 {
-    struct sockaddr_in repeater_DNS_addr, receive_DNS_addr;
+    printf("Thread DNS data started\n");
+
+    struct sockaddr_in repeater_DNS_addr, receive_DNS_addr, client_addr;
 
     repeater_DNS_addr.sin_family = AF_INET;
     repeater_DNS_addr.sin_port = htons(listen_port + 1);
@@ -32,68 +38,42 @@ void *DNS_data(__attribute__((unused)) void *arg)
 
     pthread_barrier_wait(&threads_barrier);
 
-    packet_t *receive_msg = NULL;
-    while (1) {
-        int32_t remain_div = packets_ring_buffer_end % packets_ring_buffer_size;
-        if (packets_ring_buffer[remain_div].packet_size > 0) {
-            send_packet(remain_div);
-            stat.packets_ring_buffer_error++;
-        }
+    packet_t receive_msg;
 
-        receive_msg = &packets_ring_buffer[remain_div];
-        receive_msg->packet_size =
-            recvfrom(repeater_DNS_socket, receive_msg->packet, PACKET_MAX_SIZE, 0,
-                     (struct sockaddr *)&receive_DNS_addr, &receive_DNS_addr_length);
+    while (true) {
+        receive_msg.packet_size = recvfrom(repeater_DNS_socket, receive_msg.packet, PACKET_MAX_SIZE,
+                                           0, (struct sockaddr *)&receive_DNS_addr,
+                                           &receive_DNS_addr_length);
 
-        if (receive_msg->packet_size < (int32_t)sizeof(dns_header_t)) {
+        if (receive_msg.packet_size < (int32_t)sizeof(dns_header_t)) {
             continue;
         }
 
-        dns_header_t *header = (dns_header_t *)receive_msg->packet;
+        dns_header_t *header = (dns_header_t *)receive_msg.packet;
+        uint16_t id = ntohs(header->id);
 
-        uint16_t flags = ntohs(header->flags);
+        dns_ans_check(&receive_msg);
 
-        if ((flags & FIRST_BIT_UINT16) == 0) {
-            continue;
+        client_addr.sin_family = AF_INET;
+        client_addr.sin_port = id_map[id].port;
+        client_addr.sin_addr.s_addr = id_map[id].ip;
+
+        if (sendto(repeater_client_socket, receive_msg.packet, receive_msg.packet_size, 0,
+                   (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
+            stat.send_to_client_error++;
+            printf("Can't send to client %s\n", strerror(errno));
+        } else {
+            stat.rec_from_dns++;
         }
-
-        stat.rec_from_dns++;
-
-        pthread_mutex_lock(&packets_ring_buffer_mutex);
-        packets_ring_buffer_end++;
-        pthread_cond_signal(&packets_ring_buffer_step);
-        pthread_mutex_unlock(&packets_ring_buffer_mutex);
     }
 
     return NULL;
 }
 
-void send_packet(int32_t packets_num)
+static void *client_data(__attribute__((unused)) void *arg)
 {
-    struct sockaddr_in client_addr;
-    char *receive_msg = NULL;
-    int32_t receive_msg_len = 0;
+    printf("Thread client data started\n");
 
-    receive_msg = packets_ring_buffer[packets_num].packet;
-    receive_msg_len = packets_ring_buffer[packets_num].packet_size;
-
-    dns_header_t *header = (dns_header_t *)receive_msg;
-
-    uint16_t id = ntohs(header->id);
-
-    client_addr.sin_family = AF_INET;
-    client_addr.sin_port = id_map[id].port;
-    client_addr.sin_addr.s_addr = id_map[id].ip;
-
-    if (sendto(repeater_client_socket, receive_msg, receive_msg_len, 0,
-               (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
-        stat.send_to_client_error++;
-        printf("Can't send to client %s\n", strerror(errno));
-    }
-}
-
-void *client_data(__attribute__((unused)) void *arg)
-{
     struct sockaddr_in repeater_client_addr, dns_addr, receive_client_addr;
 
     repeater_client_addr.sin_family = AF_INET;
@@ -122,7 +102,7 @@ void *client_data(__attribute__((unused)) void *arg)
 
     packet_t receive_msg;
 
-    while (1) {
+    while (true) {
         receive_msg.packet_size =
             recvfrom(repeater_client_socket, receive_msg.packet, PACKET_MAX_SIZE, 0,
                      (struct sockaddr *)&receive_client_addr, &receive_client_addr_length);
@@ -132,15 +112,7 @@ void *client_data(__attribute__((unused)) void *arg)
         }
 
         dns_header_t *header = (dns_header_t *)receive_msg.packet;
-
         uint16_t id = ntohs(header->id);
-        uint16_t flags = ntohs(header->flags);
-
-        if (flags & FIRST_BIT_UINT16) {
-            continue;
-        }
-
-        stat.rec_from_client++;
 
         id_map[id].ip = receive_client_addr.sin_addr.s_addr;
         id_map[id].port = receive_client_addr.sin_port;
@@ -149,20 +121,22 @@ void *client_data(__attribute__((unused)) void *arg)
                    (struct sockaddr *)&dns_addr, sizeof(dns_addr)) < 0) {
             stat.send_to_dns_error++;
             printf("Can't send to DNS :%s\n", strerror(errno));
+        } else {
+            stat.rec_from_client++;
         }
     }
 
     return NULL;
 }
 
-void init_data_threads(void)
+void init_net_data_threads(void)
 {
-    id_map = malloc(ID_MAP_MAX_SIZE * sizeof(id_map_t));
+    id_map = malloc((USHRT_MAX + 1) * sizeof(id_map_t));
     if (id_map == NULL) {
         printf("No free memory for id_map\n");
         exit(EXIT_FAILURE);
     }
-    memset(id_map, 0, ID_MAP_MAX_SIZE * sizeof(id_map_t));
+    memset(id_map, 0, (USHRT_MAX + 1) * sizeof(id_map_t));
 
     pthread_t client_data_thread;
     if (pthread_create(&client_data_thread, NULL, client_data, NULL)) {

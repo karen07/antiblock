@@ -1,6 +1,12 @@
-#include "tun.h"
+#include "antiblock.h"
+#include "config.h"
+#include "const.h"
+#include "dns_ans.h"
 #include "hash.h"
+#include "net_data.h"
 #include "stat.h"
+#include "tun.h"
+#include "urls_read.h"
 
 const array_hashmap_t *ip_ip_map_struct;
 const array_hashmap_t *nat_map_struct;
@@ -8,7 +14,7 @@ const array_hashmap_t *nat_map_struct;
 uint32_t start_subnet_ip;
 uint32_t end_subnet_ip;
 
-int32_t tun_alloc(char *dev, int32_t flags)
+static int32_t tun_alloc(char *dev, int32_t flags)
 {
     struct ifreq ifr;
     int32_t fd, err;
@@ -44,7 +50,7 @@ int32_t tun_alloc(char *dev, int32_t flags)
     return fd;
 }
 
-uint16_t checksum(const char *buf, uint32_t size)
+static uint16_t checksum(const char *buf, uint32_t size)
 {
     uint32_t sum = 0, i;
 
@@ -64,13 +70,13 @@ uint16_t checksum(const char *buf, uint32_t size)
     return ~sum;
 }
 
-uint32_t ip_ip_hash(const void *void_elem)
+static uint32_t ip_ip_hash(const void *void_elem)
 {
     const ip_ip_map_t *elem = void_elem;
     return elem->ip_local;
 }
 
-int32_t ip_ip_cmp(const void *void_elem1, const void *void_elem2)
+static int32_t ip_ip_cmp(const void *void_elem1, const void *void_elem2)
 {
     const ip_ip_map_t *elem1 = void_elem1;
     const ip_ip_map_t *elem2 = void_elem2;
@@ -88,13 +94,13 @@ int32_t ip_ip_on_collision(__attribute__((unused)) const void *void_elem1,
     return 1;
 }
 
-uint32_t nat_hash(const void *void_elem)
+static uint32_t nat_hash(const void *void_elem)
 {
     const nat_map_t *elem = void_elem;
     return djb33_hash_len((const char *)(&elem->key), sizeof(elem->key));
 }
 
-int32_t nat_cmp(const void *void_elem1, const void *void_elem2)
+static int32_t nat_cmp(const void *void_elem1, const void *void_elem2)
 {
     const nat_map_t *elem1 = void_elem1;
     const nat_map_t *elem2 = void_elem2;
@@ -106,7 +112,7 @@ int32_t nat_cmp(const void *void_elem1, const void *void_elem2)
     }
 }
 
-void *tun(__attribute__((unused)) void *arg)
+static void *tun(__attribute__((unused)) void *arg)
 {
     printf("Thread tun started\n");
 
@@ -131,9 +137,11 @@ void *tun(__attribute__((unused)) void *arg)
     printf(" %s-", inet_ntoa(start_subnet_ip_addr));
     printf("%s\n", inet_ntoa(end_subnet_ip_addr));
 
+    pthread_barrier_wait(&threads_barrier);
+
     uint32_t nat_icmp_client_ip = 0;
 
-    while (1) {
+    while (true) {
         int32_t nread = read(tap_fd, buffer, sizeof(buffer));
 
         struct timeval now_timeval;
@@ -424,7 +432,7 @@ void init_tun_thread(void)
     subnet_size <<= 32 - (tun_prefix + 1);
     end_subnet_ip = start_subnet_ip + subnet_size - 3;
 
-    ip_ip_map_struct = init_array_hashmap(LOC_TO_GLOBIP_MAP_MAX_SIZE, 1.0, sizeof(ip_ip_map_t));
+    ip_ip_map_struct = init_array_hashmap(subnet_size, 1.0, sizeof(ip_ip_map_t));
     if (ip_ip_map_struct == NULL) {
         printf("No free memory for ip_ip_map_struct\n");
         exit(EXIT_FAILURE);

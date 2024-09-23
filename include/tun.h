@@ -1,5 +1,4 @@
 #include "antiblock.h"
-#include "array_hashmap.h"
 
 typedef struct tun_header {
     uint16_t flags;
@@ -42,9 +41,5 @@ extern const array_hashmap_t *nat_map_struct;
 extern uint32_t start_subnet_ip;
 extern uint32_t end_subnet_ip;
 
-int32_t tun_alloc(char *dev, int32_t flags);
-uint16_t checksum(const char *buf, uint32_t size);
-int32_t ip_ip_cmp(const void *void_elem1, const void *void_elem2);
-int32_t ip_ip_on_collision(const void *void_elem1, const void *void_elem2);
-void *tun(void *arg);
 void init_tun_thread(void);
+int32_t ip_ip_on_collision(const void *void_elem1, const void *void_elem2);
