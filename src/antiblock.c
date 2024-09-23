@@ -71,8 +71,8 @@ int main(int argc, char *argv[])
         }
         if (!strcmp(argv[i], "-url")) {
             if (i != argc - 1) {
-                printf("Get urls from url %s\n", argv[i + 1]);
                 if (strlen(argv[i + 1]) < PATH_MAX) {
+                    printf("Get urls from url %s\n", argv[i + 1]);
                     is_domains_file_url = 1;
                     strcpy(domains_file_url, argv[i + 1]);
                 }
@@ -82,8 +82,8 @@ int main(int argc, char *argv[])
         }
         if (!strcmp(argv[i], "-file")) {
             if (i != argc - 1) {
-                printf("Get urls from file %s\n", argv[i + 1]);
                 if (strlen(argv[i + 1]) < PATH_MAX - 100) {
+                    printf("Get urls from file %s\n", argv[i + 1]);
                     is_domains_file_path = 1;
                     strcpy(domains_file_path, argv[i + 1]);
                 }
@@ -93,8 +93,8 @@ int main(int argc, char *argv[])
         }
         if (!strcmp(argv[i], "-output")) {
             if (i != argc - 1) {
-                printf("Output log or stat to %s\n", argv[i + 1]);
                 if (strlen(argv[i + 1]) < PATH_MAX - 100) {
+                    printf("Output log or stat to %s\n", argv[i + 1]);
                     is_log_or_stat_folder = 1;
                     strcpy(log_or_stat_folder, argv[i + 1]);
                 }
@@ -104,9 +104,11 @@ int main(int argc, char *argv[])
         }
         if (!strcmp(argv[i], "-DNS_IP")) {
             if (i != argc - 1) {
-                printf("DNS IP %s\n", argv[i + 1]);
                 if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
                     dns_ip = inet_addr(argv[i + 1]);
+                    struct in_addr dns_ip_in_addr;
+                    dns_ip_in_addr.s_addr = dns_ip;
+                    printf("DNS IP %s\n", inet_ntoa(dns_ip_in_addr));
                 }
                 i++;
             }
@@ -114,17 +116,19 @@ int main(int argc, char *argv[])
         }
         if (!strcmp(argv[i], "-DNS_port")) {
             if (i != argc - 1) {
-                printf("DNS port %s\n", argv[i + 1]);
                 sscanf(argv[i + 1], "%hu", &dns_port);
+                printf("DNS port %d\n", dns_port);
                 i++;
             }
             continue;
         }
         if (!strcmp(argv[i], "-listen_IP")) {
             if (i != argc - 1) {
-                printf("Listen IP %s\n", argv[i + 1]);
                 if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
                     listen_ip = inet_addr(argv[i + 1]);
+                    struct in_addr listen_ip_in_addr;
+                    listen_ip_in_addr.s_addr = listen_ip;
+                    printf("Listen IP %s\n", inet_ntoa(listen_ip_in_addr));
                 }
                 i++;
             }
@@ -132,21 +136,23 @@ int main(int argc, char *argv[])
         }
         if (!strcmp(argv[i], "-listen_port")) {
             if (i != argc - 1) {
-                printf("Listen port %s\n", argv[i + 1]);
                 sscanf(argv[i + 1], "%hu", &listen_port);
+                printf("Listen port %d\n", listen_port);
                 i++;
             }
             continue;
         }
         if (!strcmp(argv[i], "-TUN_net")) {
             if (i != argc - 1) {
-                printf("TUN net %s\n", argv[i + 1]);
                 char *slash_ptr = strchr(argv[i + 1], '/');
                 if (slash_ptr) {
                     sscanf(slash_ptr + 1, "%u", &tun_prefix);
                     *slash_ptr = 0;
                     if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
                         tun_ip = inet_addr(argv[i + 1]);
+                        struct in_addr tun_ip_in_addr;
+                        tun_ip_in_addr.s_addr = tun_ip;
+                        printf("TUN net %s/%d\n", inet_ntoa(tun_ip_in_addr), tun_prefix);
                     }
                     *slash_ptr = '/';
                 }
@@ -167,7 +173,17 @@ int main(int argc, char *argv[])
         print_help();
     }
 
-    // Check TUN_name, tun_prefix
+    printf("\n");
+
+    if (!is_tun_name) {
+        printf("Programm need TUN name\n");
+        print_help();
+    }
+
+    if (!tun_ip || !tun_prefix) {
+        printf("Programm need TUN net\n");
+        print_help();
+    }
 
     if (!(is_domains_file_url || is_domains_file_path)) {
         printf("Programm need domains file url or domains file path\n");
@@ -201,12 +217,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    int32_t threads_barrier_count = 4;
-    if (pthread_barrier_init(&threads_barrier, NULL, threads_barrier_count)) {
-        printf("Can't create threads_barrier\n");
-        exit(EXIT_FAILURE);
-    }
-
     if (is_log_print) {
         char log_path[PATH_MAX];
         sprintf(log_path, "%s%s", log_or_stat_folder, "/log.txt");
@@ -229,27 +239,32 @@ int main(int argc, char *argv[])
         }
     }
 
+    int32_t threads_barrier_count = 4;
+    if (pthread_barrier_init(&threads_barrier, NULL, threads_barrier_count)) {
+        printf("Can't create threads_barrier\n");
+        exit(EXIT_FAILURE);
+    }
+
     init_tun_thread();
 
     init_net_data_threads();
 
     pthread_barrier_wait(&threads_barrier);
 
-    int sleep_circles = 0;
+    int32_t sleep_circles = 0;
+    int64_t urls_web_file_size = 0;
 
     while (true) {
         if (sleep_circles == 0) {
-            urls_read();
+            urls_web_file_size = urls_read();
         }
 
         sleep_circles++;
-        sleep_circles %= URLS_UPDATE_TIME / STAT_PRINT_TIME;
-
-        /*if (urls_web_file_size > 0 || !is_domains_file_url) {
-            sleep(URLS_UPDATE_TIME);
+        if (urls_web_file_size > 0 || !is_domains_file_url) {
+            sleep_circles %= URLS_UPDATE_TIME / STAT_PRINT_TIME;
         } else {
-            sleep(URLS_ERROR_UPDATE_TIME);
-        }*/
+            sleep_circles %= URLS_ERROR_UPDATE_TIME / STAT_PRINT_TIME;
+        }
 
         if (is_stat_print) {
             stat_print();

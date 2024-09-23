@@ -13,4 +13,4 @@ struct memory {
 extern struct memory urls;
 extern const array_hashmap_t *urls_map_struct;
 
-void urls_read(void);
+int64_t urls_read(void);
