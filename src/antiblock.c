@@ -1,10 +1,10 @@
 #include "antiblock.h"
-#include "DNS.h"
+#include "config.h"
+#include "const.h"
 #include "dns_ans.h"
+#include "hash.h"
 #include "net_data.h"
-#include "route.h"
 #include "stat.h"
-#include "ttl_check.h"
 #include "tun.h"
 #include "urls_read.h"
 
@@ -25,8 +25,6 @@ char log_or_stat_folder[PATH_MAX - 100];
 int32_t is_tun_name;
 char tun_name[IFNAMSIZ];
 
-uint32_t route_ip;
-
 uint32_t tun_ip;
 uint32_t tun_prefix;
 
@@ -36,14 +34,16 @@ uint16_t dns_port;
 uint32_t listen_ip;
 uint16_t listen_port;
 
-void print_help()
+FILE *log_fd;
+FILE *stat_fd;
+
+static void print_help()
 {
     printf("Commands:\n"
            "-log                          Show operations log\n"
            "-stat                         Show statistics data\n"
            "-url https://example.com      Domains file url\n"
            "-file /example.txt            Domains file path\n"
-           "-route_IP 0.0.0.0             Route IP\n"
            "-output /example/             Log or statistics output folder\n"
            "-DNS_IP 0.0.0.0               DNS IP\n"
            "-DNS_port 00                  DNS port\n"
@@ -97,16 +97,6 @@ int main(int argc, char *argv[])
                 if (strlen(argv[i + 1]) < PATH_MAX - 100) {
                     is_log_or_stat_folder = 1;
                     strcpy(log_or_stat_folder, argv[i + 1]);
-                }
-                i++;
-            }
-            continue;
-        }
-        if (!strcmp(argv[i], "-route_IP")) {
-            if (i != argc - 1) {
-                printf("Route IP %s\n", argv[i + 1]);
-                if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
-                    route_ip = inet_addr(argv[i + 1]);
                 }
                 i++;
             }
@@ -177,11 +167,6 @@ int main(int argc, char *argv[])
         print_help();
     }
 
-    if (route_ip == tun_ip) {
-        printf("Programm need route IP or TUN net\n");
-        print_help();
-    }
-
     // Check TUN_name, tun_prefix
 
     if (!(is_domains_file_url || is_domains_file_path)) {
@@ -216,47 +201,67 @@ int main(int argc, char *argv[])
         }
     }
 
-    int32_t threads_barrier_count = 7;
-
-    if (!is_stat_print) {
-        threads_barrier_count--;
-    }
-
-    if (tun_ip) {
-        threads_barrier_count--;
-    }
-
+    int32_t threads_barrier_count = 4;
     if (pthread_barrier_init(&threads_barrier, NULL, threads_barrier_count)) {
         printf("Can't create threads_barrier\n");
         exit(EXIT_FAILURE);
     }
 
-    printf("\n");
-
-    init_stat_print_thread();
-
-    if (route_ip) {
-        init_route_socket();
+    if (is_log_print) {
+        char log_path[PATH_MAX];
+        sprintf(log_path, "%s%s", log_or_stat_folder, "/log.txt");
+        log_fd = fopen(log_path, "w");
+        if (log_fd == NULL) {
+            printf("Can't open log file\n");
+            exit(EXIT_FAILURE);
+        }
     }
 
-    if (tun_ip) {
-        init_tun_thread();
+    if (is_stat_print) {
+        memset(&stat, 0, sizeof(stat));
+
+        char stat_path[PATH_MAX];
+        sprintf(stat_path, "%s%s", log_or_stat_folder, "/stat.txt");
+        stat_fd = fopen(stat_path, "w");
+        if (stat_fd == NULL) {
+            printf("Can't open stat file\n");
+            exit(EXIT_FAILURE);
+        }
     }
 
-    init_urls_read_thread();
+    init_tun_thread();
 
-    if (route_ip) {
-        init_ttl_check_thread();
-    }
-
-    init_dns_ans_check_thread();
-
-    init_data_threads();
+    init_net_data_threads();
 
     pthread_barrier_wait(&threads_barrier);
 
-    while (1) {
-        sleep(1000);
+    int sleep_circles = 0;
+
+    while (true) {
+        if (sleep_circles == 0) {
+            urls_read();
+        }
+
+        sleep_circles++;
+        sleep_circles %= URLS_UPDATE_TIME / STAT_PRINT_TIME;
+
+        /*if (urls_web_file_size > 0 || !is_domains_file_url) {
+            sleep(URLS_UPDATE_TIME);
+        } else {
+            sleep(URLS_ERROR_UPDATE_TIME);
+        }*/
+
+        if (is_stat_print) {
+            stat_print();
+        }
+
+        if (is_log_print) {
+            fflush(log_fd);
+        }
+
+        fflush(stdout);
+
+        sleep(STAT_PRINT_TIME);
     }
 
     return EXIT_SUCCESS;

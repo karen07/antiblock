@@ -1,19 +1,30 @@
 #include "antiblock.h"
-#include "array_hashmap.h"
+
+typedef struct dns_header {
+    uint16_t id;
+    uint16_t flags;
+    uint16_t quest;
+    uint16_t ans;
+    uint16_t auth;
+    uint16_t add;
+} __attribute__((packed)) dns_header_t;
+
+typedef struct dns_que {
+    uint16_t type;
+    uint16_t class;
+} __attribute__((packed)) dns_que_t;
+
+typedef struct dns_ans {
+    uint16_t type;
+    uint16_t class;
+    uint32_t ttl;
+    uint16_t len;
+    uint32_t ip4;
+} __attribute__((packed)) dns_ans_t;
 
 typedef struct packet {
     int32_t packet_size;
     char packet[PACKET_MAX_SIZE];
 } packet_t;
 
-extern pthread_mutex_t packets_ring_buffer_mutex;
-extern pthread_cond_t packets_ring_buffer_step;
-extern int32_t packets_ring_buffer_size;
-extern int32_t packets_ring_buffer_start;
-extern int32_t packets_ring_buffer_end;
-extern packet_t *packets_ring_buffer;
-
-int32_t get_url_from_packet(char *packet_start, char *hand_point, char *receive_msg_end, char *url,
-                            int32_t *first_len);
-void *dns_ans_check(void *arg);
-void init_dns_ans_check_thread(void);
+void dns_ans_check(packet_t *receive_msg_struct);
