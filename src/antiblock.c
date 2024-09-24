@@ -37,7 +37,7 @@ uint16_t listen_port;
 FILE *log_fd;
 FILE *stat_fd;
 
-static void print_help()
+static void print_help(void)
 {
     printf("Commands:\n"
            "-log                          Show operations log\n"

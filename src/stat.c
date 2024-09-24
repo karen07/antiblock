@@ -28,9 +28,17 @@ void stat_print(void)
     fprintf(stat_fd, "\n");
 
     fprintf(stat_fd, "NAT sended to internet           : %d ptks\n", stat.nat_sended_to_dev);
-    fprintf(stat_fd, "NAT sended to internet size      : %d B\n", stat.nat_sended_to_dev_size);
+    fprintf(stat_fd, "NAT sended to internet size      : %lf MB\n",
+            stat.nat_sended_to_dev_size / 1024 / 1024);
+
+    fprintf(stat_fd, "\n");
+
     fprintf(stat_fd, "NAT received from internet       : %d ptks\n", stat.nat_sended_to_client);
-    fprintf(stat_fd, "NAT received from internet size  : %d B\n", stat.nat_sended_to_client_size);
+    fprintf(stat_fd, "NAT received from internet size  : %lf MB\n",
+            stat.nat_sended_to_client_size / 1024 / 1024);
+
+    fprintf(stat_fd, "\n");
+
     fprintf(stat_fd, "NAT sended to internet errors    : %d ptks\n", stat.nat_sended_to_dev_error);
     fprintf(stat_fd, "NAT received from internet errors: %d ptks\n",
             stat.nat_sended_to_client_error);
