@@ -42,7 +42,6 @@ static int32_t tun_alloc(char *dev, int32_t flags)
     strcpy(dev, ifr.ifr_name);
 
     //int32_t status = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
-
     //if (status == -1) {
     //    printf("Set O_NONBLOCK error\n");
     //}
@@ -433,7 +432,7 @@ void init_tun_thread(void)
 
     int32_t subnet_size = 1;
     subnet_size <<= 32 - (tun_prefix + 1);
-    end_subnet_ip = start_subnet_ip + subnet_size - 4;
+    end_subnet_ip = (ntohl(tun_ip) & netMask) + subnet_size - 2;
 
     ip_ip_map_struct = init_array_hashmap(subnet_size, 1.0, sizeof(ip_ip_map_t));
     if (ip_ip_map_struct == NULL) {
@@ -442,6 +441,11 @@ void init_tun_thread(void)
     }
 
     array_hashmap_set_func(ip_ip_map_struct, ip_ip_hash, ip_ip_cmp, ip_ip_hash, ip_ip_cmp);
+
+    //ip_ip_map_t add_elem;
+    //add_elem.ip_local = htonl(start_subnet_ip++);
+    //add_elem.ip_global = inet_addr("192.168.1.10");
+    //array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, ip_ip_on_collision);
 
     nat_map_struct = init_array_hashmap(NAT_MAP_MAX_SIZE, 1.0, sizeof(nat_map_t));
     if (nat_map_struct == NULL) {

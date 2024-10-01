@@ -193,7 +193,8 @@ void dns_ans_check(packet_t *receive_msg_struct)
                 uint32_t start_subnet_ip_n = htonl(start_subnet_ip++);
 
                 if (start_subnet_ip == end_subnet_ip) {
-                    start_subnet_ip = ntohl(tun_ip) + 1;
+                    uint32_t netMask = (0xFFFFFFFF << (32 - (tun_prefix + 1)) & 0xFFFFFFFF);
+                    start_subnet_ip = (ntohl(tun_ip) & netMask) + 2;
                 }
 
                 ip_ip_map_t add_elem;
