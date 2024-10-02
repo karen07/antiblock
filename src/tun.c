@@ -111,9 +111,23 @@ static int32_t nat_cmp(const void *void_elem1, const void *void_elem2)
     }
 }
 
+static void tun_catch_function(__attribute__((unused)) int signo)
+{
+    printf("SIGSEGV catched tun\n");
+    fflush(stdout);
+    fflush(stat_fd);
+    fflush(log_fd);
+    exit(EXIT_FAILURE);
+}
+
 static void *tun(__attribute__((unused)) void *arg)
 {
     printf("Thread TUN started\n");
+
+    if (signal(SIGSEGV, tun_catch_function) == SIG_ERR) {
+        printf("Can't set signal handler tun\n");
+        exit(EXIT_FAILURE);
+    }
 
     int32_t tap_fd;
     char buffer[4096];
@@ -142,10 +156,6 @@ static void *tun(__attribute__((unused)) void *arg)
 
     while (true) {
         int32_t nread = read(tap_fd, buffer, sizeof(buffer));
-
-        struct timeval now_timeval;
-        gettimeofday(&now_timeval, NULL);
-        uint64_t now_us_start = now_timeval.tv_sec * 1000000 + now_timeval.tv_usec;
 
         if (nread < 1) {
             continue;
@@ -316,6 +326,7 @@ static void *tun(__attribute__((unused)) void *arg)
                     array_hashmap_add_elem(nat_map_struct, &add_elem_nat, &res_elem_nat, NULL);
                 if (add_elem_nat_flag == 1) {
                     correct_new_srt_port = 0;
+                    stat.nat_records++;
                 }
                 if (add_elem_nat_flag == 0) {
                     if ((add_elem_nat.value.old_src_ip == res_elem_nat.value.old_src_ip) &&
@@ -409,17 +420,6 @@ static void *tun(__attribute__((unused)) void *arg)
         }
 
         iph->check = checksum(L3_start_pointer, iph->ihl << 2);
-
-        gettimeofday(&now_timeval, NULL);
-        uint64_t now_us_end = now_timeval.tv_sec * 1000000 + now_timeval.tv_usec;
-
-        if (in_out_flag) {
-            stat.latency_sended_to_dev_sum += now_us_end - now_us_start;
-            stat.latency_sended_to_dev_count++;
-        } else {
-            stat.latency_sended_to_client_sum += now_us_end - now_us_start;
-            stat.latency_sended_to_client_count++;
-        }
 
         write(tap_fd, buffer, nread);
     }

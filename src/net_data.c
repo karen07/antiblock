@@ -12,9 +12,23 @@ id_map_t *id_map;
 int32_t repeater_DNS_socket;
 int32_t repeater_client_socket;
 
+static void DNS_data_catch_function(__attribute__((unused)) int signo)
+{
+    printf("SIGSEGV catched DNS_data\n");
+    fflush(stdout);
+    fflush(stat_fd);
+    fflush(log_fd);
+    exit(EXIT_FAILURE);
+}
+
 static void *DNS_data(__attribute__((unused)) void *arg)
 {
     printf("Thread DNS data started\n");
+
+    if (signal(SIGSEGV, DNS_data_catch_function) == SIG_ERR) {
+        printf("Can't set signal handler DNS_data\n");
+        exit(EXIT_FAILURE);
+    }
 
     struct sockaddr_in repeater_DNS_addr, receive_DNS_addr, client_addr;
 
@@ -70,9 +84,23 @@ static void *DNS_data(__attribute__((unused)) void *arg)
     return NULL;
 }
 
+static void client_data_catch_function(__attribute__((unused)) int signo)
+{
+    printf("SIGSEGV catched client_data\n");
+    fflush(stdout);
+    fflush(stat_fd);
+    fflush(log_fd);
+    exit(EXIT_FAILURE);
+}
+
 static void *client_data(__attribute__((unused)) void *arg)
 {
     printf("Thread client data started\n");
+
+    if (signal(SIGSEGV, client_data_catch_function) == SIG_ERR) {
+        printf("Can't set signal handler client_data\n");
+        exit(EXIT_FAILURE);
+    }
 
     struct sockaddr_in repeater_client_addr, dns_addr, receive_client_addr;
 

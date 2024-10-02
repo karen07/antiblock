@@ -43,11 +43,9 @@ void stat_print(void)
     fprintf(stat_fd, "NAT received from internet errors: %d ptks\n",
             stat.nat_sended_to_client_error);
 
+    fprintf(stat_fd, "\n");
+
+    fprintf(stat_fd, "NAT records count                : %d\n", stat.nat_records);
+
     fflush(stat_fd);
-
-    stat.latency_sended_to_dev_sum = 0;
-    stat.latency_sended_to_dev_count = 0;
-
-    stat.latency_sended_to_client_sum = 0;
-    stat.latency_sended_to_client_count = 0;
 }

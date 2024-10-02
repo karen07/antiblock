@@ -17,11 +17,7 @@ typedef struct statistics {
     double nat_sended_to_dev_size;
     int32_t nat_sended_to_dev;
 
-    int32_t latency_sended_to_dev_sum;
-    int32_t latency_sended_to_dev_count;
-
-    int32_t latency_sended_to_client_sum;
-    int32_t latency_sended_to_client_count;
+    int32_t nat_records;
 } statistics_t;
 
 extern statistics_t stat;
