@@ -54,9 +54,23 @@ static void print_help(void)
     exit(EXIT_FAILURE);
 }
 
+static void main_catch_function(__attribute__((unused)) int signo)
+{
+    printf("SIGSEGV catched main\n");
+    fflush(stdout);
+    fflush(stat_fd);
+    fflush(log_fd);
+    exit(EXIT_FAILURE);
+}
+
 int main(int argc, char *argv[])
 {
     printf("\nAntiblock started\n");
+
+    if (signal(SIGSEGV, main_catch_function) == SIG_ERR) {
+        printf("Can't set signal handler main\n");
+        exit(EXIT_FAILURE);
+    }
 
     for (int32_t i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-log")) {

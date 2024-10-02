@@ -16,6 +16,7 @@
 #include <linux/ip.h>
 #include <linux/tcp.h>
 #include <linux/udp.h>
+#include <signal.h>
 #include "array_hashmap.h"
 
 extern pthread_barrier_t threads_barrier;
