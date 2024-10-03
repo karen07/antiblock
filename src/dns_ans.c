@@ -8,38 +8,50 @@
 #include "tun.h"
 #include "urls_read.h"
 
-static int32_t get_url_from_packet(char *packet_start, char *hand_point, char *receive_msg_end,
-                                   char *url, int32_t *first_len)
+static int32_t get_url_from_packet(char *receive_msg, __attribute__((unused)) char *receive_msg_end,
+                                   char *cur_pos_ptr, char **new_cur_pos_ptr, char *url)
 {
+    uint8_t two_bit_mark = FIRST_TWO_BITS_UINT8;
+    int32_t part_len = 0;
     int32_t url_len = 0;
-    url[url_len++] = '.';
 
-    while ((*hand_point != 0) && ((*hand_point & FIRST_TWO_BITS_UINT8) != FIRST_TWO_BITS_UINT8)) {
-        uint32_t part_len = *hand_point++;
-        if (hand_point + part_len > receive_msg_end) {
-            return -1;
-        }
-        memcpy(&url[url_len], hand_point, part_len);
-        url_len += part_len;
-        hand_point += part_len;
-        if (*hand_point != 0) {
-            url[url_len++] = '.';
+    if (new_cur_pos_ptr) {
+        *new_cur_pos_ptr = NULL;
+    }
+
+    while (true) {
+        if (part_len == 0) {
+            uint8_t first_byte_data = (*cur_pos_ptr) & (~two_bit_mark);
+
+            if ((*cur_pos_ptr & two_bit_mark) != two_bit_mark) {
+                part_len = first_byte_data;
+                cur_pos_ptr++;
+                if (part_len == 0) {
+                    break;
+                } else {
+                    url[url_len++] = '.';
+                }
+            } else {
+                if (new_cur_pos_ptr) {
+                    if (*new_cur_pos_ptr == NULL) {
+                        *new_cur_pos_ptr = cur_pos_ptr + 2;
+                    }
+                }
+                uint8_t second_byte_data = *(cur_pos_ptr + 1);
+                int32_t padding = 256 * first_byte_data + second_byte_data;
+                cur_pos_ptr = receive_msg + padding;
+            }
+        } else {
+            url[url_len++] = *cur_pos_ptr;
+            cur_pos_ptr++;
+            part_len--;
         }
     }
 
-    if (first_len) {
-        *first_len = url_len + 1;
-    }
-
-    if ((*hand_point & FIRST_TWO_BITS_UINT8) == FIRST_TWO_BITS_UINT8) {
-        url_len--;
-        int32_t new_len;
-        new_len = get_url_from_packet(packet_start, packet_start + *(hand_point + 1),
-                                      receive_msg_end, &url[url_len], NULL);
-        if (new_len == -1) {
-            return -1;
+    if (new_cur_pos_ptr) {
+        if (*new_cur_pos_ptr == NULL) {
+            *new_cur_pos_ptr = cur_pos_ptr;
         }
-        url_len += new_len;
     }
 
     url[url_len] = 0;
@@ -105,11 +117,11 @@ void dns_ans_check(packet_t *receive_msg_struct)
     // DNS HEADER
 
     // QUE URL
-    int32_t que_url_pad_len;
+    char *que_new_cur_pos_ptr;
     char que_url[URL_MAX_SIZE];
     char *que_url_start = cur_pos_ptr;
-    int32_t que_url_len =
-        get_url_from_packet(receive_msg, que_url_start, receive_msg_end, que_url, &que_url_pad_len);
+    int32_t que_url_len = get_url_from_packet(receive_msg, receive_msg_end, que_url_start,
+                                              &que_new_cur_pos_ptr, que_url);
     if (que_url_len == -1) {
         stat.request_parsing_error++;
         return;
@@ -117,7 +129,7 @@ void dns_ans_check(packet_t *receive_msg_struct)
 
     __attribute__((unused)) int32_t block_que_url_flag = check_url(que_url, que_url_len);
 
-    cur_pos_ptr += que_url_pad_len;
+    cur_pos_ptr = que_new_cur_pos_ptr;
     // QUE URL
 
     // QUE DATA
@@ -144,11 +156,11 @@ void dns_ans_check(packet_t *receive_msg_struct)
 
     for (int32_t i = 0; i < ans_count; i++) {
         // ANS URL
-        int32_t ans_url_pad_len;
+        char *ans_new_cur_pos_ptr;
         char ans_url[URL_MAX_SIZE];
         char *ans_url_start = cur_pos_ptr;
-        int32_t ans_url_len = get_url_from_packet(receive_msg, ans_url_start, receive_msg_end,
-                                                  ans_url, &ans_url_pad_len);
+        int32_t ans_url_len = get_url_from_packet(receive_msg, receive_msg_end, ans_url_start,
+                                                  &ans_new_cur_pos_ptr, ans_url);
         if (ans_url_len == -1) {
             stat.request_parsing_error++;
             return;
@@ -157,7 +169,7 @@ void dns_ans_check(packet_t *receive_msg_struct)
         int32_t block_ans_url_flag = 0;
         block_ans_url_flag = check_url(ans_url, ans_url_len);
 
-        cur_pos_ptr += ans_url_pad_len;
+        cur_pos_ptr = ans_new_cur_pos_ptr;
         // ANS URL
 
         // ANS DATA
@@ -223,7 +235,11 @@ void dns_ans_check(packet_t *receive_msg_struct)
             char cname_url[URL_MAX_SIZE];
             char *cname_url_start = cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t);
             int32_t cname_url_len =
-                get_url_from_packet(receive_msg, cname_url_start, receive_msg_end, cname_url, NULL);
+                get_url_from_packet(receive_msg, receive_msg_end, cname_url_start, NULL, cname_url);
+            if (cname_url_len == -1) {
+                stat.request_parsing_error++;
+                return;
+            }
 
             int32_t block_cname_url_flag = 0;
             block_cname_url_flag = check_url(cname_url, cname_url_len);
