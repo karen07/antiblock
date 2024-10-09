@@ -9,7 +9,7 @@
 #include "urls_read.h"
 
 const array_hashmap_t *ip_ip_map_struct;
-const array_hashmap_t *nat_map_struct;
+static const array_hashmap_t *nat_map_struct;
 
 uint32_t start_subnet_ip;
 uint32_t end_subnet_ip;
@@ -49,7 +49,7 @@ static int32_t tun_alloc(char *dev, int32_t flags)
     return fd;
 }
 
-static uint16_t checksum(const char *buf, uint32_t size)
+static uint16_t checksum(char *buf, uint32_t size)
 {
     uint32_t sum = 0, i;
 
@@ -130,8 +130,8 @@ static void *tun(__attribute__((unused)) void *arg)
     }
 
     int32_t tap_fd;
-    char buffer[4096];
-    char pseudogram[4096];
+    char *buffer = (char *)malloc(PACKET_MAX_SIZE * sizeof(char));
+    char *pseudogram = (char *)malloc(PACKET_MAX_SIZE * sizeof(char));
 
     tap_fd = tun_alloc(tun_name, IFF_TUN | IFF_MULTI_QUEUE);
 
@@ -155,7 +155,7 @@ static void *tun(__attribute__((unused)) void *arg)
     uint32_t nat_icmp_client_ip = 0;
 
     while (true) {
-        int32_t nread = read(tap_fd, buffer, sizeof(buffer));
+        int32_t nread = read(tap_fd, buffer, PACKET_MAX_SIZE);
 
         if (nread < 1) {
             continue;
@@ -225,8 +225,8 @@ static void *tun(__attribute__((unused)) void *arg)
             continue;
         }
 
-        uint16_t src_port;
-        uint16_t dst_port;
+        uint16_t src_port = 0;
+        uint16_t dst_port = 0;
 
         char *L4_start_pointer = L3_start_pointer + sizeof(struct iphdr);
         if (proto_L4 == IPPROTO_TCP) {
@@ -405,7 +405,7 @@ static void *tun(__attribute__((unused)) void *arg)
         memcpy(pseudogram + sizeof(pseudo_header_t), L4_start_pointer, L4_len);
 
         int32_t psize = sizeof(pseudo_header_t) + L4_len;
-        uint16_t checksum_value = checksum((const char *)pseudogram, psize);
+        uint16_t checksum_value = checksum(pseudogram, psize);
 
         if (proto_L4 == IPPROTO_TCP) {
             struct tcphdr *tcph = (struct tcphdr *)L4_start_pointer;

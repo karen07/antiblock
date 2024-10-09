@@ -81,10 +81,10 @@ static int32_t check_url(char *url, int32_t url_len)
     return 0;
 }
 
-void dns_ans_check(packet_t *receive_msg_struct)
+void dns_ans_check(memory_t *receive_msg_struct)
 {
-    char *receive_msg = receive_msg_struct->packet;
-    int32_t receive_msg_len = receive_msg_struct->packet_size;
+    char *receive_msg = receive_msg_struct->data;
+    int32_t receive_msg_len = receive_msg_struct->size;
 
     char *cur_pos_ptr = receive_msg;
     char *receive_msg_end = receive_msg + receive_msg_len;
@@ -118,16 +118,15 @@ void dns_ans_check(packet_t *receive_msg_struct)
 
     // QUE URL
     char *que_new_cur_pos_ptr;
-    char que_url[URL_MAX_SIZE];
     char *que_url_start = cur_pos_ptr;
     int32_t que_url_len = get_url_from_packet(receive_msg, receive_msg_end, que_url_start,
-                                              &que_new_cur_pos_ptr, que_url);
+                                              &que_new_cur_pos_ptr, que_url.data);
     if (que_url_len == -1) {
         stat.request_parsing_error++;
         return;
     }
 
-    __attribute__((unused)) int32_t block_que_url_flag = check_url(que_url, que_url_len);
+    __attribute__((unused)) int32_t block_que_url_flag = check_url(que_url.data, que_url_len);
 
     cur_pos_ptr = que_new_cur_pos_ptr;
     // QUE URL
@@ -151,23 +150,22 @@ void dns_ans_check(packet_t *receive_msg_struct)
         fprintf(log_fd, "%02d.%02d.%04d %02d:%02d:%02d\n", tm_struct->tm_mday,
                 tm_struct->tm_mon + 1, tm_struct->tm_year + 1900, tm_struct->tm_hour,
                 tm_struct->tm_min, tm_struct->tm_sec);
-        fprintf(log_fd, "Que_url %d: %s\n", que_type, que_url + 1);
+        fprintf(log_fd, "Que_url %d: %s\n", que_type, que_url.data + 1);
     }
 
     for (int32_t i = 0; i < ans_count; i++) {
         // ANS URL
         char *ans_new_cur_pos_ptr;
-        char ans_url[URL_MAX_SIZE];
         char *ans_url_start = cur_pos_ptr;
         int32_t ans_url_len = get_url_from_packet(receive_msg, receive_msg_end, ans_url_start,
-                                                  &ans_new_cur_pos_ptr, ans_url);
+                                                  &ans_new_cur_pos_ptr, ans_url.data);
         if (ans_url_len == -1) {
             stat.request_parsing_error++;
             return;
         }
 
         int32_t block_ans_url_flag = 0;
-        block_ans_url_flag = check_url(ans_url, ans_url_len);
+        block_ans_url_flag = check_url(ans_url.data, ans_url_len);
 
         cur_pos_ptr = ans_new_cur_pos_ptr;
         // ANS URL
@@ -190,7 +188,7 @@ void dns_ans_check(packet_t *receive_msg_struct)
         }
 
         if (log_fd) {
-            fprintf(log_fd, "    Ans_url %d: %s ", ans_type, ans_url + 1);
+            fprintf(log_fd, "    Ans_url %d: %s ", ans_type, ans_url.data + 1);
         }
 
         if (ans_type == 1) {
@@ -224,7 +222,7 @@ void dns_ans_check(packet_t *receive_msg_struct)
                     struct in_addr old_ip;
                     old_ip.s_addr = add_elem.ip_global;
 
-                    fprintf(log_fd, "    Blocked_IP: %s", ans_url + 1);
+                    fprintf(log_fd, "    Blocked_IP: %s", ans_url.data + 1);
                     fprintf(log_fd, " %s", inet_ntoa(old_ip));
                     fprintf(log_fd, " %s\n", inet_ntoa(new_ip));
                 }
@@ -232,24 +230,23 @@ void dns_ans_check(packet_t *receive_msg_struct)
         }
 
         if (ans_type == 5) {
-            char cname_url[URL_MAX_SIZE];
             char *cname_url_start = cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t);
-            int32_t cname_url_len =
-                get_url_from_packet(receive_msg, receive_msg_end, cname_url_start, NULL, cname_url);
+            int32_t cname_url_len = get_url_from_packet(receive_msg, receive_msg_end,
+                                                        cname_url_start, NULL, cname_url.data);
             if (cname_url_len == -1) {
                 stat.request_parsing_error++;
                 return;
             }
 
             int32_t block_cname_url_flag = 0;
-            block_cname_url_flag = check_url(cname_url, cname_url_len);
+            block_cname_url_flag = check_url(cname_url.data, cname_url_len);
 
             if (log_fd) {
-                fprintf(log_fd, "%s\n", cname_url + 1);
+                fprintf(log_fd, "%s\n", cname_url.data + 1);
             }
 
             if (block_ans_url_flag == 1 && block_cname_url_flag == 0) {
-                strcpy(&(urls.data[urls.size]), cname_url + 1);
+                strcpy(&(urls.data[urls.size]), cname_url.data + 1);
 
                 int32_t url_offset = urls.size;
                 urls.size += cname_url_len;
@@ -257,7 +254,7 @@ void dns_ans_check(packet_t *receive_msg_struct)
                 array_hashmap_add_elem(urls_map_struct, &url_offset, NULL, NULL);
 
                 if (log_fd) {
-                    fprintf(log_fd, "    Blocked_Cname: %s\n", cname_url + 1);
+                    fprintf(log_fd, "    Blocked_Cname: %s\n", cname_url.data + 1);
                 }
             }
         }

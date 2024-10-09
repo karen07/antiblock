@@ -54,9 +54,13 @@ static void print_help(void)
     exit(EXIT_FAILURE);
 }
 
-static void main_catch_function(__attribute__((unused)) int signo)
+static void main_catch_function(int signo)
 {
-    printf("SIGSEGV catched main\n");
+    if (signo == SIGSEGV) {
+        printf("SIGSEGV catched main\n");
+    } else {
+        printf("SIGINT catched main\n");
+    }
     fflush(stdout);
     fflush(stat_fd);
     fflush(log_fd);
@@ -66,6 +70,11 @@ static void main_catch_function(__attribute__((unused)) int signo)
 int main(int argc, char *argv[])
 {
     printf("\nAntiblock started\n");
+
+    if (signal(SIGINT, main_catch_function) == SIG_ERR) {
+        printf("Can't set signal handler main\n");
+        exit(EXIT_FAILURE);
+    }
 
     if (signal(SIGSEGV, main_catch_function) == SIG_ERR) {
         printf("Can't set signal handler main\n");
