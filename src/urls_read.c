@@ -9,7 +9,7 @@
 #include "urls_read.h"
 #include <curl/curl.h>
 
-struct memory urls;
+memory_t urls;
 const array_hashmap_t *urls_map_struct;
 
 static uint32_t add_url_hash(const void *void_elem)
@@ -43,7 +43,7 @@ static int32_t find_url_cmp(const void *void_elem1, const void *void_elem2)
 static size_t cb(void *data, size_t size, size_t nmemb, void *clientp)
 {
     size_t realsize = size * nmemb;
-    struct memory *mem = (struct memory *)clientp;
+    memory_t *mem = (memory_t *)clientp;
 
     char *ptr = realloc(mem->data, mem->size + realsize + 1);
     if (!ptr)

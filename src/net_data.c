@@ -8,9 +8,13 @@
 #include "tun.h"
 #include "urls_read.h"
 
-id_map_t *id_map;
-int32_t repeater_DNS_socket;
-int32_t repeater_client_socket;
+static id_map_t *id_map;
+static int32_t repeater_DNS_socket;
+static int32_t repeater_client_socket;
+
+memory_t que_url;
+memory_t ans_url;
+memory_t cname_url;
 
 static void DNS_data_catch_function(__attribute__((unused)) int signo)
 {
@@ -50,21 +54,61 @@ static void *DNS_data(__attribute__((unused)) void *arg)
         exit(EXIT_FAILURE);
     }
 
+    memory_t receive_msg;
+    receive_msg.size = 0;
+    receive_msg.max_size = PACKET_MAX_SIZE;
+    receive_msg.data = (char *)malloc(receive_msg.max_size * sizeof(char));
+
+    if (receive_msg.data == 0) {
+        printf("No free memory for receive_msg from DNS\n");
+        exit(EXIT_FAILURE);
+    }
+
+    que_url.size = 0;
+    que_url.max_size = URL_MAX_SIZE;
+    que_url.data = (char *)malloc(que_url.max_size * sizeof(char));
+
+    if (que_url.data == 0) {
+        printf("No free memory for que_url\n");
+        exit(EXIT_FAILURE);
+    }
+
+    ans_url.size = 0;
+    ans_url.max_size = URL_MAX_SIZE;
+    ans_url.data = (char *)malloc(ans_url.max_size * sizeof(char));
+
+    if (ans_url.data == 0) {
+        printf("No free memory for ans_url\n");
+        exit(EXIT_FAILURE);
+    }
+
+    cname_url.size = 0;
+    cname_url.max_size = URL_MAX_SIZE;
+    cname_url.data = (char *)malloc(cname_url.max_size * sizeof(char));
+
+    if (cname_url.data == 0) {
+        printf("No free memory for cname_url\n");
+        exit(EXIT_FAILURE);
+    }
+
     pthread_barrier_wait(&threads_barrier);
 
-    packet_t receive_msg;
-
     while (true) {
-        receive_msg.packet_size = recvfrom(repeater_DNS_socket, receive_msg.packet, PACKET_MAX_SIZE,
-                                           0, (struct sockaddr *)&receive_DNS_addr,
-                                           &receive_DNS_addr_length);
+        receive_msg.size = recvfrom(repeater_DNS_socket, receive_msg.data, receive_msg.max_size, 0,
+                                    (struct sockaddr *)&receive_DNS_addr, &receive_DNS_addr_length);
 
-        if (receive_msg.packet_size < (int32_t)sizeof(dns_header_t)) {
+        if (receive_msg.size < (int32_t)sizeof(dns_header_t)) {
+            stat.send_to_client_error++;
             continue;
         }
 
-        dns_header_t *header = (dns_header_t *)receive_msg.packet;
+        dns_header_t *header = (dns_header_t *)receive_msg.data;
         uint16_t id = ntohs(header->id);
+
+        if (id_map[id].port == 0 || id_map[id].ip == 0) {
+            stat.send_to_client_error++;
+            continue;
+        }
 
         dns_ans_check(&receive_msg);
 
@@ -72,7 +116,10 @@ static void *DNS_data(__attribute__((unused)) void *arg)
         client_addr.sin_port = id_map[id].port;
         client_addr.sin_addr.s_addr = id_map[id].ip;
 
-        if (sendto(repeater_client_socket, receive_msg.packet, receive_msg.packet_size, 0,
+        id_map[id].port = 0;
+        id_map[id].ip = 0;
+
+        if (sendto(repeater_client_socket, receive_msg.data, receive_msg.size, 0,
                    (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
             stat.send_to_client_error++;
             printf("Can't send to client %s\n", strerror(errno));
@@ -126,26 +173,35 @@ static void *client_data(__attribute__((unused)) void *arg)
         exit(EXIT_FAILURE);
     }
 
+    memory_t receive_msg;
+    receive_msg.size = 0;
+    receive_msg.max_size = PACKET_MAX_SIZE;
+    receive_msg.data = (char *)malloc(receive_msg.max_size * sizeof(char));
+
+    if (receive_msg.data == 0) {
+        printf("No free memory for receive_msg from client\n");
+        exit(EXIT_FAILURE);
+    }
+
     pthread_barrier_wait(&threads_barrier);
 
-    packet_t receive_msg;
-
     while (true) {
-        receive_msg.packet_size =
-            recvfrom(repeater_client_socket, receive_msg.packet, PACKET_MAX_SIZE, 0,
-                     (struct sockaddr *)&receive_client_addr, &receive_client_addr_length);
+        receive_msg.size = recvfrom(repeater_client_socket, receive_msg.data, receive_msg.max_size,
+                                    0, (struct sockaddr *)&receive_client_addr,
+                                    &receive_client_addr_length);
 
-        if (receive_msg.packet_size < (int32_t)sizeof(dns_header_t)) {
+        if (receive_msg.size < (int32_t)sizeof(dns_header_t)) {
+            stat.send_to_dns_error++;
             continue;
         }
 
-        dns_header_t *header = (dns_header_t *)receive_msg.packet;
+        dns_header_t *header = (dns_header_t *)receive_msg.data;
         uint16_t id = ntohs(header->id);
 
         id_map[id].ip = receive_client_addr.sin_addr.s_addr;
         id_map[id].port = receive_client_addr.sin_port;
 
-        if (sendto(repeater_DNS_socket, receive_msg.packet, receive_msg.packet_size, 0,
+        if (sendto(repeater_DNS_socket, receive_msg.data, receive_msg.size, 0,
                    (struct sockaddr *)&dns_addr, sizeof(dns_addr)) < 0) {
             stat.send_to_dns_error++;
             printf("Can't send to DNS :%s\n", strerror(errno));

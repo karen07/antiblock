@@ -22,9 +22,13 @@ typedef struct dns_ans {
     uint32_t ip4;
 } __attribute__((packed)) dns_ans_t;
 
-typedef struct packet {
-    int32_t packet_size;
-    char packet[PACKET_MAX_SIZE];
-} packet_t;
+#ifndef _STRUCT_MEMORY_ANTIBLOCK
+#define _STRUCT_MEMORY_ANTIBLOCK
+typedef struct memory {
+    char *data;
+    size_t size;
+    size_t max_size;
+} memory_t;
+#endif
 
-void dns_ans_check(packet_t *receive_msg_struct);
+void dns_ans_check(memory_t *receive_msg_struct);

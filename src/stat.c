@@ -23,7 +23,12 @@ void stat_print(void)
 
     fprintf(stat_fd, "DNS sended to DNS                : %d\n", stat.rec_from_client);
     fprintf(stat_fd, "DNS received from DNS            : %d\n", stat.rec_from_dns);
-    fprintf(stat_fd, "DNS parsing error                : %d\n", stat.request_parsing_error);
+
+    fprintf(stat_fd, "\n");
+
+    fprintf(stat_fd, "DNS sended to DNS errors         : %d\n", stat.send_to_dns_error);
+    fprintf(stat_fd, "DNS received from DNS errors     : %d\n", stat.send_to_client_error);
+    fprintf(stat_fd, "DNS parsing errors               : %d\n", stat.request_parsing_error);
 
     fprintf(stat_fd, "\n");
 
