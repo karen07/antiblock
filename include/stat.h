@@ -1,11 +1,11 @@
 #include "antiblock.h"
 
 typedef struct statistics {
-    int32_t rec_from_client;
-    int32_t rec_from_dns;
+    int32_t sended_to_client;
+    int32_t sended_to_dns;
 
-    int32_t send_to_client_error;
-    int32_t send_to_dns_error;
+    int32_t sended_to_client_error;
+    int32_t sended_to_dns_error;
 
     int32_t request_parsing_error;
 
@@ -18,10 +18,10 @@ typedef struct statistics {
     int32_t nat_sended_to_dev;
 
     int32_t nat_records;
+
+    time_t stat_start;
 } statistics_t;
 
 extern statistics_t stat;
-extern FILE *log_fd;
-extern FILE *stat_fd;
 
 void stat_print(void);

@@ -11,8 +11,8 @@
 const array_hashmap_t *ip_ip_map_struct;
 static const array_hashmap_t *nat_map_struct;
 
-uint32_t start_subnet_ip;
-uint32_t end_subnet_ip;
+uint32_t NAT_subnet_start;
+uint32_t NAT_subnet_end;
 
 static int32_t tun_alloc(char *dev, int32_t flags)
 {
@@ -140,15 +140,15 @@ static void *tun(__attribute__((unused)) void *arg)
         exit(EXIT_FAILURE);
     }
 
-    struct in_addr start_subnet_ip_addr;
-    start_subnet_ip_addr.s_addr = htonl(start_subnet_ip);
+    struct in_addr NAT_subnet_start_addr;
+    NAT_subnet_start_addr.s_addr = htonl(NAT_subnet_start);
 
-    struct in_addr end_subnet_ip_addr;
-    end_subnet_ip_addr.s_addr = htonl(end_subnet_ip);
+    struct in_addr NAT_subnet_end_addr;
+    NAT_subnet_end_addr.s_addr = htonl(NAT_subnet_end);
 
     printf("TUN dev %s allocated", tun_name);
-    printf(" %s-", inet_ntoa(start_subnet_ip_addr));
-    printf("%s\n", inet_ntoa(end_subnet_ip_addr));
+    printf(" %s-", inet_ntoa(NAT_subnet_start_addr));
+    printf("%s\n", inet_ntoa(NAT_subnet_end_addr));
 
     pthread_barrier_wait(&threads_barrier);
 
@@ -428,11 +428,11 @@ static void *tun(__attribute__((unused)) void *arg)
 void init_tun_thread(void)
 {
     uint32_t netMask = (0xFFFFFFFF << (32 - (tun_prefix + 1)) & 0xFFFFFFFF);
-    start_subnet_ip = (ntohl(tun_ip) & netMask) + 2;
+    NAT_subnet_start = (ntohl(tun_ip) & netMask) + 2;
 
     int32_t subnet_size = 1;
     subnet_size <<= 32 - (tun_prefix + 1);
-    end_subnet_ip = (ntohl(tun_ip) & netMask) + subnet_size - 2;
+    NAT_subnet_end = (ntohl(tun_ip) & netMask) + subnet_size - 2;
 
     ip_ip_map_struct = init_array_hashmap(subnet_size, 1.0, sizeof(ip_ip_map_t));
     if (ip_ip_map_struct == NULL) {
@@ -443,7 +443,7 @@ void init_tun_thread(void)
     array_hashmap_set_func(ip_ip_map_struct, ip_ip_hash, ip_ip_cmp, ip_ip_hash, ip_ip_cmp);
 
     //ip_ip_map_t add_elem;
-    //add_elem.ip_local = htonl(start_subnet_ip++);
+    //add_elem.ip_local = htonl(NAT_subnet_start++);
     //add_elem.ip_global = inet_addr("192.168.1.10");
     //array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, ip_ip_on_collision);
 
