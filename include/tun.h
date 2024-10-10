@@ -37,8 +37,8 @@ typedef struct nat_map {
 
 extern const array_hashmap_t *ip_ip_map_struct;
 
-extern uint32_t start_subnet_ip;
-extern uint32_t end_subnet_ip;
+extern uint32_t NAT_subnet_start;
+extern uint32_t NAT_subnet_end;
 
 void init_tun_thread(void);
 int32_t ip_ip_on_collision(const void *void_elem1, const void *void_elem2);

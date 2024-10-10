@@ -44,3 +44,6 @@ extern uint16_t dns_port;
 
 extern uint32_t listen_ip;
 extern uint16_t listen_port;
+
+extern FILE *log_fd;
+extern FILE *stat_fd;

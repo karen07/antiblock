@@ -112,12 +112,13 @@ int64_t urls_read(void)
         fclose(urls_fd);
     }
 
-    char *ptr = realloc(urls.data, urls.size + CNAME_URLS_MAP_MAX_SIZE);
+    char *ptr = realloc(urls.data, urls.size + CNAME_URLS_MAP_MAX_SIZE * URL_MAX_SIZE);
     if (!ptr) {
         printf("No free memory for cname_urls\n");
         exit(EXIT_FAILURE);
     }
     urls.data = ptr;
+    urls.max_size = urls.size + CNAME_URLS_MAP_MAX_SIZE * URL_MAX_SIZE;
 
     if (urls.size > 0) {
         int32_t urls_map_size = 0;
@@ -132,7 +133,8 @@ int64_t urls_read(void)
             }
         }
 
-        urls_map_struct = init_array_hashmap(urls_map_size, 1.0, sizeof(uint32_t));
+        int32_t urls_map_size_cname = urls_map_size + CNAME_URLS_MAP_MAX_SIZE;
+        urls_map_struct = init_array_hashmap(urls_map_size_cname, 1.0, sizeof(uint32_t));
         if (urls_map_struct == NULL) {
             printf("No free memory for urls_map_struct\n");
             exit(EXIT_FAILURE);

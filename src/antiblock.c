@@ -251,8 +251,6 @@ int main(int argc, char *argv[])
     }
 
     if (is_stat_print) {
-        memset(&stat, 0, sizeof(stat));
-
         char stat_path[PATH_MAX];
         sprintf(stat_path, "%s%s", log_or_stat_folder, "/stat.txt");
         stat_fd = fopen(stat_path, "w");
@@ -274,20 +272,24 @@ int main(int argc, char *argv[])
 
     pthread_barrier_wait(&threads_barrier);
 
+    int32_t circles = 0;
     int32_t sleep_circles = 0;
-    int64_t urls_web_file_size = 0;
 
     while (true) {
-        if (sleep_circles == 0) {
-            urls_web_file_size = urls_read();
+        if (circles++ == 0) {
+            memset(&stat, 0, sizeof(stat));
+            stat.stat_start = time(NULL);
+
+            int64_t urls_web_file_size = urls_read();
+
+            if (urls_web_file_size > 0 || !is_domains_file_url) {
+                sleep_circles = URLS_UPDATE_TIME / STAT_PRINT_TIME;
+            } else {
+                sleep_circles = URLS_ERROR_UPDATE_TIME / STAT_PRINT_TIME;
+            }
         }
 
-        sleep_circles++;
-        if (urls_web_file_size > 0 || !is_domains_file_url) {
-            sleep_circles %= URLS_UPDATE_TIME / STAT_PRINT_TIME;
-        } else {
-            sleep_circles %= URLS_ERROR_UPDATE_TIME / STAT_PRINT_TIME;
-        }
+        circles %= sleep_circles;
 
         if (is_stat_print) {
             stat_print();

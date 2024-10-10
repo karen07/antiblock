@@ -98,7 +98,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
                                     (struct sockaddr *)&receive_DNS_addr, &receive_DNS_addr_length);
 
         if (receive_msg.size < (int32_t)sizeof(dns_header_t)) {
-            stat.send_to_client_error++;
+            stat.sended_to_client_error++;
             continue;
         }
 
@@ -106,7 +106,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
         uint16_t id = ntohs(header->id);
 
         if (id_map[id].port == 0 || id_map[id].ip == 0) {
-            stat.send_to_client_error++;
+            stat.sended_to_client_error++;
             continue;
         }
 
@@ -121,10 +121,10 @@ static void *DNS_data(__attribute__((unused)) void *arg)
 
         if (sendto(repeater_client_socket, receive_msg.data, receive_msg.size, 0,
                    (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
-            stat.send_to_client_error++;
+            stat.sended_to_client_error++;
             printf("Can't send to client %s\n", strerror(errno));
         } else {
-            stat.rec_from_dns++;
+            stat.sended_to_client++;
         }
     }
 
@@ -191,7 +191,7 @@ static void *client_data(__attribute__((unused)) void *arg)
                                     &receive_client_addr_length);
 
         if (receive_msg.size < (int32_t)sizeof(dns_header_t)) {
-            stat.send_to_dns_error++;
+            stat.sended_to_dns_error++;
             continue;
         }
 
@@ -203,10 +203,10 @@ static void *client_data(__attribute__((unused)) void *arg)
 
         if (sendto(repeater_DNS_socket, receive_msg.data, receive_msg.size, 0,
                    (struct sockaddr *)&dns_addr, sizeof(dns_addr)) < 0) {
-            stat.send_to_dns_error++;
+            stat.sended_to_dns_error++;
             printf("Can't send to DNS :%s\n", strerror(errno));
         } else {
-            stat.rec_from_client++;
+            stat.sended_to_dns++;
         }
     }
 
