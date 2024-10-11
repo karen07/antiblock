@@ -35,10 +35,18 @@ typedef struct nat_map {
     nat_map_value_t value;
 } nat_map_t;
 
+typedef struct subnet_range {
+    uint32_t network_ip;
+    uint32_t network_prefix;
+    uint32_t start_ip;
+    uint32_t end_ip;
+    int32_t subnet_size;
+} subnet_range_t;
+
 extern const array_hashmap_t *ip_ip_map_struct;
 
-extern uint32_t NAT_subnet_start;
-extern uint32_t NAT_subnet_end;
+extern subnet_range_t NAT_VPN;
 
 void init_tun_thread(void);
 int32_t ip_ip_on_collision(const void *void_elem1, const void *void_elem2);
+void subnet_init(subnet_range_t *subnet);
