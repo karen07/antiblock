@@ -8,6 +8,9 @@
 #include "tun.h"
 #include "urls_read.h"
 
+#define DNS_TypeA 1
+#define DNS_TypeCNAME 5
+
 static char *get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, memory_t *url)
 {
     uint8_t two_bit_mark = FIRST_TWO_BITS_UINT8;
@@ -185,7 +188,7 @@ void dns_ans_check(memory_t *receive_msg)
             fprintf(log_fd, "    Ans_url %d: %s ", ans_type, ans_url.data + 1);
         }
 
-        if (ans_type == 1) {
+        if (ans_type == DNS_TypeA) {
             if (log_fd) {
                 struct in_addr new_ip;
                 new_ip.s_addr = ans->ip4;
@@ -194,11 +197,10 @@ void dns_ans_check(memory_t *receive_msg)
             }
 
             if (block_ans_url_flag) {
-                uint32_t NAT_subnet_start_n = htonl(NAT_subnet_start++);
+                uint32_t NAT_subnet_start_n = htonl(NAT_VPN.start_ip++);
 
-                if (NAT_subnet_start == NAT_subnet_end) {
-                    uint32_t netMask = (0xFFFFFFFF << (32 - (tun_prefix + 1)) & 0xFFFFFFFF);
-                    NAT_subnet_start = (ntohl(tun_ip) & netMask) + 2;
+                if (NAT_VPN.start_ip == NAT_VPN.end_ip) {
+                    subnet_init(&NAT_VPN);
                 }
 
                 ip_ip_map_t add_elem;
@@ -223,7 +225,7 @@ void dns_ans_check(memory_t *receive_msg)
             }
         }
 
-        if (ans_type == 5) {
+        if (ans_type == DNS_TypeCNAME) {
             char *cname_new_cur_pos_ptr;
             char *cname_url_start = cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t);
             cname_new_cur_pos_ptr = get_url_from_packet(receive_msg, cname_url_start, &cname_url);
@@ -257,7 +259,7 @@ void dns_ans_check(memory_t *receive_msg)
             }
         }
 
-        if (ans_type != 1 && ans_type != 5) {
+        if (ans_type != DNS_TypeA && ans_type != DNS_TypeCNAME) {
             if (log_fd) {
                 fprintf(log_fd, "\n");
             }

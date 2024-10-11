@@ -11,8 +11,17 @@
 const array_hashmap_t *ip_ip_map_struct;
 static const array_hashmap_t *nat_map_struct;
 
-uint32_t NAT_subnet_start;
-uint32_t NAT_subnet_end;
+subnet_range_t NAT_VPN;
+
+void subnet_init(subnet_range_t *subnet)
+{
+    uint32_t netMask = (0xFFFFFFFF << (32 - (subnet->network_prefix + 1)) & 0xFFFFFFFF);
+    subnet->start_ip = (ntohl(subnet->network_ip) & netMask) + 2;
+
+    subnet->subnet_size = 1;
+    subnet->subnet_size <<= 32 - (subnet->network_prefix + 1);
+    subnet->end_ip = (ntohl(subnet->network_ip) & netMask) + subnet->subnet_size - 2;
+}
 
 static int32_t tun_alloc(char *dev, int32_t flags)
 {
@@ -141,10 +150,10 @@ static void *tun(__attribute__((unused)) void *arg)
     }
 
     struct in_addr NAT_subnet_start_addr;
-    NAT_subnet_start_addr.s_addr = htonl(NAT_subnet_start);
+    NAT_subnet_start_addr.s_addr = htonl(NAT_VPN.start_ip);
 
     struct in_addr NAT_subnet_end_addr;
-    NAT_subnet_end_addr.s_addr = htonl(NAT_subnet_end);
+    NAT_subnet_end_addr.s_addr = htonl(NAT_VPN.end_ip);
 
     printf("TUN dev %s allocated", tun_name);
     printf(" %s-", inet_ntoa(NAT_subnet_start_addr));
@@ -198,14 +207,6 @@ static void *tun(__attribute__((unused)) void *arg)
                     array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
                 if (find_elem_ip_ip_flag != 1) {
                     stat.nat_sended_to_dev_error++;
-
-                    struct in_addr s_ip_new;
-                    s_ip_new.s_addr = iph->daddr;
-
-                    if (log_fd) {
-                        fprintf(log_fd, "NAT_sended_to_dev_error %s\n", inet_ntoa(s_ip_new));
-                    }
-
                     continue;
                 }
 
@@ -296,14 +297,6 @@ static void *tun(__attribute__((unused)) void *arg)
                 array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
             if (find_elem_ip_ip_flag != 1) {
                 stat.nat_sended_to_dev_error++;
-
-                struct in_addr s_ip_new;
-                s_ip_new.s_addr = iph->daddr;
-
-                if (log_fd) {
-                    fprintf(log_fd, "NAT_sended_to_dev_error %s\n", inet_ntoa(s_ip_new));
-                }
-
                 continue;
             }
 
@@ -427,14 +420,11 @@ static void *tun(__attribute__((unused)) void *arg)
 
 void init_tun_thread(void)
 {
-    uint32_t netMask = (0xFFFFFFFF << (32 - (tun_prefix + 1)) & 0xFFFFFFFF);
-    NAT_subnet_start = (ntohl(tun_ip) & netMask) + 2;
+    NAT_VPN.network_ip = tun_ip;
+    NAT_VPN.network_prefix = tun_prefix;
+    subnet_init(&NAT_VPN);
 
-    int32_t subnet_size = 1;
-    subnet_size <<= 32 - (tun_prefix + 1);
-    NAT_subnet_end = (ntohl(tun_ip) & netMask) + subnet_size - 2;
-
-    ip_ip_map_struct = init_array_hashmap(subnet_size, 1.0, sizeof(ip_ip_map_t));
+    ip_ip_map_struct = init_array_hashmap(NAT_VPN.subnet_size, 1.0, sizeof(ip_ip_map_t));
     if (ip_ip_map_struct == NULL) {
         printf("No free memory for ip_ip_map_struct\n");
         exit(EXIT_FAILURE);
