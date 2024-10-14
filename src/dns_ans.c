@@ -184,18 +184,7 @@ void dns_ans_check(memory_t *receive_msg)
             return;
         }
 
-        if (log_fd) {
-            fprintf(log_fd, "    Ans_url %d: %s ", ans_type, ans_url.data + 1);
-        }
-
         if (ans_type == DNS_TypeA) {
-            if (log_fd) {
-                struct in_addr new_ip;
-                new_ip.s_addr = ans->ip4;
-
-                fprintf(log_fd, "%s\n", inet_ntoa(new_ip));
-            }
-
             if (block_ans_url_flag) {
                 uint32_t NAT_subnet_start_n = htonl(NAT_VPN.start_ip++);
 
@@ -222,6 +211,14 @@ void dns_ans_check(memory_t *receive_msg)
                     fprintf(log_fd, " %s", inet_ntoa(old_ip));
                     fprintf(log_fd, " %s\n", inet_ntoa(new_ip));
                 }
+            } else {
+                if (log_fd) {
+                    struct in_addr new_ip;
+                    new_ip.s_addr = ans->ip4;
+
+                    fprintf(log_fd, "    Not_Blocked_IP: %s", ans_url.data + 1);
+                    fprintf(log_fd, " %s\n", inet_ntoa(new_ip));
+                }
             }
         }
 
@@ -237,11 +234,8 @@ void dns_ans_check(memory_t *receive_msg)
             int32_t block_cname_url_flag = 0;
             block_cname_url_flag = check_url(&cname_url);
 
-            if (log_fd) {
-                fprintf(log_fd, "%s\n", cname_url.data + 1);
-            }
-
             if (block_ans_url_flag == 1 && block_cname_url_flag == 0) {
+                block_cname_url_flag = 1;
                 if (urls_map_struct) {
                     if (urls.size + cname_url.size < urls.max_size) {
                         strcpy(&(urls.data[urls.size]), cname_url.data + 1);
@@ -250,18 +244,24 @@ void dns_ans_check(memory_t *receive_msg)
                         urls.size += cname_url.size;
 
                         array_hashmap_add_elem(urls_map_struct, &url_offset, NULL, NULL);
-
-                        if (log_fd) {
-                            fprintf(log_fd, "    Blocked_Cname: %s\n", cname_url.data + 1);
-                        }
                     }
+                }
+            }
+
+            if (block_cname_url_flag) {
+                if (log_fd) {
+                    fprintf(log_fd, "    Blocked_Cname: %s\n", cname_url.data + 1);
+                }
+            } else {
+                if (log_fd) {
+                    fprintf(log_fd, "    Not_Blocked_Cname: %s\n", cname_url.data + 1);
                 }
             }
         }
 
         if (ans_type != DNS_TypeA && ans_type != DNS_TypeCNAME) {
             if (log_fd) {
-                fprintf(log_fd, "\n");
+                fprintf(log_fd, "    Ans_url %d: %s\n", ans_type, ans_url.data + 1);
             }
         }
 
