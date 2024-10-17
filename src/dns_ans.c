@@ -33,6 +33,9 @@ static char *get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, memor
                 if (part_len == 0) {
                     break;
                 } else {
+                    if (url_len >= (int32_t)url->max_size) {
+                        return NULL;
+                    }
                     url->data[url_len++] = '.';
                 }
             } else {
@@ -50,6 +53,9 @@ static char *get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, memor
             if (cur_pos_ptr + sizeof(uint8_t) > receive_msg_end) {
                 return NULL;
             }
+            if (url_len >= (int32_t)url->max_size) {
+                return NULL;
+            }
             url->data[url_len++] = *cur_pos_ptr;
             cur_pos_ptr++;
             part_len--;
@@ -60,6 +66,9 @@ static char *get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, memor
         new_cur_pos_ptr = cur_pos_ptr;
     }
 
+    if (url_len >= (int32_t)url->max_size) {
+        return NULL;
+    }
     url->data[url_len] = 0;
     url->size = url_len;
 
