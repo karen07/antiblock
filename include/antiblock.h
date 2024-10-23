@@ -17,6 +17,7 @@
 #include <linux/tcp.h>
 #include <linux/udp.h>
 #include <signal.h>
+#include <net/route.h>
 #include "array_hashmap.h"
 
 extern pthread_barrier_t threads_barrier;
@@ -47,3 +48,6 @@ extern uint16_t listen_port;
 
 extern FILE *log_fd;
 extern FILE *stat_fd;
+
+extern int32_t route_socket;
+extern struct rtentry route;
