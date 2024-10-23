@@ -195,30 +195,49 @@ void dns_ans_check(memory_t *receive_msg)
 
         if (ans_type == DNS_TypeA) {
             if (block_ans_url_flag) {
-                uint32_t NAT_subnet_start_n = htonl(NAT_VPN.start_ip++);
+                if (is_tun_name) {
+                    uint32_t NAT_subnet_start_n = htonl(NAT_VPN.start_ip++);
 
-                if (NAT_VPN.start_ip == NAT_VPN.end_ip) {
-                    subnet_init(&NAT_VPN);
-                }
+                    if (NAT_VPN.start_ip == NAT_VPN.end_ip) {
+                        subnet_init(&NAT_VPN);
+                    }
 
-                ip_ip_map_t add_elem;
-                add_elem.ip_local = NAT_subnet_start_n;
-                add_elem.ip_global = ans->ip4;
+                    ip_ip_map_t add_elem;
+                    add_elem.ip_local = NAT_subnet_start_n;
+                    add_elem.ip_global = ans->ip4;
 
-                array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, ip_ip_on_collision);
+                    array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, ip_ip_on_collision);
 
-                ans->ip4 = NAT_subnet_start_n;
+                    ans->ip4 = NAT_subnet_start_n;
 
-                if (log_fd) {
-                    struct in_addr new_ip;
-                    new_ip.s_addr = add_elem.ip_local;
+                    if (log_fd) {
+                        struct in_addr new_ip;
+                        new_ip.s_addr = add_elem.ip_local;
 
-                    struct in_addr old_ip;
-                    old_ip.s_addr = add_elem.ip_global;
+                        struct in_addr old_ip;
+                        old_ip.s_addr = add_elem.ip_global;
 
-                    fprintf(log_fd, "    Blocked_IP: %s", ans_url.data + 1);
-                    fprintf(log_fd, " %s", inet_ntoa(old_ip));
-                    fprintf(log_fd, " %s\n", inet_ntoa(new_ip));
+                        fprintf(log_fd, "    Blocked_IP: %s", ans_url.data + 1);
+                        fprintf(log_fd, " %s", inet_ntoa(old_ip));
+                        fprintf(log_fd, " %s\n", inet_ntoa(new_ip));
+                    }
+                } else {
+                    struct in_addr rec_ip;
+                    rec_ip.s_addr = ans->ip4;
+
+                    struct sockaddr_in *route_addr = (struct sockaddr_in *)&route.rt_dst;
+                    route_addr->sin_family = AF_INET;
+                    route_addr->sin_addr.s_addr = rec_ip.s_addr;
+
+                    if (ioctl(route_socket, SIOCADDRT, &route) < 0) {
+                        printf("Ioctl can't add %s to route table :%s\n", inet_ntoa(rec_ip),
+                               strerror(errno));
+                    }
+
+                    if (log_fd) {
+                        fprintf(log_fd, "    Blocked_IP: %s", ans_url.data + 1);
+                        fprintf(log_fd, " %s\n", inet_ntoa(rec_ip));
+                    }
                 }
             } else {
                 if (log_fd) {
