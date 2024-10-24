@@ -55,7 +55,8 @@ void stat_print(void)
         fprintf(stat_fd, "\n");
 
         fprintf(stat_fd, "NAT sended to internet errors : %d ptks\n", stat.nat_sended_to_dev_error);
-        fprintf(stat_fd, "NAT sended to client errors   : %d ptks\n", stat.nat_sended_to_client_error);
+        fprintf(stat_fd, "NAT sended to client errors   : %d ptks\n",
+                stat.nat_sended_to_client_error);
 
         fprintf(stat_fd, "\n");
 
