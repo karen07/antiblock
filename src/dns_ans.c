@@ -230,8 +230,10 @@ void dns_ans_check(memory_t *receive_msg)
                     route_addr->sin_addr.s_addr = rec_ip.s_addr;
 
                     if (ioctl(route_socket, SIOCADDRT, &route) < 0) {
-                        printf("Ioctl can't add %s to route table :%s\n", inet_ntoa(rec_ip),
-                               strerror(errno));
+                        if (strcmp(strerror(errno), "File exists")) {
+                            printf("Ioctl can't add %s to route table :%s\n", inet_ntoa(rec_ip),
+                                   strerror(errno));
+                        }
                     }
 
                     if (log_fd) {
