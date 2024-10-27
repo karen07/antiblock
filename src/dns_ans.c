@@ -17,6 +17,8 @@ static char *get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, memor
     int32_t part_len = 0;
     int32_t url_len = 0;
 
+    int jump_count = 0;
+
     char *new_cur_pos_ptr = NULL;
     char *receive_msg_end = receive_msg->data + receive_msg->size;
 
@@ -48,6 +50,9 @@ static char *get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, memor
                 uint8_t second_byte_data = *(cur_pos_ptr + 1);
                 int32_t padding = 256 * first_byte_data + second_byte_data;
                 cur_pos_ptr = receive_msg->data + padding;
+                if (jump_count++ > 100) {
+                    return NULL;
+                }
             }
         } else {
             if (cur_pos_ptr + sizeof(uint8_t) > receive_msg_end) {
@@ -97,7 +102,7 @@ static int32_t check_url(memory_t *url)
     return 0;
 }
 
-void dns_ans_check(memory_t *receive_msg)
+int32_t dns_ans_check(memory_t *receive_msg)
 {
     char *cur_pos_ptr = receive_msg->data;
     char *receive_msg_end = receive_msg->data + receive_msg->size;
@@ -105,7 +110,7 @@ void dns_ans_check(memory_t *receive_msg)
     // DNS HEADER
     if (cur_pos_ptr + sizeof(dns_header_t) > receive_msg_end) {
         stat.request_parsing_error++;
-        return;
+        return -1;
     }
 
     dns_header_t *header = (dns_header_t *)cur_pos_ptr;
@@ -114,17 +119,17 @@ void dns_ans_check(memory_t *receive_msg)
     uint16_t flags = ntohs(header->flags);
     if ((flags & first_bit_mark) == 0) {
         stat.request_parsing_error++;
-        return;
+        return -1;
     }
 
     uint16_t quest_count = ntohs(header->quest);
     if (quest_count != 1) {
-        return;
+        return -1;
     }
 
     uint16_t ans_count = ntohs(header->ans);
     if (ans_count == 0) {
-        return;
+        return -1;
     }
 
     cur_pos_ptr += sizeof(dns_header_t);
@@ -135,7 +140,7 @@ void dns_ans_check(memory_t *receive_msg)
     cur_pos_ptr = get_url_from_packet(receive_msg, que_url_start, &que_url);
     if (cur_pos_ptr == 0) {
         stat.request_parsing_error++;
-        return;
+        return -1;
     }
 
     __attribute__((unused)) int32_t block_que_url_flag = check_url(&que_url);
@@ -144,7 +149,7 @@ void dns_ans_check(memory_t *receive_msg)
     // QUE DATA
     if (cur_pos_ptr + sizeof(dns_que_t) > receive_msg_end) {
         stat.request_parsing_error++;
-        return;
+        return -1;
     }
 
     dns_que_t *que = (dns_que_t *)cur_pos_ptr;
@@ -169,7 +174,7 @@ void dns_ans_check(memory_t *receive_msg)
         cur_pos_ptr = get_url_from_packet(receive_msg, ans_url_start, &ans_url);
         if (cur_pos_ptr == 0) {
             stat.request_parsing_error++;
-            return;
+            return -1;
         }
 
         int32_t block_ans_url_flag = 0;
@@ -179,7 +184,7 @@ void dns_ans_check(memory_t *receive_msg)
         // ANS DATA
         if (cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t) > receive_msg_end) {
             stat.request_parsing_error++;
-            return;
+            return -1;
         }
 
         dns_ans_t *ans = (dns_ans_t *)cur_pos_ptr;
@@ -190,7 +195,7 @@ void dns_ans_check(memory_t *receive_msg)
 
         if (cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t) + ans_len > receive_msg_end) {
             stat.request_parsing_error++;
-            return;
+            return -1;
         }
 
         if (ans_type == DNS_TypeA) {
@@ -258,7 +263,7 @@ void dns_ans_check(memory_t *receive_msg)
             cname_new_cur_pos_ptr = get_url_from_packet(receive_msg, cname_url_start, &cname_url);
             if (cname_new_cur_pos_ptr == 0) {
                 stat.request_parsing_error++;
-                return;
+                return -1;
             }
 
             int32_t block_cname_url_flag = 0;
@@ -302,4 +307,6 @@ void dns_ans_check(memory_t *receive_msg)
     if (log_fd) {
         fprintf(log_fd, "\n");
     }
+
+    return 1;
 }
