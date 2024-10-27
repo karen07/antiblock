@@ -91,8 +91,6 @@ static void *DNS_data(__attribute__((unused)) void *arg)
         exit(EXIT_FAILURE);
     }
 
-    pthread_barrier_wait(&threads_barrier);
-
     char endless_jumping_test[] = {
         0xab, 0x67, 0x81, 0x80, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x03, 0x79,
         0x74, 0x33, 0x05, 0x67, 0x67, 0x70, 0x68, 0x74, 0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00,
@@ -112,6 +110,8 @@ static void *DNS_data(__attribute__((unused)) void *arg)
         fprintf(log_fd, "Fail\n");
     }
     fprintf(log_fd, "---Test endless jumping---\n");
+
+    pthread_barrier_wait(&threads_barrier);
 
     while (true) {
         receive_msg.size = recvfrom(repeater_DNS_socket, receive_msg.data, receive_msg.max_size, 0,
