@@ -124,8 +124,12 @@ static void tun_catch_function(__attribute__((unused)) int signo)
 {
     printf("SIGSEGV catched tun\n");
     fflush(stdout);
-    fflush(stat_fd);
-    fflush(log_fd);
+    if (stat_fd) {
+        fflush(stat_fd);
+    }
+    if (log_fd) {
+        fflush(log_fd);
+    }
     exit(EXIT_FAILURE);
 }
 
