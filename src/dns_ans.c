@@ -308,5 +308,12 @@ int32_t dns_ans_check(memory_t *receive_msg)
         fprintf(log_fd, "\n");
     }
 
+    if ((header->auth == 0) && (header->add == 0)) {
+        if (cur_pos_ptr != receive_msg_end) {
+            stat.request_parsing_error++;
+            return 11;
+        }
+    }
+
     return 0;
 }

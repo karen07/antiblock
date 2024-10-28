@@ -133,8 +133,12 @@ static void main_catch_function(int signo)
         printf("SIGINT catched main\n");
     }
     fflush(stdout);
-    fflush(stat_fd);
-    fflush(log_fd);
+    if (stat_fd) {
+        fflush(stat_fd);
+    }
+    if (log_fd) {
+        fflush(log_fd);
+    }
     exit(EXIT_FAILURE);
 }
 
