@@ -228,22 +228,29 @@ static void *DNS_data(__attribute__((unused)) void *arg)
     receive_msg.data[32] = correct_test[32];
     receive_msg.data[68] = correct_test[68];
 
+    receive_msg.data[31] = 0xBF;
+    if (get_url_from_packet(&receive_msg, receive_msg.data + 31, &tmp_ptr, &que_url) != 5) {
+        printf("Test get url byte 01 10 fail\n");
+        exit(EXIT_FAILURE);
+    }
+    receive_msg.data[31] = correct_test[31];
+
     receive_msg.size = 13;
-    if (get_url_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_url) != 5) {
+    if (get_url_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_url) != 6) {
         printf("Test get url data byte fail\n");
         exit(EXIT_FAILURE);
     }
     receive_msg.size = sizeof(correct_test);
 
     que_url.max_size = 1;
-    if (get_url_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_url) != 6) {
+    if (get_url_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_url) != 7) {
         printf("Test get url data url len fail\n");
         exit(EXIT_FAILURE);
     }
     que_url.max_size = URL_MAX_SIZE;
 
     que_url.max_size = 14;
-    if (get_url_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_url) != 7) {
+    if (get_url_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_url) != 8) {
         printf("Test get url data url last byte fail\n");
         exit(EXIT_FAILURE);
     }
