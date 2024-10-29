@@ -228,7 +228,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
     receive_msg.data[32] = correct_test[32];
     receive_msg.data[68] = correct_test[68];
 
-    receive_msg.data[31] = 0xBF;
+    receive_msg.data[31] = 0x7F;
     if (get_url_from_packet(&receive_msg, receive_msg.data + 31, &tmp_ptr, &que_url) != 5) {
         printf("Test get url byte 01 10 fail\n");
         exit(EXIT_FAILURE);
