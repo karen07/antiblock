@@ -11,21 +11,22 @@
 #define DNS_TypeA 1
 #define DNS_TypeCNAME 5
 
-static char *get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, memory_t *url)
+int32_t get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, char **new_cur_pos_ptr,
+                            memory_t *url)
 {
     uint8_t two_bit_mark = FIRST_TWO_BITS_UINT8;
     int32_t part_len = 0;
     int32_t url_len = 0;
 
-    int jump_count = 0;
+    int32_t jump_count = 0;
 
-    char *new_cur_pos_ptr = NULL;
+    *new_cur_pos_ptr = NULL;
     char *receive_msg_end = receive_msg->data + receive_msg->size;
 
     while (true) {
         if (part_len == 0) {
             if (cur_pos_ptr + sizeof(uint8_t) > receive_msg_end) {
-                return NULL;
+                return 1;
             }
             uint8_t first_byte_data = (*cur_pos_ptr) & (~two_bit_mark);
 
@@ -36,30 +37,30 @@ static char *get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, memor
                     break;
                 } else {
                     if (url_len >= (int32_t)url->max_size) {
-                        return NULL;
+                        return 2;
                     }
                     url->data[url_len++] = '.';
                 }
             } else {
                 if (cur_pos_ptr + sizeof(uint16_t) > receive_msg_end) {
-                    return NULL;
+                    return 3;
                 }
-                if (new_cur_pos_ptr == NULL) {
-                    new_cur_pos_ptr = cur_pos_ptr + 2;
+                if (*new_cur_pos_ptr == NULL) {
+                    *new_cur_pos_ptr = cur_pos_ptr + 2;
                 }
                 uint8_t second_byte_data = *(cur_pos_ptr + 1);
                 int32_t padding = 256 * first_byte_data + second_byte_data;
                 cur_pos_ptr = receive_msg->data + padding;
                 if (jump_count++ > 100) {
-                    return NULL;
+                    return 4;
                 }
             }
         } else {
             if (cur_pos_ptr + sizeof(uint8_t) > receive_msg_end) {
-                return NULL;
+                return 5;
             }
             if (url_len >= (int32_t)url->max_size) {
-                return NULL;
+                return 6;
             }
             url->data[url_len++] = *cur_pos_ptr;
             cur_pos_ptr++;
@@ -67,17 +68,17 @@ static char *get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, memor
         }
     }
 
-    if (new_cur_pos_ptr == NULL) {
-        new_cur_pos_ptr = cur_pos_ptr;
+    if (*new_cur_pos_ptr == NULL) {
+        *new_cur_pos_ptr = cur_pos_ptr;
     }
 
     if (url_len >= (int32_t)url->max_size) {
-        return NULL;
+        return 7;
     }
     url->data[url_len] = 0;
     url->size = url_len;
 
-    return new_cur_pos_ptr;
+    return 0;
 }
 
 static int32_t check_url(memory_t *url)
@@ -137,11 +138,12 @@ int32_t dns_ans_check(memory_t *receive_msg)
 
     // QUE URL
     char *que_url_start = cur_pos_ptr;
-    cur_pos_ptr = get_url_from_packet(receive_msg, que_url_start, &que_url);
-    if (cur_pos_ptr == 0) {
+    char *que_url_end = NULL;
+    if (get_url_from_packet(receive_msg, que_url_start, &que_url_end, &que_url) != 0) {
         stat.request_parsing_error++;
         return 5;
     }
+    cur_pos_ptr = que_url_end;
 
     __attribute__((unused)) int32_t block_que_url_flag = check_url(&que_url);
     // QUE URL
@@ -171,11 +173,12 @@ int32_t dns_ans_check(memory_t *receive_msg)
     for (int32_t i = 0; i < ans_count; i++) {
         // ANS URL
         char *ans_url_start = cur_pos_ptr;
-        cur_pos_ptr = get_url_from_packet(receive_msg, ans_url_start, &ans_url);
-        if (cur_pos_ptr == 0) {
+        char *ans_url_end = NULL;
+        if (get_url_from_packet(receive_msg, ans_url_start, &ans_url_end, &ans_url) != 0) {
             stat.request_parsing_error++;
             return 7;
         }
+        cur_pos_ptr = ans_url_end;
 
         int32_t block_ans_url_flag = 0;
         block_ans_url_flag = check_url(&ans_url);
@@ -258,10 +261,10 @@ int32_t dns_ans_check(memory_t *receive_msg)
         }
 
         if (ans_type == DNS_TypeCNAME) {
-            char *cname_new_cur_pos_ptr;
             char *cname_url_start = cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t);
-            cname_new_cur_pos_ptr = get_url_from_packet(receive_msg, cname_url_start, &cname_url);
-            if (cname_new_cur_pos_ptr == 0) {
+            char *cname_url_end = NULL;
+            if (get_url_from_packet(receive_msg, cname_url_start, &cname_url_end, &cname_url) !=
+                0) {
                 stat.request_parsing_error++;
                 return 10;
             }
