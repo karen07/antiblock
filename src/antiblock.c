@@ -125,7 +125,7 @@ static void print_help(void)
     exit(EXIT_FAILURE);
 }
 
-static void main_catch_function(int signo)
+static void main_catch_function(int32_t signo)
 {
     if (signo == SIGSEGV) {
         printf("SIGSEGV catched main\n");
@@ -142,7 +142,7 @@ static void main_catch_function(int signo)
     exit(EXIT_FAILURE);
 }
 
-int main(int argc, char *argv[])
+int32_t main(int32_t argc, char *argv[])
 {
     printf("\nAntiblock started\n");
 

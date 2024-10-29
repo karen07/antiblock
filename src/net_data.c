@@ -16,7 +16,7 @@ memory_t que_url;
 memory_t ans_url;
 memory_t cname_url;
 
-static void DNS_data_catch_function(__attribute__((unused)) int signo)
+static void DNS_data_catch_function(__attribute__((unused)) int32_t signo)
 {
     printf("SIGSEGV catched DNS_data\n");
     fflush(stdout);
@@ -98,18 +98,19 @@ static void *DNS_data(__attribute__((unused)) void *arg)
     FILE *log_fd_tmp = log_fd;
     log_fd = NULL;
 
-    char correct_test[] = { 0x0f, 0x32, 0x81, 0x80, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00,
-                            0x03, 0x79, 0x74, 0x33, 0x05, 0x67, 0x67, 0x70, 0x68, 0x74, 0x03, 0x63,
-                            0x6f, 0x6d, 0x00, 0x00, 0x01, 0x00, 0x01, 0xc0, 0x0c, 0x00, 0x05, 0x00,
-                            0x01, 0x00, 0x00, 0x01, 0x09, 0x00, 0x18, 0x0c, 0x77, 0x69, 0x64, 0x65,
-                            0x2d, 0x79, 0x6f, 0x75, 0x74, 0x75, 0x62, 0x65, 0x01, 0x6c, 0x06, 0x67,
-                            0x6f, 0x6f, 0x67, 0x6c, 0x65, 0xc0, 0x16, 0xc0, 0x2b, 0x00, 0x01, 0x00,
-                            0x01, 0x00, 0x00, 0x01, 0x09, 0x00, 0x04, 0x40, 0xe9, 0xa1, 0xc6 };
+    uint8_t correct_test[] = { 0x0f, 0x32, 0x81, 0x80, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00,
+                               0x00, 0x03, 0x79, 0x74, 0x33, 0x05, 0x67, 0x67, 0x70, 0x68, 0x74,
+                               0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01, 0x00, 0x01, 0xc0, 0x0c,
+                               0x00, 0x05, 0x00, 0x01, 0x00, 0x00, 0x01, 0x09, 0x00, 0x18, 0x0c,
+                               0x77, 0x69, 0x64, 0x65, 0x2d, 0x79, 0x6f, 0x75, 0x74, 0x75, 0x62,
+                               0x65, 0x01, 0x6c, 0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0xc0,
+                               0x16, 0xc0, 0x2b, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x01, 0x09,
+                               0x00, 0x04, 0x40, 0xe9, 0xa1, 0xc6 };
 
     receive_msg.size = sizeof(correct_test);
     memcpy(receive_msg.data, correct_test, receive_msg.size);
     if (dns_ans_check(&receive_msg) != 0) {
-        printf("Test correct fail\n");
+        printf("Test DNS correct fail\n");
         exit(EXIT_FAILURE);
     }
 
@@ -190,16 +191,65 @@ static void *DNS_data(__attribute__((unused)) void *arg)
     }
     receive_msg.size = sizeof(correct_test);
 
-    log_fd = log_fd_tmp;
+    char *tmp_ptr;
 
-    /*receive_msg.data[32] = 0x43;
+    if (get_url_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_url) != 0) {
+        printf("Test get url correct fail\n");
+        exit(EXIT_FAILURE);
+    }
+
+    receive_msg.size = 12;
+    if (get_url_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_url) != 1) {
+        printf("Test get url first byte fail\n");
+        exit(EXIT_FAILURE);
+    }
+    receive_msg.size = sizeof(correct_test);
+
+    que_url.max_size = 0;
+    if (get_url_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_url) != 2) {
+        printf("Test get url first byte url len fail\n");
+        exit(EXIT_FAILURE);
+    }
+    que_url.max_size = URL_MAX_SIZE;
+
+    receive_msg.size = 32;
+    if (get_url_from_packet(&receive_msg, receive_msg.data + 31, &tmp_ptr, &que_url) != 3) {
+        printf("Test get url second byte fail\n");
+        exit(EXIT_FAILURE);
+    }
+    receive_msg.size = sizeof(correct_test);
+
+    receive_msg.data[32] = 0x43;
     receive_msg.data[68] = 0x1F;
-    if (dns_ans_check(&receive_msg) != -1) {
-        printf("Test endless jumping fail\n");
+    if (get_url_from_packet(&receive_msg, receive_msg.data + 31, &tmp_ptr, &que_url) != 4) {
+        printf("Test get url endless jumping fail\n");
         exit(EXIT_FAILURE);
     }
     receive_msg.data[32] = correct_test[32];
-    receive_msg.data[68] = correct_test[68];*/
+    receive_msg.data[68] = correct_test[68];
+
+    receive_msg.size = 13;
+    if (get_url_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_url) != 5) {
+        printf("Test get url data byte fail\n");
+        exit(EXIT_FAILURE);
+    }
+    receive_msg.size = sizeof(correct_test);
+
+    que_url.max_size = 1;
+    if (get_url_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_url) != 6) {
+        printf("Test get url data url len fail\n");
+        exit(EXIT_FAILURE);
+    }
+    que_url.max_size = URL_MAX_SIZE;
+
+    que_url.max_size = 14;
+    if (get_url_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_url) != 7) {
+        printf("Test get url data url last byte fail\n");
+        exit(EXIT_FAILURE);
+    }
+    que_url.max_size = URL_MAX_SIZE;
+
+    log_fd = log_fd_tmp;
 
     pthread_barrier_wait(&threads_barrier);
 
@@ -241,7 +291,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
     return NULL;
 }
 
-static void client_data_catch_function(__attribute__((unused)) int signo)
+static void client_data_catch_function(__attribute__((unused)) int32_t signo)
 {
     printf("SIGSEGV catched client_data\n");
     fflush(stdout);

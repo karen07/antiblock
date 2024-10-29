@@ -120,7 +120,7 @@ static int32_t nat_cmp(const void *void_elem1, const void *void_elem2)
     }
 }
 
-static void tun_catch_function(__attribute__((unused)) int signo)
+static void tun_catch_function(__attribute__((unused)) int32_t signo)
 {
     printf("SIGSEGV catched tun\n");
     fflush(stdout);
