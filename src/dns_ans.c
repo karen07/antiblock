@@ -30,7 +30,7 @@ int32_t get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, char **new
             }
             uint8_t first_byte_data = (*cur_pos_ptr) & (~two_bit_mark);
 
-            if ((*cur_pos_ptr & two_bit_mark) != two_bit_mark) {
+            if ((*cur_pos_ptr & two_bit_mark) == 0) {
                 part_len = first_byte_data;
                 cur_pos_ptr++;
                 if (part_len == 0) {
@@ -41,7 +41,7 @@ int32_t get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, char **new
                     }
                     url->data[url_len++] = '.';
                 }
-            } else {
+            } else if ((*cur_pos_ptr & two_bit_mark) == two_bit_mark) {
                 if (cur_pos_ptr + sizeof(uint16_t) > receive_msg_end) {
                     return 3;
                 }
@@ -54,13 +54,15 @@ int32_t get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, char **new
                 if (jump_count++ > 100) {
                     return 4;
                 }
+            } else {
+                return 5;
             }
         } else {
             if (cur_pos_ptr + sizeof(uint8_t) > receive_msg_end) {
-                return 5;
+                return 6;
             }
             if (url_len >= (int32_t)url->max_size) {
-                return 6;
+                return 7;
             }
             url->data[url_len++] = *cur_pos_ptr;
             cur_pos_ptr++;
@@ -73,7 +75,7 @@ int32_t get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, char **new
     }
 
     if (url_len >= (int32_t)url->max_size) {
-        return 7;
+        return 8;
     }
     url->data[url_len] = 0;
     url->size = url_len;
