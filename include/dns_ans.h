@@ -31,6 +31,6 @@ typedef struct memory {
 } memory_t;
 #endif
 
-int32_t dns_ans_check(memory_t *receive_msg_struct);
-int32_t get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, char **new_cur_pos_ptr,
-                            memory_t *url);
+int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_url, memory_t *ans_url,
+                      memory_t *cname_url);
+void dns_ans_check_test(void);
