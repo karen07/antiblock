@@ -144,7 +144,7 @@ static void main_catch_function(int32_t signo)
 
 int32_t main(int32_t argc, char *argv[])
 {
-    printf("\nAntiblock started\n");
+    printf("\nAntiblock started " ANTIBLOCK_VERSION "\n");
 
     if (signal(SIGINT, main_catch_function) == SIG_ERR) {
         printf("Can't set signal handler main\n");
