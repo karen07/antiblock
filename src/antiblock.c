@@ -37,6 +37,78 @@ uint16_t listen_port;
 FILE *log_fd;
 FILE *stat_fd;
 
+uint32_t gateway_ip;
+uint32_t gateway_mask;
+
+int32_t route_socket;
+struct rtentry route;
+
+static void init_route_socket(void)
+{
+    route_socket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (route_socket < 0) {
+        printf("Can't create route_socket :%s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    gateway_mask = inet_addr("255.255.255.255");
+
+    memset(&route, 0, sizeof(route));
+
+    struct sockaddr_in *route_addr;
+    route_addr = (struct sockaddr_in *)&route.rt_gateway;
+    route_addr->sin_family = AF_INET;
+    route_addr->sin_addr.s_addr = gateway_ip;
+
+    route_addr = (struct sockaddr_in *)&route.rt_genmask;
+    route_addr->sin_family = AF_INET;
+    route_addr->sin_addr.s_addr = gateway_mask;
+
+    route.rt_flags = RTF_UP | RTF_GATEWAY;
+}
+
+static void clean_route_table(void)
+{
+    FILE *route_fd = fopen("/proc/net/route", "r");
+    if (route_fd == NULL) {
+        printf("Can't open /proc/net/route\n");
+        exit(EXIT_FAILURE);
+    }
+
+    fseek(route_fd, 128, SEEK_SET);
+
+    char iface[128];
+    uint32_t dest_ip;
+    uint32_t gate_ip;
+    uint32_t flags;
+    uint32_t refcnt;
+    uint32_t use;
+    uint32_t metric;
+    uint32_t mask;
+    uint32_t mtu;
+    uint32_t window;
+    uint32_t irtt;
+
+    while (fscanf(route_fd, "%s %x %x %x %x %x %x %x %x %x %x", iface, &dest_ip, &gate_ip, &flags,
+                  &refcnt, &use, &metric, &mask, &mtu, &window, &irtt) != EOF) {
+        if ((gate_ip == gateway_ip) && (mask == gateway_mask)) {
+            struct in_addr rec_ip;
+            rec_ip.s_addr = dest_ip;
+
+            struct sockaddr_in *route_addr = (struct sockaddr_in *)&route.rt_dst;
+            route_addr->sin_family = AF_INET;
+            route_addr->sin_addr.s_addr = rec_ip.s_addr;
+
+            if (ioctl(route_socket, SIOCDELRT, &route) < 0) {
+                printf("Ioctl can't delete %s from route table :%s\n", inet_ntoa(rec_ip),
+                       strerror(errno));
+            }
+        }
+    }
+
+    fclose(route_fd);
+}
+
 static void print_help(void)
 {
     printf("Commands:\n"
@@ -45,31 +117,34 @@ static void print_help(void)
            "-url https://example.com      Domains file url\n"
            "-file /example.txt            Domains file path\n"
            "-output /example/             Log or statistics output folder\n"
-           "-DNS_IP 0.0.0.0               DNS IP\n"
-           "-DNS_port 00                  DNS port\n"
-           "-listen_IP 0.0.0.0            Listen IP\n"
-           "-listen_port 0000             Listen port\n"
+           "-DNS 0.0.0.0:00               DNS address\n"
+           "-listen 0.0.0.0:00            Listen address\n"
+           "-gateway 0.0.0.0              Gateway IP\n"
            "-TUN_net 0.0.0.0/0            TUN net\n"
            "-TUN_name example             TUN name\n");
     exit(EXIT_FAILURE);
 }
 
-static void main_catch_function(int signo)
+static void main_catch_function(int32_t signo)
 {
     if (signo == SIGSEGV) {
         printf("SIGSEGV catched main\n");
-    } else {
+    } else if (signo == SIGINT) {
         printf("SIGINT catched main\n");
     }
     fflush(stdout);
-    fflush(stat_fd);
-    fflush(log_fd);
+    if (stat_fd) {
+        fflush(stat_fd);
+    }
+    if (log_fd) {
+        fflush(log_fd);
+    }
     exit(EXIT_FAILURE);
 }
 
-int main(int argc, char *argv[])
+int32_t main(int32_t argc, char *argv[])
 {
-    printf("\nAntiblock started\n");
+    printf("\nAntiblock started " ANTIBLOCK_VERSION "\n");
 
     if (signal(SIGINT, main_catch_function) == SIG_ERR) {
         printf("Can't set signal handler main\n");
@@ -83,21 +158,21 @@ int main(int argc, char *argv[])
 
     for (int32_t i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-log")) {
-            printf("Log enabled\n");
             is_log_print = 1;
+            printf("Log enabled\n");
             continue;
         }
         if (!strcmp(argv[i], "-stat")) {
-            printf("Stat enabled\n");
             is_stat_print = 1;
+            printf("Stat enabled\n");
             continue;
         }
         if (!strcmp(argv[i], "-url")) {
             if (i != argc - 1) {
                 if (strlen(argv[i + 1]) < PATH_MAX) {
-                    printf("Get urls from url %s\n", argv[i + 1]);
                     is_domains_file_url = 1;
                     strcpy(domains_file_url, argv[i + 1]);
+                    printf("Get urls from url %s\n", domains_file_url);
                 }
                 i++;
             }
@@ -106,9 +181,9 @@ int main(int argc, char *argv[])
         if (!strcmp(argv[i], "-file")) {
             if (i != argc - 1) {
                 if (strlen(argv[i + 1]) < PATH_MAX - 100) {
-                    printf("Get urls from file %s\n", argv[i + 1]);
                     is_domains_file_path = 1;
                     strcpy(domains_file_path, argv[i + 1]);
+                    printf("Get urls from file %s\n", domains_file_path);
                 }
                 i++;
             }
@@ -117,50 +192,58 @@ int main(int argc, char *argv[])
         if (!strcmp(argv[i], "-output")) {
             if (i != argc - 1) {
                 if (strlen(argv[i + 1]) < PATH_MAX - 100) {
-                    printf("Output log or stat to %s\n", argv[i + 1]);
                     is_log_or_stat_folder = 1;
                     strcpy(log_or_stat_folder, argv[i + 1]);
+                    printf("Output log or stat to %s\n", log_or_stat_folder);
                 }
                 i++;
             }
             continue;
         }
-        if (!strcmp(argv[i], "-DNS_IP")) {
+        if (!strcmp(argv[i], "-DNS")) {
+            if (i != argc - 1) {
+                char *colon_ptr = strchr(argv[i + 1], ':');
+                if (colon_ptr) {
+                    sscanf(colon_ptr + 1, "%hu", &dns_port);
+                    *colon_ptr = 0;
+                    if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
+                        dns_ip = inet_addr(argv[i + 1]);
+                        struct in_addr dns_ip_in_addr;
+                        dns_ip_in_addr.s_addr = dns_ip;
+                        printf("DNS %s:%hu\n", inet_ntoa(dns_ip_in_addr), dns_port);
+                    }
+                    *colon_ptr = ':';
+                }
+                i++;
+            }
+            continue;
+        }
+        if (!strcmp(argv[i], "-listen")) {
+            if (i != argc - 1) {
+                char *colon_ptr = strchr(argv[i + 1], ':');
+                if (colon_ptr) {
+                    sscanf(colon_ptr + 1, "%hu", &listen_port);
+                    *colon_ptr = 0;
+                    if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
+                        listen_ip = inet_addr(argv[i + 1]);
+                        struct in_addr listen_ip_in_addr;
+                        listen_ip_in_addr.s_addr = listen_ip;
+                        printf("Listen %s:%hu\n", inet_ntoa(listen_ip_in_addr), listen_port);
+                    }
+                    *colon_ptr = ':';
+                }
+                i++;
+            }
+            continue;
+        }
+        if (!strcmp(argv[i], "-gateway")) {
             if (i != argc - 1) {
                 if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
-                    dns_ip = inet_addr(argv[i + 1]);
-                    struct in_addr dns_ip_in_addr;
-                    dns_ip_in_addr.s_addr = dns_ip;
-                    printf("DNS IP %s\n", inet_ntoa(dns_ip_in_addr));
+                    gateway_ip = inet_addr(argv[i + 1]);
+                    struct in_addr gateway_ip_in_addr;
+                    gateway_ip_in_addr.s_addr = gateway_ip;
+                    printf("Gateway IP %s\n", inet_ntoa(gateway_ip_in_addr));
                 }
-                i++;
-            }
-            continue;
-        }
-        if (!strcmp(argv[i], "-DNS_port")) {
-            if (i != argc - 1) {
-                sscanf(argv[i + 1], "%hu", &dns_port);
-                printf("DNS port %d\n", dns_port);
-                i++;
-            }
-            continue;
-        }
-        if (!strcmp(argv[i], "-listen_IP")) {
-            if (i != argc - 1) {
-                if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
-                    listen_ip = inet_addr(argv[i + 1]);
-                    struct in_addr listen_ip_in_addr;
-                    listen_ip_in_addr.s_addr = listen_ip;
-                    printf("Listen IP %s\n", inet_ntoa(listen_ip_in_addr));
-                }
-                i++;
-            }
-            continue;
-        }
-        if (!strcmp(argv[i], "-listen_port")) {
-            if (i != argc - 1) {
-                sscanf(argv[i + 1], "%hu", &listen_port);
-                printf("Listen port %d\n", listen_port);
                 i++;
             }
             continue;
@@ -185,26 +268,42 @@ int main(int argc, char *argv[])
         }
         if (!strcmp(argv[i], "-TUN_name")) {
             if (i != argc - 1) {
-                printf("TUN name %s\n", argv[i + 1]);
-                is_tun_name = 1;
-                strcpy(tun_name, argv[i + 1]);
+                if (strlen(argv[i + 1]) < IFNAMSIZ) {
+                    is_tun_name = 1;
+                    strcpy(tun_name, argv[i + 1]);
+                    printf("TUN name %s\n", tun_name);
+                }
                 i++;
             }
             continue;
         }
-        printf("Unknown command %s\n", argv[i]);
+        printf("\nUnknown command %s\n", argv[i]);
         print_help();
     }
 
     printf("\n");
 
-    if (!is_tun_name) {
-        printf("Programm need TUN name\n");
+    if (!gateway_ip) {
+        printf("Programm need Gateway IP\n");
         print_help();
     }
 
-    if (!tun_ip || !tun_prefix) {
-        printf("Programm need TUN net\n");
+    if (is_tun_name) {
+        if (!tun_ip || !tun_prefix) {
+            printf("Programm need TUN net\n");
+            print_help();
+        }
+    }
+
+    if (tun_ip || tun_prefix) {
+        if (!is_tun_name) {
+            printf("Programm need TUN name\n");
+            print_help();
+        }
+    }
+
+    if (tun_prefix > 24) {
+        printf("Programm need TUN net prefix 1 - 24\n");
         print_help();
     }
 
@@ -260,17 +359,23 @@ int main(int argc, char *argv[])
         }
     }
 
-    int32_t threads_barrier_count = 4;
+    int32_t threads_barrier_count = 3 + is_tun_name;
     if (pthread_barrier_init(&threads_barrier, NULL, threads_barrier_count)) {
         printf("Can't create threads_barrier\n");
         exit(EXIT_FAILURE);
     }
 
-    init_tun_thread();
+    if (is_tun_name) {
+        init_tun_thread();
+    } else {
+        init_route_socket();
+    }
 
     init_net_data_threads();
 
     pthread_barrier_wait(&threads_barrier);
+
+    printf("\n");
 
     int32_t circles = 0;
     int32_t sleep_circles = 0;
@@ -279,6 +384,10 @@ int main(int argc, char *argv[])
         if (circles++ == 0) {
             memset(&stat, 0, sizeof(stat));
             stat.stat_start = time(NULL);
+
+            if (!is_tun_name) {
+                clean_route_table();
+            }
 
             int64_t urls_web_file_size = urls_read();
 
