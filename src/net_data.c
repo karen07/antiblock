@@ -12,16 +12,16 @@ static id_map_t *id_map;
 static int32_t repeater_DNS_socket;
 static int32_t repeater_client_socket;
 
-memory_t que_url;
-memory_t ans_url;
-memory_t cname_url;
-
-static void DNS_data_catch_function(__attribute__((unused)) int signo)
+static void DNS_data_catch_function(__attribute__((unused)) int32_t signo)
 {
     printf("SIGSEGV catched DNS_data\n");
     fflush(stdout);
-    fflush(stat_fd);
-    fflush(log_fd);
+    if (stat_fd) {
+        fflush(stat_fd);
+    }
+    if (log_fd) {
+        fflush(log_fd);
+    }
     exit(EXIT_FAILURE);
 }
 
@@ -58,38 +58,39 @@ static void *DNS_data(__attribute__((unused)) void *arg)
     receive_msg.size = 0;
     receive_msg.max_size = PACKET_MAX_SIZE;
     receive_msg.data = (char *)malloc(receive_msg.max_size * sizeof(char));
-
     if (receive_msg.data == 0) {
         printf("No free memory for receive_msg from DNS\n");
         exit(EXIT_FAILURE);
     }
 
+    memory_t que_url;
     que_url.size = 0;
     que_url.max_size = URL_MAX_SIZE;
     que_url.data = (char *)malloc(que_url.max_size * sizeof(char));
-
     if (que_url.data == 0) {
         printf("No free memory for que_url\n");
         exit(EXIT_FAILURE);
     }
 
+    memory_t ans_url;
     ans_url.size = 0;
     ans_url.max_size = URL_MAX_SIZE;
     ans_url.data = (char *)malloc(ans_url.max_size * sizeof(char));
-
     if (ans_url.data == 0) {
         printf("No free memory for ans_url\n");
         exit(EXIT_FAILURE);
     }
 
+    memory_t cname_url;
     cname_url.size = 0;
     cname_url.max_size = URL_MAX_SIZE;
     cname_url.data = (char *)malloc(cname_url.max_size * sizeof(char));
-
     if (cname_url.data == 0) {
         printf("No free memory for cname_url\n");
         exit(EXIT_FAILURE);
     }
+
+    dns_ans_check_test();
 
     pthread_barrier_wait(&threads_barrier);
 
@@ -110,7 +111,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
             continue;
         }
 
-        dns_ans_check(&receive_msg);
+        dns_ans_check(&receive_msg, &que_url, &ans_url, &cname_url);
 
         client_addr.sin_family = AF_INET;
         client_addr.sin_port = id_map[id].port;
@@ -128,15 +129,24 @@ static void *DNS_data(__attribute__((unused)) void *arg)
         }
     }
 
+    free(receive_msg.data);
+    free(que_url.data);
+    free(ans_url.data);
+    free(cname_url.data);
+
     return NULL;
 }
 
-static void client_data_catch_function(__attribute__((unused)) int signo)
+static void client_data_catch_function(__attribute__((unused)) int32_t signo)
 {
     printf("SIGSEGV catched client_data\n");
     fflush(stdout);
-    fflush(stat_fd);
-    fflush(log_fd);
+    if (stat_fd) {
+        fflush(stat_fd);
+    }
+    if (log_fd) {
+        fflush(log_fd);
+    }
     exit(EXIT_FAILURE);
 }
 
@@ -177,7 +187,6 @@ static void *client_data(__attribute__((unused)) void *arg)
     receive_msg.size = 0;
     receive_msg.max_size = PACKET_MAX_SIZE;
     receive_msg.data = (char *)malloc(receive_msg.max_size * sizeof(char));
-
     if (receive_msg.data == 0) {
         printf("No free memory for receive_msg from client\n");
         exit(EXIT_FAILURE);
@@ -209,6 +218,8 @@ static void *client_data(__attribute__((unused)) void *arg)
             stat.sended_to_dns++;
         }
     }
+
+    free(receive_msg.data);
 
     return NULL;
 }
