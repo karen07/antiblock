@@ -206,6 +206,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_url, memory_t *ans_ur
 
         if (ans_type == DNS_TypeA) {
             if (block_ans_url_flag) {
+#ifdef TUN_MODE
                 if (is_tun_name) {
                     uint32_t NAT_subnet_start_n = htonl(NAT_VPN.start_ip++);
 
@@ -232,7 +233,9 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_url, memory_t *ans_ur
                         fprintf(log_fd, " %s", inet_ntoa(old_ip));
                         fprintf(log_fd, " %s\n", inet_ntoa(new_ip));
                     }
-                } else {
+                } else
+#endif
+                {
                     struct in_addr rec_ip;
                     rec_ip.s_addr = ans->ip4;
 

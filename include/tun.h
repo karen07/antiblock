@@ -1,5 +1,7 @@
 #include "antiblock.h"
 
+#ifdef TUN_MODE
+
 typedef struct tun_header {
     uint16_t flags;
     uint16_t proto;
@@ -50,3 +52,5 @@ extern subnet_range_t NAT_VPN;
 void init_tun_thread(void);
 int32_t ip_ip_on_collision(const void *void_elem1, const void *void_elem2);
 void subnet_init(subnet_range_t *subnet);
+
+#endif

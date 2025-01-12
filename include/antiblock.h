@@ -10,7 +10,9 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <errno.h>
+#ifdef TUN_MODE
 #include <linux/if_tun.h>
+#endif
 #include <limits.h>
 #include <sys/time.h>
 #include <linux/ip.h>
@@ -34,11 +36,13 @@ extern char domains_file_path[PATH_MAX - 100];
 extern int32_t is_log_or_stat_folder;
 extern char log_or_stat_folder[PATH_MAX - 100];
 
+#ifdef TUN_MODE
 extern int32_t is_tun_name;
 extern char tun_name[IFNAMSIZ];
 
 extern uint32_t tun_ip;
 extern uint32_t tun_prefix;
+#endif
 
 extern uint32_t dns_ip;
 extern uint16_t dns_port;

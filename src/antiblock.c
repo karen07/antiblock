@@ -22,11 +22,13 @@ char domains_file_path[PATH_MAX - 100];
 int32_t is_log_or_stat_folder;
 char log_or_stat_folder[PATH_MAX - 100];
 
+#ifdef TUN_MODE
 int32_t is_tun_name;
 char tun_name[IFNAMSIZ];
 
 uint32_t tun_ip;
 uint32_t tun_prefix;
+#endif
 
 uint32_t dns_ip;
 uint16_t dns_port;
@@ -111,27 +113,36 @@ static void clean_route_table(void)
 
 static void print_help(void)
 {
-    printf("Commands:\n"
-           "-log                          Show operations log\n"
-           "-stat                         Show statistics data\n"
-           "-url https://example.com      Domains file url\n"
-           "-file /example.txt            Domains file path\n"
-           "-output /example/             Log or statistics output folder\n"
-           "-DNS 0.0.0.0:00               DNS address\n"
-           "-listen 0.0.0.0:00            Listen address\n"
-           "-gateway 0.0.0.0              Gateway IP\n"
+    printf("\nCommands:\n"
+           "  At least one parameters needs to be filled:\n"
+           "    -url      https://example.com  Domains file URL\n"
+           "    -file     /example.txt         Domains file path\n"
+           "  Required parameters:\n"
+           "    -listen   0.0.0.0:00           Listen address\n"
+           "    -DNS      0.0.0.0:00           DNS address\n"
+           "    -gateway  0.0.0.0              Gateway IP\n"
+           "  Optional parameters:\n"
+           "    -log                           Show operations log\n"
+           "    -stat                          Show statistics data\n"
+           "    -output   /example/            Log or statistics output folder\n"
+#ifdef TUN_MODE
            "-TUN_net 0.0.0.0/0            TUN net\n"
-           "-TUN_name example             TUN name\n");
+           "-TUN_name example             TUN name\n"
+#endif
+    );
     exit(EXIT_FAILURE);
 }
 
 static void main_catch_function(int32_t signo)
 {
-    if (signo == SIGSEGV) {
-        printf("SIGSEGV catched main\n");
-    } else if (signo == SIGINT) {
+    if (signo == SIGINT) {
         printf("SIGINT catched main\n");
+    } else if (signo == SIGSEGV) {
+        printf("SIGSEGV catched main\n");
+    } else if (signo == SIGTERM) {
+        printf("SIGTERM catched main\n");
     }
+    clean_route_table();
     fflush(stdout);
     if (stat_fd) {
         fflush(stat_fd);
@@ -139,12 +150,12 @@ static void main_catch_function(int32_t signo)
     if (log_fd) {
         fflush(log_fd);
     }
-    exit(EXIT_FAILURE);
+    exit(EXIT_SUCCESS);
 }
 
 int32_t main(int32_t argc, char *argv[])
 {
-    printf("\nAntiblock started " ANTIBLOCK_VERSION "\n");
+    printf("\nAntiBlock started " ANTIBLOCK_VERSION "\n\n");
 
     if (signal(SIGINT, main_catch_function) == SIG_ERR) {
         printf("Can't set signal handler main\n");
@@ -152,6 +163,11 @@ int32_t main(int32_t argc, char *argv[])
     }
 
     if (signal(SIGSEGV, main_catch_function) == SIG_ERR) {
+        printf("Can't set signal handler main\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (signal(SIGTERM, main_catch_function) == SIG_ERR) {
         printf("Can't set signal handler main\n");
         exit(EXIT_FAILURE);
     }
@@ -248,6 +264,7 @@ int32_t main(int32_t argc, char *argv[])
             }
             continue;
         }
+#ifdef TUN_MODE
         if (!strcmp(argv[i], "-TUN_net")) {
             if (i != argc - 1) {
                 char *slash_ptr = strchr(argv[i + 1], '/');
@@ -277,19 +294,22 @@ int32_t main(int32_t argc, char *argv[])
             }
             continue;
         }
-        printf("\nUnknown command %s\n", argv[i]);
+#endif
+        printf("Error:\n");
+        printf("Unknown command: %s\n", argv[i]);
         print_help();
     }
 
-    printf("\n");
-
     if (!gateway_ip) {
+        printf("Error:\n");
         printf("Programm need Gateway IP\n");
         print_help();
     }
 
+#ifdef TUN_MODE
     if (is_tun_name) {
         if (!tun_ip || !tun_prefix) {
+            printf("Error:\n");
             printf("Programm need TUN net\n");
             print_help();
         }
@@ -297,43 +317,52 @@ int32_t main(int32_t argc, char *argv[])
 
     if (tun_ip || tun_prefix) {
         if (!is_tun_name) {
+            printf("Error:\n");
             printf("Programm need TUN name\n");
             print_help();
         }
     }
 
     if (tun_prefix > 24) {
+        printf("Error:\n");
         printf("Programm need TUN net prefix 1 - 24\n");
         print_help();
     }
+#endif
 
     if (!(is_domains_file_url || is_domains_file_path)) {
+        printf("Error:\n");
         printf("Programm need domains file url or domains file path\n");
         print_help();
     }
 
     if (!dns_ip) {
+        printf("Error:\n");
         printf("Programm need DNS IP\n");
         print_help();
     }
 
     if (!dns_port) {
+        printf("Error:\n");
         printf("Programm need DNS port\n");
         print_help();
     }
 
     if (!listen_ip) {
+        printf("Error:\n");
         printf("Programm need listen IP\n");
         print_help();
     }
 
     if (!listen_port) {
+        printf("Error:\n");
         printf("Programm need listen port\n");
         print_help();
     }
 
     if (is_log_print || is_stat_print) {
         if (!is_log_or_stat_folder) {
+            printf("Error:\n");
             printf("Programm need output folder for log or statistics\n");
             print_help();
         }
@@ -359,15 +388,21 @@ int32_t main(int32_t argc, char *argv[])
         }
     }
 
-    int32_t threads_barrier_count = 3 + is_tun_name;
+    int32_t threads_barrier_count = 3;
+#ifdef TUN_MODE
+    threads_barrier_count += is_tun_name;
+#endif
     if (pthread_barrier_init(&threads_barrier, NULL, threads_barrier_count)) {
         printf("Can't create threads_barrier\n");
         exit(EXIT_FAILURE);
     }
 
+#ifdef TUN_MODE
     if (is_tun_name) {
         init_tun_thread();
-    } else {
+    } else
+#endif
+    {
         init_route_socket();
     }
 
@@ -385,7 +420,10 @@ int32_t main(int32_t argc, char *argv[])
             memset(&stat, 0, sizeof(stat));
             stat.stat_start = time(NULL);
 
-            if (!is_tun_name) {
+#ifdef TUN_MODE
+            if (!is_tun_name)
+#endif
+            {
                 clean_route_table();
             }
 

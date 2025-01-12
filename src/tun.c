@@ -8,6 +8,8 @@
 #include "tun.h"
 #include "urls_read.h"
 
+#ifdef TUN_MODE
+
 const array_hashmap_t *ip_ip_map_struct;
 static const array_hashmap_t *nat_map_struct;
 
@@ -460,3 +462,5 @@ void init_tun_thread(void)
         exit(EXIT_FAILURE);
     }
 }
+
+#endif
