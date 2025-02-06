@@ -6,7 +6,7 @@
 #include "net_data.h"
 #include "stat.h"
 #include "tun.h"
-#include "urls_read.h"
+#include "domains_read.h"
 
 #define DNS_TypeA 1
 #define DNS_TypeCNAME 5
