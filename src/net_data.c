@@ -63,30 +63,30 @@ static void *DNS_data(__attribute__((unused)) void *arg)
         exit(EXIT_FAILURE);
     }
 
-    memory_t que_url;
-    que_url.size = 0;
-    que_url.max_size = URL_MAX_SIZE;
-    que_url.data = (char *)malloc(que_url.max_size * sizeof(char));
-    if (que_url.data == 0) {
-        printf("No free memory for que_url\n");
+    memory_t que_domain;
+    que_domain.size = 0;
+    que_domain.max_size = DOMAIN_MAX_SIZE;
+    que_domain.data = (char *)malloc(que_domain.max_size * sizeof(char));
+    if (que_domain.data == 0) {
+        printf("No free memory for que_domain\n");
         exit(EXIT_FAILURE);
     }
 
-    memory_t ans_url;
-    ans_url.size = 0;
-    ans_url.max_size = URL_MAX_SIZE;
-    ans_url.data = (char *)malloc(ans_url.max_size * sizeof(char));
-    if (ans_url.data == 0) {
-        printf("No free memory for ans_url\n");
+    memory_t ans_domain;
+    ans_domain.size = 0;
+    ans_domain.max_size = DOMAIN_MAX_SIZE;
+    ans_domain.data = (char *)malloc(ans_domain.max_size * sizeof(char));
+    if (ans_domain.data == 0) {
+        printf("No free memory for ans_domain\n");
         exit(EXIT_FAILURE);
     }
 
-    memory_t cname_url;
-    cname_url.size = 0;
-    cname_url.max_size = URL_MAX_SIZE;
-    cname_url.data = (char *)malloc(cname_url.max_size * sizeof(char));
-    if (cname_url.data == 0) {
-        printf("No free memory for cname_url\n");
+    memory_t cname_domain;
+    cname_domain.size = 0;
+    cname_domain.max_size = DOMAIN_MAX_SIZE;
+    cname_domain.data = (char *)malloc(cname_domain.max_size * sizeof(char));
+    if (cname_domain.data == 0) {
+        printf("No free memory for cname_domain\n");
         exit(EXIT_FAILURE);
     }
 
@@ -111,7 +111,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
             continue;
         }
 
-        dns_ans_check(&receive_msg, &que_url, &ans_url, &cname_url);
+        dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain);
 
         client_addr.sin_family = AF_INET;
         client_addr.sin_port = id_map[id].port;
@@ -130,9 +130,9 @@ static void *DNS_data(__attribute__((unused)) void *arg)
     }
 
     free(receive_msg.data);
-    free(que_url.data);
-    free(ans_url.data);
-    free(cname_url.data);
+    free(que_domain.data);
+    free(ans_domain.data);
+    free(cname_domain.data);
 
     return NULL;
 }

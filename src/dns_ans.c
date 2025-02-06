@@ -11,12 +11,12 @@
 #define DNS_TypeA 1
 #define DNS_TypeCNAME 5
 
-int32_t get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, char **new_cur_pos_ptr,
-                            memory_t *url)
+int32_t get_domain_from_packet(memory_t *receive_msg, char *cur_pos_ptr, char **new_cur_pos_ptr,
+                               memory_t *domain)
 {
     uint8_t two_bit_mark = FIRST_TWO_BITS_UINT8;
     int32_t part_len = 0;
-    int32_t url_len = 0;
+    int32_t domain_len = 0;
 
     int32_t jump_count = 0;
 
@@ -36,10 +36,10 @@ int32_t get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, char **new
                 if (part_len == 0) {
                     break;
                 } else {
-                    if (url_len >= (int32_t)url->max_size) {
+                    if (domain_len >= (int32_t)domain->max_size) {
                         return 2;
                     }
-                    url->data[url_len++] = '.';
+                    domain->data[domain_len++] = '.';
                 }
             } else if ((*cur_pos_ptr & two_bit_mark) == two_bit_mark) {
                 if (cur_pos_ptr + sizeof(uint16_t) > receive_msg_end) {
@@ -61,10 +61,10 @@ int32_t get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, char **new
             if (cur_pos_ptr + sizeof(uint8_t) > receive_msg_end) {
                 return 6;
             }
-            if (url_len >= (int32_t)url->max_size) {
+            if (domain_len >= (int32_t)domain->max_size) {
                 return 7;
             }
-            url->data[url_len++] = *cur_pos_ptr;
+            domain->data[domain_len++] = *cur_pos_ptr;
             cur_pos_ptr++;
             part_len--;
         }
@@ -74,28 +74,28 @@ int32_t get_url_from_packet(memory_t *receive_msg, char *cur_pos_ptr, char **new
         *new_cur_pos_ptr = cur_pos_ptr;
     }
 
-    if (url_len >= (int32_t)url->max_size) {
+    if (domain_len >= (int32_t)domain->max_size) {
         return 8;
     }
-    url->data[url_len] = 0;
-    url->size = url_len;
+    domain->data[domain_len] = 0;
+    domain->size = domain_len;
 
     return 0;
 }
 
-static int32_t check_url(memory_t *url)
+static int32_t check_domain(memory_t *domain)
 {
     char *dot_pos = NULL;
     int32_t dot_count = 0;
-    for (int32_t i = url->size; i >= 0; i--) {
-        if (url->data[i] == '.') {
+    for (int32_t i = domain->size; i >= 0; i--) {
+        if (domain->data[i] == '.') {
             if (dot_count++ == 0) {
                 continue;
             }
 
-            dot_pos = &url->data[i + 1];
+            dot_pos = &domain->data[i + 1];
 
-            int32_t find_res = array_hashmap_find_elem(urls_map_struct, dot_pos, NULL);
+            int32_t find_res = array_hashmap_find_elem(domains_map_struct, dot_pos, NULL);
             if (find_res == array_hashmap_elem_finded) {
                 return 1;
             }
@@ -105,8 +105,8 @@ static int32_t check_url(memory_t *url)
     return 0;
 }
 
-int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_url, memory_t *ans_url,
-                      memory_t *cname_url)
+int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans_domain,
+                      memory_t *cname_domain)
 {
     char *cur_pos_ptr = receive_msg->data;
     char *receive_msg_end = receive_msg->data + receive_msg->size;
@@ -139,17 +139,17 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_url, memory_t *ans_ur
     cur_pos_ptr += sizeof(dns_header_t);
     // DNS HEADER
 
-    // QUE URL
-    char *que_url_start = cur_pos_ptr;
-    char *que_url_end = NULL;
-    if (get_url_from_packet(receive_msg, que_url_start, &que_url_end, que_url) != 0) {
+    // QUE DOMAIN
+    char *que_domain_start = cur_pos_ptr;
+    char *que_domain_end = NULL;
+    if (get_domain_from_packet(receive_msg, que_domain_start, &que_domain_end, que_domain) != 0) {
         stat.request_parsing_error++;
         return 5;
     }
-    cur_pos_ptr = que_url_end;
+    cur_pos_ptr = que_domain_end;
 
-    __attribute__((unused)) int32_t block_que_url_flag = check_url(que_url);
-    // QUE URL
+    __attribute__((unused)) int32_t block_que_domain_flag = check_domain(que_domain);
+    // QUE DOMAIN
 
     // QUE DATA
     if (cur_pos_ptr + sizeof(dns_que_t) > receive_msg_end) {
@@ -170,22 +170,23 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_url, memory_t *ans_ur
         fprintf(log_fd, "%02d.%02d.%04d %02d:%02d:%02d\n", tm_struct->tm_mday,
                 tm_struct->tm_mon + 1, tm_struct->tm_year + 1900, tm_struct->tm_hour,
                 tm_struct->tm_min, tm_struct->tm_sec);
-        fprintf(log_fd, "Que_url %d: %s\n", que_type, que_url->data + 1);
+        fprintf(log_fd, "Que_domain %d: %s\n", que_type, que_domain->data + 1);
     }
 
     for (int32_t i = 0; i < ans_count; i++) {
-        // ANS URL
-        char *ans_url_start = cur_pos_ptr;
-        char *ans_url_end = NULL;
-        if (get_url_from_packet(receive_msg, ans_url_start, &ans_url_end, ans_url) != 0) {
+        // ANS DOMAIN
+        char *ans_domain_start = cur_pos_ptr;
+        char *ans_domain_end = NULL;
+        if (get_domain_from_packet(receive_msg, ans_domain_start, &ans_domain_end, ans_domain) !=
+            0) {
             stat.request_parsing_error++;
             return 7;
         }
-        cur_pos_ptr = ans_url_end;
+        cur_pos_ptr = ans_domain_end;
 
-        int32_t block_ans_url_flag = 0;
-        block_ans_url_flag = check_url(ans_url);
-        // ANS URL
+        int32_t block_ans_domain_flag = 0;
+        block_ans_domain_flag = check_domain(ans_domain);
+        // ANS DOMAIN
 
         // ANS DATA
         if (cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t) > receive_msg_end) {
@@ -205,7 +206,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_url, memory_t *ans_ur
         }
 
         if (ans_type == DNS_TypeA) {
-            if (block_ans_url_flag) {
+            if (block_ans_domain_flag) {
 #ifdef TUN_MODE
                 if (is_tun_name) {
                     uint32_t NAT_subnet_start_n = htonl(NAT_VPN.start_ip++);
@@ -230,7 +231,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_url, memory_t *ans_ur
                         struct in_addr old_ip;
                         old_ip.s_addr = add_elem.ip_global;
 
-                        fprintf(log_fd, "    Blocked_IP: %s", ans_url->data + 1);
+                        fprintf(log_fd, "    Blocked_IP: %s", ans_domain->data + 1);
                         fprintf(log_fd, " %s", inet_ntoa(old_ip));
                         fprintf(log_fd, " %s\n", inet_ntoa(new_ip));
                     }
@@ -254,7 +255,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_url, memory_t *ans_ur
                     }
 
                     if (log_fd) {
-                        fprintf(log_fd, "    Blocked_IP: %s", ans_url->data + 1);
+                        fprintf(log_fd, "    Blocked_IP: %s", ans_domain->data + 1);
                         fprintf(log_fd, " %s\n", inet_ntoa(rec_ip));
                     }
                 }
@@ -263,51 +264,52 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_url, memory_t *ans_ur
                     struct in_addr new_ip;
                     new_ip.s_addr = ans->ip4;
 
-                    fprintf(log_fd, "    Not_Blocked_IP: %s", ans_url->data + 1);
+                    fprintf(log_fd, "    Not_Blocked_IP: %s", ans_domain->data + 1);
                     fprintf(log_fd, " %s\n", inet_ntoa(new_ip));
                 }
             }
         }
 
         if (ans_type == DNS_TypeCNAME) {
-            char *cname_url_start = cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t);
-            char *cname_url_end = NULL;
-            if (get_url_from_packet(receive_msg, cname_url_start, &cname_url_end, cname_url) != 0) {
+            char *cname_domain_start = cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t);
+            char *cname_domain_end = NULL;
+            if (get_domain_from_packet(receive_msg, cname_domain_start, &cname_domain_end,
+                                       cname_domain) != 0) {
                 stat.request_parsing_error++;
                 return 10;
             }
 
-            int32_t block_cname_url_flag = 0;
-            block_cname_url_flag = check_url(cname_url);
+            int32_t block_cname_domain_flag = 0;
+            block_cname_domain_flag = check_domain(cname_domain);
 
-            if (block_ans_url_flag == 1 && block_cname_url_flag == 0) {
-                block_cname_url_flag = 1;
-                if (urls_map_struct) {
-                    if (urls.size + cname_url->size < urls.max_size) {
-                        strcpy(&(urls.data[urls.size]), cname_url->data + 1);
+            if (block_ans_domain_flag == 1 && block_cname_domain_flag == 0) {
+                block_cname_domain_flag = 1;
+                if (domains_map_struct) {
+                    if (domains.size + cname_domain->size < domains.max_size) {
+                        strcpy(&(domains.data[domains.size]), cname_domain->data + 1);
 
-                        int32_t url_offset = urls.size;
-                        urls.size += cname_url->size;
+                        int32_t domain_offset = domains.size;
+                        domains.size += cname_domain->size;
 
-                        array_hashmap_add_elem(urls_map_struct, &url_offset, NULL, NULL);
+                        array_hashmap_add_elem(domains_map_struct, &domain_offset, NULL, NULL);
                     }
                 }
             }
 
-            if (block_cname_url_flag) {
+            if (block_cname_domain_flag) {
                 if (log_fd) {
-                    fprintf(log_fd, "    Blocked_Cname: %s\n", cname_url->data + 1);
+                    fprintf(log_fd, "    Blocked_Cname: %s\n", cname_domain->data + 1);
                 }
             } else {
                 if (log_fd) {
-                    fprintf(log_fd, "    Not_Blocked_Cname: %s\n", cname_url->data + 1);
+                    fprintf(log_fd, "    Not_Blocked_Cname: %s\n", cname_domain->data + 1);
                 }
             }
         }
 
         if (ans_type != DNS_TypeA && ans_type != DNS_TypeCNAME) {
             if (log_fd) {
-                fprintf(log_fd, "    Ans_url %d: %s\n", ans_type, ans_url->data + 1);
+                fprintf(log_fd, "    Ans_domain %d: %s\n", ans_type, ans_domain->data + 1);
             }
         }
 
@@ -340,30 +342,30 @@ void dns_ans_check_test(void)
         exit(EXIT_FAILURE);
     }
 
-    memory_t que_url;
-    que_url.size = 0;
-    que_url.max_size = URL_MAX_SIZE;
-    que_url.data = (char *)malloc(que_url.max_size * sizeof(char));
-    if (que_url.data == 0) {
-        printf("No free memory for que_url\n");
+    memory_t que_domain;
+    que_domain.size = 0;
+    que_domain.max_size = DOMAIN_MAX_SIZE;
+    que_domain.data = (char *)malloc(que_domain.max_size * sizeof(char));
+    if (que_domain.data == 0) {
+        printf("No free memory for que_domain\n");
         exit(EXIT_FAILURE);
     }
 
-    memory_t ans_url;
-    ans_url.size = 0;
-    ans_url.max_size = URL_MAX_SIZE;
-    ans_url.data = (char *)malloc(ans_url.max_size * sizeof(char));
-    if (ans_url.data == 0) {
-        printf("No free memory for ans_url\n");
+    memory_t ans_domain;
+    ans_domain.size = 0;
+    ans_domain.max_size = DOMAIN_MAX_SIZE;
+    ans_domain.data = (char *)malloc(ans_domain.max_size * sizeof(char));
+    if (ans_domain.data == 0) {
+        printf("No free memory for ans_domain\n");
         exit(EXIT_FAILURE);
     }
 
-    memory_t cname_url;
-    cname_url.size = 0;
-    cname_url.max_size = URL_MAX_SIZE;
-    cname_url.data = (char *)malloc(cname_url.max_size * sizeof(char));
-    if (cname_url.data == 0) {
-        printf("No free memory for cname_url\n");
+    memory_t cname_domain;
+    cname_domain.size = 0;
+    cname_domain.max_size = DOMAIN_MAX_SIZE;
+    cname_domain.data = (char *)malloc(cname_domain.max_size * sizeof(char));
+    if (cname_domain.data == 0) {
+        printf("No free memory for cname_domain\n");
         exit(EXIT_FAILURE);
     }
 
@@ -381,83 +383,83 @@ void dns_ans_check_test(void)
 
     receive_msg.size = sizeof(correct_test);
     memcpy(receive_msg.data, correct_test, receive_msg.size);
-    if (dns_ans_check(&receive_msg, &que_url, &ans_url, &cname_url) != 0) {
+    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 0) {
         printf("Test DNS correct fail\n");
         exit(EXIT_FAILURE);
     }
 
     receive_msg.size = 11;
-    if (dns_ans_check(&receive_msg, &que_url, &ans_url, &cname_url) != 1) {
+    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 1) {
         printf("Test DNS header size fail\n");
         exit(EXIT_FAILURE);
     }
     receive_msg.size = sizeof(correct_test);
 
     receive_msg.data[2] = 1;
-    if (dns_ans_check(&receive_msg, &que_url, &ans_url, &cname_url) != 2) {
+    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 2) {
         printf("Test DNS flag fail\n");
         exit(EXIT_FAILURE);
     }
     receive_msg.data[2] = correct_test[2];
 
     receive_msg.data[5] = 2;
-    if (dns_ans_check(&receive_msg, &que_url, &ans_url, &cname_url) != 3) {
+    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 3) {
         printf("Test DNS quest count fail\n");
         exit(EXIT_FAILURE);
     }
     receive_msg.data[5] = correct_test[5];
 
     receive_msg.data[7] = 0;
-    if (dns_ans_check(&receive_msg, &que_url, &ans_url, &cname_url) != 4) {
+    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 4) {
         printf("Test DNS ans count fail\n");
         exit(EXIT_FAILURE);
     }
     receive_msg.data[7] = correct_test[7];
 
     receive_msg.size = 26;
-    if (dns_ans_check(&receive_msg, &que_url, &ans_url, &cname_url) != 5) {
-        printf("Test DNS que url fail\n");
+    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 5) {
+        printf("Test DNS que domain fail\n");
         exit(EXIT_FAILURE);
     }
     receive_msg.size = sizeof(correct_test);
 
     receive_msg.size = 30;
-    if (dns_ans_check(&receive_msg, &que_url, &ans_url, &cname_url) != 6) {
+    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 6) {
         printf("Test DNS header que size fail\n");
         exit(EXIT_FAILURE);
     }
     receive_msg.size = sizeof(correct_test);
 
     receive_msg.size = 32;
-    if (dns_ans_check(&receive_msg, &que_url, &ans_url, &cname_url) != 7) {
-        printf("Test DNS ans url fail\n");
+    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 7) {
+        printf("Test DNS ans domain fail\n");
         exit(EXIT_FAILURE);
     }
     receive_msg.size = sizeof(correct_test);
 
     receive_msg.size = 42;
-    if (dns_ans_check(&receive_msg, &que_url, &ans_url, &cname_url) != 8) {
+    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 8) {
         printf("Test DNS header ans size fail\n");
         exit(EXIT_FAILURE);
     }
     receive_msg.size = sizeof(correct_test);
 
     receive_msg.size = 66;
-    if (dns_ans_check(&receive_msg, &que_url, &ans_url, &cname_url) != 9) {
+    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 9) {
         printf("Test DNS header ans data size fail\n");
         exit(EXIT_FAILURE);
     }
     receive_msg.size = sizeof(correct_test);
 
     receive_msg.data[58] = 0x3F;
-    if (dns_ans_check(&receive_msg, &que_url, &ans_url, &cname_url) != 10) {
-        printf("Test DNS cname url fail\n");
+    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 10) {
+        printf("Test DNS cname domain fail\n");
         exit(EXIT_FAILURE);
     }
     receive_msg.data[58] = correct_test[58];
 
     receive_msg.size = sizeof(correct_test) + 1;
-    if (dns_ans_check(&receive_msg, &que_url, &ans_url, &cname_url) != 11) {
+    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 11) {
         printf("Test DNS end fail\n");
         exit(EXIT_FAILURE);
     }
@@ -465,73 +467,73 @@ void dns_ans_check_test(void)
 
     char *tmp_ptr;
 
-    if (get_url_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_url) != 0) {
-        printf("Test get url correct fail\n");
+    if (get_domain_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_domain) != 0) {
+        printf("Test get domain correct fail\n");
         exit(EXIT_FAILURE);
     }
 
     receive_msg.size = 12;
-    if (get_url_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_url) != 1) {
-        printf("Test get url first byte fail\n");
+    if (get_domain_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_domain) != 1) {
+        printf("Test get domain first byte fail\n");
         exit(EXIT_FAILURE);
     }
     receive_msg.size = sizeof(correct_test);
 
-    que_url.max_size = 0;
-    if (get_url_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_url) != 2) {
-        printf("Test get url first byte url len fail\n");
+    que_domain.max_size = 0;
+    if (get_domain_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_domain) != 2) {
+        printf("Test get domain first byte domain len fail\n");
         exit(EXIT_FAILURE);
     }
-    que_url.max_size = URL_MAX_SIZE;
+    que_domain.max_size = DOMAIN_MAX_SIZE;
 
     receive_msg.size = 32;
-    if (get_url_from_packet(&receive_msg, receive_msg.data + 31, &tmp_ptr, &que_url) != 3) {
-        printf("Test get url second byte fail\n");
+    if (get_domain_from_packet(&receive_msg, receive_msg.data + 31, &tmp_ptr, &que_domain) != 3) {
+        printf("Test get domain second byte fail\n");
         exit(EXIT_FAILURE);
     }
     receive_msg.size = sizeof(correct_test);
 
     receive_msg.data[32] = 0x43;
     receive_msg.data[68] = 0x1F;
-    if (get_url_from_packet(&receive_msg, receive_msg.data + 31, &tmp_ptr, &que_url) != 4) {
-        printf("Test get url endless jumping fail\n");
+    if (get_domain_from_packet(&receive_msg, receive_msg.data + 31, &tmp_ptr, &que_domain) != 4) {
+        printf("Test get domain endless jumping fail\n");
         exit(EXIT_FAILURE);
     }
     receive_msg.data[32] = correct_test[32];
     receive_msg.data[68] = correct_test[68];
 
     receive_msg.data[31] = 0x7F;
-    if (get_url_from_packet(&receive_msg, receive_msg.data + 31, &tmp_ptr, &que_url) != 5) {
-        printf("Test get url byte 01 10 fail\n");
+    if (get_domain_from_packet(&receive_msg, receive_msg.data + 31, &tmp_ptr, &que_domain) != 5) {
+        printf("Test get domain byte 01 10 fail\n");
         exit(EXIT_FAILURE);
     }
     receive_msg.data[31] = correct_test[31];
 
     receive_msg.size = 13;
-    if (get_url_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_url) != 6) {
-        printf("Test get url data byte fail\n");
+    if (get_domain_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_domain) != 6) {
+        printf("Test get domain data byte fail\n");
         exit(EXIT_FAILURE);
     }
     receive_msg.size = sizeof(correct_test);
 
-    que_url.max_size = 1;
-    if (get_url_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_url) != 7) {
-        printf("Test get url data url len fail\n");
+    que_domain.max_size = 1;
+    if (get_domain_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_domain) != 7) {
+        printf("Test get domain data domain len fail\n");
         exit(EXIT_FAILURE);
     }
-    que_url.max_size = URL_MAX_SIZE;
+    que_domain.max_size = DOMAIN_MAX_SIZE;
 
-    que_url.max_size = 14;
-    if (get_url_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_url) != 8) {
-        printf("Test get url data url last byte fail\n");
+    que_domain.max_size = 14;
+    if (get_domain_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_domain) != 8) {
+        printf("Test get domain data domain last byte fail\n");
         exit(EXIT_FAILURE);
     }
-    que_url.max_size = URL_MAX_SIZE;
+    que_domain.max_size = DOMAIN_MAX_SIZE;
 
     log_fd = log_fd_tmp;
 
     free(receive_msg.data);
-    free(que_url.data);
-    free(ans_url.data);
-    free(cname_url.data);
+    free(que_domain.data);
+    free(ans_domain.data);
+    free(cname_domain.data);
 }

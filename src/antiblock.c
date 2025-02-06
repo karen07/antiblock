@@ -188,7 +188,7 @@ int32_t main(int32_t argc, char *argv[])
                 if (strlen(argv[i + 1]) < PATH_MAX) {
                     is_domains_file_url = 1;
                     strcpy(domains_file_url, argv[i + 1]);
-                    printf("Get urls from url %s\n", domains_file_url);
+                    printf("Get domains from url %s\n", domains_file_url);
                 }
                 i++;
             }
@@ -199,7 +199,7 @@ int32_t main(int32_t argc, char *argv[])
                 if (strlen(argv[i + 1]) < PATH_MAX - 100) {
                     is_domains_file_path = 1;
                     strcpy(domains_file_path, argv[i + 1]);
-                    printf("Get urls from file %s\n", domains_file_path);
+                    printf("Get domains from file %s\n", domains_file_path);
                 }
                 i++;
             }
@@ -427,12 +427,12 @@ int32_t main(int32_t argc, char *argv[])
                 clean_route_table();
             }
 
-            int64_t urls_web_file_size = urls_read();
+            int64_t domains_web_file_size = domains_read();
 
-            if (urls_web_file_size > 0 || !is_domains_file_url) {
-                sleep_circles = URLS_UPDATE_TIME / STAT_PRINT_TIME;
+            if (domains_web_file_size > 0 || !is_domains_file_url) {
+                sleep_circles = DOMAINS_UPDATE_TIME / STAT_PRINT_TIME;
             } else {
-                sleep_circles = URLS_ERROR_UPDATE_TIME / STAT_PRINT_TIME;
+                sleep_circles = DOMAINS_ERROR_UPDATE_TIME / STAT_PRINT_TIME;
             }
         }
 

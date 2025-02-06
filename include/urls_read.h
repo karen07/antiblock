@@ -9,7 +9,7 @@ typedef struct memory {
 } memory_t;
 #endif
 
-extern memory_t urls;
-extern array_hashmap_t urls_map_struct;
+extern memory_t domains;
+extern array_hashmap_t domains_map_struct;
 
-int64_t urls_read(void);
+int64_t domains_read(void);
