@@ -96,7 +96,7 @@ static int32_t check_url(memory_t *url)
             dot_pos = &url->data[i + 1];
 
             int32_t find_res = array_hashmap_find_elem(urls_map_struct, dot_pos, NULL);
-            if (find_res == 1) {
+            if (find_res == array_hashmap_elem_finded) {
                 return 1;
             }
         }
@@ -218,7 +218,8 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_url, memory_t *ans_ur
                     add_elem.ip_local = NAT_subnet_start_n;
                     add_elem.ip_global = ans->ip4;
 
-                    array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, ip_ip_on_collision);
+                    array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL,
+                                           array_hashmap_save_new_func);
 
                     ans->ip4 = NAT_subnet_start_n;
 

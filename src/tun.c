@@ -10,8 +10,8 @@
 
 #ifdef TUN_MODE
 
-const array_hashmap_t *ip_ip_map_struct;
-static const array_hashmap_t *nat_map_struct;
+array_hashmap_t ip_ip_map_struct;
+static array_hashmap_t nat_map_struct;
 
 subnet_range_t NAT_VPN;
 
@@ -80,16 +80,16 @@ static uint16_t checksum(char *buf, uint32_t size)
     return ~sum;
 }
 
-static uint32_t ip_ip_hash(const void *void_elem)
+static array_hashmap_hash ip_ip_hash(const void *elem_data)
 {
-    const ip_ip_map_t *elem = void_elem;
+    const ip_ip_map_t *elem = elem_data;
     return elem->ip_local;
 }
 
-static int32_t ip_ip_cmp(const void *void_elem1, const void *void_elem2)
+static array_hashmap_bool ip_ip_cmp(const void *elem_data, const void *hashmap_elem_data)
 {
-    const ip_ip_map_t *elem1 = void_elem1;
-    const ip_ip_map_t *elem2 = void_elem2;
+    const ip_ip_map_t *elem1 = elem_data;
+    const ip_ip_map_t *elem2 = hashmap_elem_data;
 
     if (elem1->ip_local == elem2->ip_local) {
         return 1;
@@ -98,22 +98,16 @@ static int32_t ip_ip_cmp(const void *void_elem1, const void *void_elem2)
     }
 }
 
-int32_t ip_ip_on_collision(__attribute__((unused)) const void *void_elem1,
-                           __attribute__((unused)) const void *void_elem2)
+static array_hashmap_hash nat_hash(const void *elem_data)
 {
-    return 1;
-}
-
-static uint32_t nat_hash(const void *void_elem)
-{
-    const nat_map_t *elem = void_elem;
+    const nat_map_t *elem = elem_data;
     return djb33_hash_len((const char *)(&elem->key), sizeof(elem->key));
 }
 
-static int32_t nat_cmp(const void *void_elem1, const void *void_elem2)
+static array_hashmap_bool nat_cmp(const void *elem_data, const void *hashmap_elem_data)
 {
-    const nat_map_t *elem1 = void_elem1;
-    const nat_map_t *elem2 = void_elem2;
+    const nat_map_t *elem1 = elem_data;
+    const nat_map_t *elem2 = hashmap_elem_data;
 
     if (memcmp(&elem1->key, &elem2->key, sizeof(elem1->key)) == 0) {
         return 1;
@@ -209,9 +203,11 @@ static void *tun(__attribute__((unused)) void *arg)
                 find_elem_ip_ip.ip_local = iph->daddr;
 
                 ip_ip_map_t res_elem_ip_ip;
-                int32_t find_elem_ip_ip_flag =
+                int32_t find_elem_ip_ip_flag = 0;
+
+                find_elem_ip_ip_flag =
                     array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
-                if (find_elem_ip_ip_flag != 1) {
+                if (find_elem_ip_ip_flag != array_hashmap_elem_finded) {
                     stat.nat_sended_to_dev_error++;
                     continue;
                 }
@@ -277,9 +273,11 @@ static void *tun(__attribute__((unused)) void *arg)
             find_elem_nat.key.proto = proto_L4;
 
             nat_map_t res_elem_nat;
-            int32_t find_elem_nat_flag =
+            int32_t find_elem_nat_flag = 0;
+
+            find_elem_nat_flag =
                 array_hashmap_find_elem(nat_map_struct, &find_elem_nat, &res_elem_nat);
-            if (find_elem_nat_flag != 1) {
+            if (find_elem_nat_flag != array_hashmap_elem_finded) {
                 stat.nat_sended_to_client_error++;
 
                 continue;
@@ -299,9 +297,11 @@ static void *tun(__attribute__((unused)) void *arg)
             find_elem_ip_ip.ip_local = iph->daddr;
 
             ip_ip_map_t res_elem_ip_ip;
-            int32_t find_elem_ip_ip_flag =
+            int32_t find_elem_ip_ip_flag = 0;
+
+            find_elem_ip_ip_flag =
                 array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
-            if (find_elem_ip_ip_flag != 1) {
+            if (find_elem_ip_ip_flag != array_hashmap_elem_finded) {
                 stat.nat_sended_to_dev_error++;
                 continue;
             }
@@ -321,9 +321,10 @@ static void *tun(__attribute__((unused)) void *arg)
                 add_elem_nat.value.old_src_port = src_port;
 
                 nat_map_t res_elem_nat;
-                int32_t add_elem_nat_flag =
+                int32_t add_elem_nat_flag = 0;
+                add_elem_nat_flag =
                     array_hashmap_add_elem(nat_map_struct, &add_elem_nat, &res_elem_nat, NULL);
-                if (add_elem_nat_flag == 1) {
+                if (add_elem_nat_flag == array_hashmap_elem_finded) {
                     correct_new_srt_port = 0;
                     stat.nat_records++;
                 }
@@ -430,26 +431,27 @@ void init_tun_thread(void)
     NAT_VPN.network_prefix = tun_prefix;
     subnet_init(&NAT_VPN);
 
-    ip_ip_map_struct = init_array_hashmap(NAT_VPN.subnet_size, 1.0, sizeof(ip_ip_map_t));
+    ip_ip_map_struct = array_hashmap_init(NAT_VPN.subnet_size, 1.0, sizeof(ip_ip_map_t));
     if (ip_ip_map_struct == NULL) {
         printf("No free memory for ip_ip_map_struct\n");
         exit(EXIT_FAILURE);
     }
 
-    array_hashmap_set_func(ip_ip_map_struct, ip_ip_hash, ip_ip_cmp, ip_ip_hash, ip_ip_cmp);
+    array_hashmap_set_func(ip_ip_map_struct, ip_ip_hash, ip_ip_cmp, ip_ip_hash, ip_ip_cmp,
+                           ip_ip_hash, ip_ip_cmp);
 
     //ip_ip_map_t add_elem;
     //add_elem.ip_local = htonl(NAT_subnet_start++);
     //add_elem.ip_global = inet_addr("192.168.1.10");
-    //array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, ip_ip_on_collision);
+    //array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, array_hashmap_save_new_func);
 
-    nat_map_struct = init_array_hashmap(NAT_MAP_MAX_SIZE, 1.0, sizeof(nat_map_t));
+    nat_map_struct = array_hashmap_init(NAT_MAP_MAX_SIZE, 1.0, sizeof(nat_map_t));
     if (nat_map_struct == NULL) {
         printf("No free memory for nat_map_struct\n");
         exit(EXIT_FAILURE);
     }
 
-    array_hashmap_set_func(nat_map_struct, nat_hash, nat_cmp, nat_hash, nat_cmp);
+    array_hashmap_set_func(nat_map_struct, nat_hash, nat_cmp, nat_hash, nat_cmp, nat_hash, nat_cmp);
 
     pthread_t tun_thread;
     if (pthread_create(&tun_thread, NULL, tun, NULL)) {
