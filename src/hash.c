@@ -6,7 +6,7 @@
 #include "net_data.h"
 #include "stat.h"
 #include "tun.h"
-#include "urls_read.h"
+#include "domains_read.h"
 
 uint32_t djb33_hash_len(const char *s, size_t len)
 {

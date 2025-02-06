@@ -6,7 +6,7 @@
 #include "net_data.h"
 #include "stat.h"
 #include "tun.h"
-#include "urls_read.h"
+#include "domains_read.h"
 
 static id_map_t *id_map;
 static int32_t repeater_DNS_socket;
