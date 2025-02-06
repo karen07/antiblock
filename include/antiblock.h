@@ -20,6 +20,8 @@
 #include <linux/udp.h>
 #include <signal.h>
 #include <net/route.h>
+#include <stdlib.h>
+#include <string.h>
 #include "array_hashmap.h"
 
 extern pthread_barrier_t threads_barrier;

@@ -10,32 +10,32 @@
 #include <curl/curl.h>
 
 memory_t urls;
-const array_hashmap_t *urls_map_struct;
+array_hashmap_t urls_map_struct;
 
-static uint32_t add_url_hash(const void *void_elem)
+static array_hashmap_hash domain_add_hash(const void *add_elem_data)
 {
-    const uint32_t *elem = void_elem;
+    const uint32_t *elem = add_elem_data;
     return djb33_hash_len(&urls.data[*elem], -1);
 }
 
-static int32_t add_url_cmp(const void *void_elem1, const void *void_elem2)
+static array_hashmap_bool domain_add_cmp(const void *add_elem_data, const void *hashmap_elem_data)
 {
-    const uint32_t *elem1 = void_elem1;
-    const uint32_t *elem2 = void_elem2;
+    const uint32_t *elem1 = add_elem_data;
+    const uint32_t *elem2 = hashmap_elem_data;
 
     return !strcmp(&urls.data[*elem1], &urls.data[*elem2]);
 }
 
-static uint32_t find_url_hash(const void *void_elem)
+static array_hashmap_hash domain_find_hash(const void *find_elem_data)
 {
-    const char *elem = void_elem;
+    const char *elem = find_elem_data;
     return djb33_hash_len(elem, -1);
 }
 
-static int32_t find_url_cmp(const void *void_elem1, const void *void_elem2)
+static array_hashmap_bool domain_find_cmp(const void *find_elem_data, const void *hashmap_elem_data)
 {
-    const char *elem1 = void_elem1;
-    const uint32_t *elem2 = void_elem2;
+    const char *elem1 = find_elem_data;
+    const uint32_t *elem2 = hashmap_elem_data;
 
     return !strcmp(elem1, &urls.data[*elem2]);
 }
@@ -59,12 +59,7 @@ static size_t cb(void *data, size_t size, size_t nmemb, void *clientp)
 
 int64_t urls_read(void)
 {
-    if (urls_map_struct) {
-        const array_hashmap_t *tmp_urls_map_struct = urls_map_struct;
-        urls_map_struct = NULL;
-        sleep(1);
-        del_array_hashmap(tmp_urls_map_struct);
-    }
+    array_hashmap_del(&urls_map_struct);
 
     if (urls.data) {
         free(urls.data);
@@ -134,7 +129,7 @@ int64_t urls_read(void)
         }
 
         int32_t urls_map_size_cname = urls_map_size + CNAME_URLS_MAP_MAX_SIZE;
-        urls_map_struct = init_array_hashmap(urls_map_size_cname, 1.0, sizeof(uint32_t));
+        urls_map_struct = array_hashmap_init(urls_map_size_cname, 1.0, sizeof(uint32_t));
         if (urls_map_struct == NULL) {
             printf("No free memory for urls_map_struct\n");
             exit(EXIT_FAILURE);
@@ -143,8 +138,8 @@ int64_t urls_read(void)
         printf("Readed domains from file %d from url %d\n", file_urls_map_size,
                urls_map_size - file_urls_map_size);
 
-        array_hashmap_set_func(urls_map_struct, add_url_hash, add_url_cmp, find_url_hash,
-                               find_url_cmp);
+        array_hashmap_set_func(urls_map_struct, domain_add_hash, domain_add_cmp, domain_find_hash,
+                               domain_find_cmp, domain_find_hash, domain_find_cmp);
 
         int32_t url_offset = 0;
         for (int32_t i = 0; i < urls_map_size; i++) {

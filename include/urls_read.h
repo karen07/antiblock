@@ -10,6 +10,6 @@ typedef struct memory {
 #endif
 
 extern memory_t urls;
-extern const array_hashmap_t *urls_map_struct;
+extern array_hashmap_t urls_map_struct;
 
 int64_t urls_read(void);
