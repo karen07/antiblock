@@ -135,6 +135,13 @@ int64_t domains_read(void)
             exit(EXIT_FAILURE);
         }
 
+        int32_t is_thread_safety = 0;
+        is_thread_safety = array_hashmap_is_thread_safety(domains_map_struct);
+        if (!is_thread_safety) {
+            printf("No thread safety hashmap\n");
+            exit(EXIT_FAILURE);
+        }
+
         printf("Readed domains from file %d from url %d\n", file_domains_map_size,
                domains_map_size - file_domains_map_size);
 
