@@ -26,20 +26,20 @@ char log_or_stat_folder[PATH_MAX - 100];
 int32_t is_tun_name;
 char tun_name[IFNAMSIZ];
 
-uint32_t tun_ip;
+uint32_t tun_ip = 0xFFFFFFFF;
 uint32_t tun_prefix;
 #endif
 
-uint32_t dns_ip;
+uint32_t dns_ip = 0xFFFFFFFF;
 uint16_t dns_port;
 
-uint32_t listen_ip;
+uint32_t listen_ip = 0xFFFFFFFF;
 uint16_t listen_port;
 
 FILE *log_fd;
 FILE *stat_fd;
 
-uint32_t gateway_ip;
+uint32_t gateway_ip = 0xFFFFFFFF;
 uint32_t gateway_mask;
 
 int32_t route_socket;
@@ -118,15 +118,15 @@ static void print_help(void)
            "    -url      https://example.com  Domains file URL\n"
            "    -file     /example.txt         Domains file path\n"
            "  Required parameters:\n"
-           "    -listen   0.0.0.0:00           Listen address\n"
-           "    -DNS      0.0.0.0:00           DNS address\n"
-           "    -gateway  0.0.0.0              Gateway IP\n"
+           "    -listen   x.x.x.x:xx           Listen address\n"
+           "    -DNS      x.x.x.x:xx           DNS address\n"
+           "    -gateway  x.x.x.x              Gateway IP\n"
            "  Optional parameters:\n"
            "    -log                           Show operations log\n"
            "    -stat                          Show statistics data\n"
            "    -output   /example/            Log or statistics output folder\n"
 #ifdef TUN_MODE
-           "-TUN_net 0.0.0.0/0            TUN net\n"
+           "-TUN_net x.x.x.x/xx           TUN net\n"
            "-TUN_name example             TUN name\n"
 #endif
     );
@@ -218,15 +218,13 @@ int32_t main(int32_t argc, char *argv[])
         }
         if (!strcmp(argv[i], "-DNS")) {
             if (i != argc - 1) {
+                printf("DNS %s\n", argv[i + 1]);
                 char *colon_ptr = strchr(argv[i + 1], ':');
                 if (colon_ptr) {
                     sscanf(colon_ptr + 1, "%hu", &dns_port);
                     *colon_ptr = 0;
                     if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
                         dns_ip = inet_addr(argv[i + 1]);
-                        struct in_addr dns_ip_in_addr;
-                        dns_ip_in_addr.s_addr = dns_ip;
-                        printf("DNS %s:%hu\n", inet_ntoa(dns_ip_in_addr), dns_port);
                     }
                     *colon_ptr = ':';
                 }
@@ -236,15 +234,13 @@ int32_t main(int32_t argc, char *argv[])
         }
         if (!strcmp(argv[i], "-listen")) {
             if (i != argc - 1) {
+                printf("Listen %s\n", argv[i + 1]);
                 char *colon_ptr = strchr(argv[i + 1], ':');
                 if (colon_ptr) {
                     sscanf(colon_ptr + 1, "%hu", &listen_port);
                     *colon_ptr = 0;
                     if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
                         listen_ip = inet_addr(argv[i + 1]);
-                        struct in_addr listen_ip_in_addr;
-                        listen_ip_in_addr.s_addr = listen_ip;
-                        printf("Listen %s:%hu\n", inet_ntoa(listen_ip_in_addr), listen_port);
                     }
                     *colon_ptr = ':';
                 }
@@ -254,11 +250,9 @@ int32_t main(int32_t argc, char *argv[])
         }
         if (!strcmp(argv[i], "-gateway")) {
             if (i != argc - 1) {
+                printf("Gateway %s\n", argv[i + 1]);
                 if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
                     gateway_ip = inet_addr(argv[i + 1]);
-                    struct in_addr gateway_ip_in_addr;
-                    gateway_ip_in_addr.s_addr = gateway_ip;
-                    printf("Gateway IP %s\n", inet_ntoa(gateway_ip_in_addr));
                 }
                 i++;
             }
@@ -267,15 +261,13 @@ int32_t main(int32_t argc, char *argv[])
 #ifdef TUN_MODE
         if (!strcmp(argv[i], "-TUN_net")) {
             if (i != argc - 1) {
+                printf("TUN net %s\n", argv[i + 1]);
                 char *slash_ptr = strchr(argv[i + 1], '/');
                 if (slash_ptr) {
                     sscanf(slash_ptr + 1, "%u", &tun_prefix);
                     *slash_ptr = 0;
                     if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
                         tun_ip = inet_addr(argv[i + 1]);
-                        struct in_addr tun_ip_in_addr;
-                        tun_ip_in_addr.s_addr = tun_ip;
-                        printf("TUN net %s/%d\n", inet_ntoa(tun_ip_in_addr), tun_prefix);
                     }
                     *slash_ptr = '/';
                 }
@@ -295,74 +287,67 @@ int32_t main(int32_t argc, char *argv[])
             continue;
         }
 #endif
-        printf("Error:\n");
         printf("Unknown command: %s\n", argv[i]);
         print_help();
     }
 
-    if (!gateway_ip) {
-        printf("Error:\n");
-        printf("Programm need Gateway IP\n");
+    if (gateway_ip == 0xFFFFFFFF) {
+        printf("Programm need correct Gateway IP\n");
         print_help();
     }
 
 #ifdef TUN_MODE
     if (is_tun_name) {
-        if (!tun_ip || !tun_prefix) {
-            printf("Error:\n");
-            printf("Programm need TUN net\n");
+        if (tun_ip == 0xFFFFFFFF) {
+            printf("Programm need correct TUN IP\n");
+            print_help();
+        }
+        if (!tun_prefix) {
+            printf("Programm need correct TUN prefix\n");
             print_help();
         }
     }
 
-    if (tun_ip || tun_prefix) {
+    if ((tun_ip != 0xFFFFFFFF) || (tun_prefix != 0)) {
         if (!is_tun_name) {
-            printf("Error:\n");
             printf("Programm need TUN name\n");
             print_help();
         }
     }
 
     if (tun_prefix > 24) {
-        printf("Error:\n");
         printf("Programm need TUN net prefix 1 - 24\n");
         print_help();
     }
 #endif
 
     if (!(is_domains_file_url || is_domains_file_path)) {
-        printf("Error:\n");
         printf("Programm need domains file url or domains file path\n");
         print_help();
     }
 
-    if (!dns_ip) {
-        printf("Error:\n");
-        printf("Programm need DNS IP\n");
+    if (dns_ip == 0xFFFFFFFF) {
+        printf("Programm need correct DNS IP\n");
         print_help();
     }
 
     if (!dns_port) {
-        printf("Error:\n");
-        printf("Programm need DNS port\n");
+        printf("Programm need correct DNS port\n");
         print_help();
     }
 
-    if (!listen_ip) {
-        printf("Error:\n");
-        printf("Programm need listen IP\n");
+    if (listen_ip == 0xFFFFFFFF) {
+        printf("Programm need correct listen IP\n");
         print_help();
     }
 
     if (!listen_port) {
-        printf("Error:\n");
-        printf("Programm need listen port\n");
+        printf("Programm need correct listen port\n");
         print_help();
     }
 
     if (is_log_print || is_stat_print) {
         if (!is_log_or_stat_folder) {
-            printf("Error:\n");
             printf("Programm need output folder for log or statistics\n");
             print_help();
         }

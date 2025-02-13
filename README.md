@@ -7,9 +7,9 @@ Commands:
     -url      https://example.com  Domains file URL
     -file     /example.txt         Domains file path
   Required parameters:
-    -listen   0.0.0.0:00           Listen address
-    -DNS      0.0.0.0:00           DNS address
-    -gateway  0.0.0.0              Gateway IP
+    -listen   x.x.x.x:xx           Listen address
+    -DNS      x.x.x.x:xx           DNS address
+    -gateway  x.x.x.x              Gateway IP
   Optional parameters:
     -log                           Show operations log
     -stat                          Show statistics data
