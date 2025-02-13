@@ -52,10 +52,12 @@ static int32_t tun_alloc(char *dev, int32_t flags)
 
     strcpy(dev, ifr.ifr_name);
 
-    //int32_t status = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
-    //if (status == -1) {
-    //    printf("Set O_NONBLOCK error\n");
-    //}
+    /*
+    int32_t status = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
+    if (status == -1) {
+        printf("Set O_NONBLOCK error\n");
+    }
+    */
 
     return fd;
 }
@@ -131,11 +133,8 @@ static void tun_catch_function(__attribute__((unused)) int32_t signo)
 
 static void *tun(__attribute__((unused)) void *arg)
 {
-    printf("Thread TUN started\n");
-
     if (signal(SIGSEGV, tun_catch_function) == SIG_ERR) {
-        printf("Can't set signal handler tun\n");
-        exit(EXIT_FAILURE);
+        errmsg("Can't set signal handler tun\n");
     }
 
     int32_t tap_fd;
@@ -145,8 +144,7 @@ static void *tun(__attribute__((unused)) void *arg)
     tap_fd = tun_alloc(tun_name, IFF_TUN | IFF_MULTI_QUEUE);
 
     if (tap_fd < 0) {
-        printf("Can't allocate TUN interface\n");
-        exit(EXIT_FAILURE);
+        errmsg("Can't allocate TUN interface\n");
     }
 
     struct in_addr NAT_subnet_start_addr;
@@ -433,35 +431,33 @@ void init_tun_thread(void)
 
     ip_ip_map_struct = array_hashmap_init(NAT_VPN.subnet_size, 1.0, sizeof(ip_ip_map_t));
     if (ip_ip_map_struct == NULL) {
-        printf("No free memory for ip_ip_map_struct\n");
-        exit(EXIT_FAILURE);
+        errmsg("No free memory for ip_ip_map_struct\n");
     }
 
     array_hashmap_set_func(ip_ip_map_struct, ip_ip_hash, ip_ip_cmp, ip_ip_hash, ip_ip_cmp,
                            ip_ip_hash, ip_ip_cmp);
 
-    //ip_ip_map_t add_elem;
-    //add_elem.ip_local = htonl(NAT_subnet_start++);
-    //add_elem.ip_global = inet_addr("192.168.1.10");
-    //array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, array_hashmap_save_new_func);
+    /*
+    ip_ip_map_t add_elem;
+    add_elem.ip_local = htonl(NAT_subnet_start++);
+    add_elem.ip_global = inet_addr("192.168.1.10");
+    array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, array_hashmap_save_new_func);
+    */
 
     nat_map_struct = array_hashmap_init(NAT_MAP_MAX_SIZE, 1.0, sizeof(nat_map_t));
     if (nat_map_struct == NULL) {
-        printf("No free memory for nat_map_struct\n");
-        exit(EXIT_FAILURE);
+        errmsg("No free memory for nat_map_struct\n");
     }
 
     array_hashmap_set_func(nat_map_struct, nat_hash, nat_cmp, nat_hash, nat_cmp, nat_hash, nat_cmp);
 
     pthread_t tun_thread;
     if (pthread_create(&tun_thread, NULL, tun, NULL)) {
-        printf("Can't create tun_thread\n");
-        exit(EXIT_FAILURE);
+        errmsg("Can't create tun_thread\n");
     }
 
     if (pthread_detach(tun_thread)) {
-        printf("Can't detach tun_thread\n");
-        exit(EXIT_FAILURE);
+        errmsg("Can't detach tun_thread\n");
     }
 }
 

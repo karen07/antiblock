@@ -9,6 +9,8 @@
 #include "domains_read.h"
 #include <curl/curl.h>
 
+#define HTTP_OK 200
+
 memory_t domains;
 array_hashmap_t domains_map_struct;
 
@@ -75,7 +77,19 @@ int64_t domains_read(void)
             curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
             curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
             curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&domains);
-            curl_easy_perform(curl);
+
+            CURLcode response;
+            response = curl_easy_perform(curl);
+            if (response == CURLE_COULDNT_RESOLVE_HOST) {
+                errmsg("Wrong domains url %s\n", domains_file_url);
+            }
+
+            long http_code = 0;
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+            if (http_code != HTTP_OK) {
+                errmsg("Received non 200 status code %d\n", http_code);
+            }
+
             curl_easy_cleanup(curl);
         }
         curl_global_cleanup();
@@ -86,21 +100,18 @@ int64_t domains_read(void)
     if (is_domains_file_path) {
         FILE *domains_fd = fopen(domains_file_path, "r");
         if (domains_fd == NULL) {
-            printf("Can't open domains file\n");
-            exit(EXIT_FAILURE);
+            errmsg("Can't open domains file\n");
         }
         fseek(domains_fd, 0, SEEK_END);
         int64_t domains_file_size_add = ftell(domains_fd);
         fseek(domains_fd, 0, SEEK_SET);
         char *ptr = realloc(domains.data, domains.size + domains_file_size_add + 1);
         if (!ptr) {
-            printf("No free memory for domains_file\n");
-            exit(EXIT_FAILURE);
+            errmsg("No free memory for domains_file\n");
         }
         domains.data = ptr;
         if (fread(&(domains.data[domains.size]), domains_file_size_add, 1, domains_fd) != 1) {
-            printf("Can't read domains file\n");
-            exit(EXIT_FAILURE);
+            errmsg("Can't read domains file\n");
         }
         domains.size += domains_file_size_add;
         domains.data[domains.size] = 0;
@@ -109,8 +120,7 @@ int64_t domains_read(void)
 
     char *ptr = realloc(domains.data, domains.size + CNAME_DOMAINS_MAP_MAX_SIZE * DOMAIN_MAX_SIZE);
     if (!ptr) {
-        printf("No free memory for cname_domains\n");
-        exit(EXIT_FAILURE);
+        errmsg("No free memory for cname_domains\n");
     }
     domains.data = ptr;
     domains.max_size = domains.size + CNAME_DOMAINS_MAP_MAX_SIZE * DOMAIN_MAX_SIZE;
@@ -131,15 +141,13 @@ int64_t domains_read(void)
         int32_t domains_map_size_cname = domains_map_size + CNAME_DOMAINS_MAP_MAX_SIZE;
         domains_map_struct = array_hashmap_init(domains_map_size_cname, 1.0, sizeof(uint32_t));
         if (domains_map_struct == NULL) {
-            printf("No free memory for domains_map_struct\n");
-            exit(EXIT_FAILURE);
+            errmsg("No free memory for domains_map\n");
         }
 
         int32_t is_thread_safety = 0;
         is_thread_safety = array_hashmap_is_thread_safety(domains_map_struct);
         if (!is_thread_safety) {
-            printf("No thread safety hashmap\n");
-            exit(EXIT_FAILURE);
+            errmsg("No thread safety hashmap\n");
         }
 
         printf("Readed domains from file %d from url %d\n", file_domains_map_size,

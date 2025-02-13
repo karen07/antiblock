@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <stdarg.h>
 #include <sys/ioctl.h>
 #include <errno.h>
 #ifdef TUN_MODE
@@ -57,3 +58,5 @@ extern FILE *stat_fd;
 
 extern int32_t route_socket;
 extern struct rtentry route;
+
+void errmsg(const char *format, ...);
