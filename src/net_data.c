@@ -27,11 +27,8 @@ static void DNS_data_catch_function(__attribute__((unused)) int32_t signo)
 
 static void *DNS_data(__attribute__((unused)) void *arg)
 {
-    printf("Thread DNS data started\n");
-
     if (signal(SIGSEGV, DNS_data_catch_function) == SIG_ERR) {
-        printf("Can't set signal handler DNS_data\n");
-        exit(EXIT_FAILURE);
+        errmsg("Can't set signal handler DNS_data\n");
     }
 
     struct sockaddr_in repeater_DNS_addr, receive_DNS_addr, client_addr;
@@ -44,14 +41,12 @@ static void *DNS_data(__attribute__((unused)) void *arg)
 
     repeater_DNS_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (repeater_DNS_socket < 0) {
-        printf("Can't create socket for listen from DNS :%s\n", strerror(errno));
-        exit(EXIT_FAILURE);
+        errmsg("Can't create socket for listen from DNS :%s\n", strerror(errno));
     }
 
     if (bind(repeater_DNS_socket, (struct sockaddr *)&repeater_DNS_addr,
              sizeof(repeater_DNS_addr)) < 0) {
-        printf("Can't bind to the port for listen from DNS :%s\n", strerror(errno));
-        exit(EXIT_FAILURE);
+        errmsg("Can't bind to the port for listen from DNS :%s\n", strerror(errno));
     }
 
     memory_t receive_msg;
@@ -59,8 +54,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
     receive_msg.max_size = PACKET_MAX_SIZE;
     receive_msg.data = (char *)malloc(receive_msg.max_size * sizeof(char));
     if (receive_msg.data == 0) {
-        printf("No free memory for receive_msg from DNS\n");
-        exit(EXIT_FAILURE);
+        errmsg("No free memory for receive_msg from DNS\n");
     }
 
     memory_t que_domain;
@@ -68,8 +62,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
     que_domain.max_size = DOMAIN_MAX_SIZE;
     que_domain.data = (char *)malloc(que_domain.max_size * sizeof(char));
     if (que_domain.data == 0) {
-        printf("No free memory for que_domain\n");
-        exit(EXIT_FAILURE);
+        errmsg("No free memory for que_domain\n");
     }
 
     memory_t ans_domain;
@@ -77,8 +70,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
     ans_domain.max_size = DOMAIN_MAX_SIZE;
     ans_domain.data = (char *)malloc(ans_domain.max_size * sizeof(char));
     if (ans_domain.data == 0) {
-        printf("No free memory for ans_domain\n");
-        exit(EXIT_FAILURE);
+        errmsg("No free memory for ans_domain\n");
     }
 
     memory_t cname_domain;
@@ -86,8 +78,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
     cname_domain.max_size = DOMAIN_MAX_SIZE;
     cname_domain.data = (char *)malloc(cname_domain.max_size * sizeof(char));
     if (cname_domain.data == 0) {
-        printf("No free memory for cname_domain\n");
-        exit(EXIT_FAILURE);
+        errmsg("No free memory for cname_domain\n");
     }
 
     dns_ans_check_test();
@@ -152,11 +143,8 @@ static void client_data_catch_function(__attribute__((unused)) int32_t signo)
 
 static void *client_data(__attribute__((unused)) void *arg)
 {
-    printf("Thread client data started\n");
-
     if (signal(SIGSEGV, client_data_catch_function) == SIG_ERR) {
-        printf("Can't set signal handler client_data\n");
-        exit(EXIT_FAILURE);
+        errmsg("Can't set signal handler client_data\n");
     }
 
     struct sockaddr_in repeater_client_addr, dns_addr, receive_client_addr;
@@ -173,14 +161,12 @@ static void *client_data(__attribute__((unused)) void *arg)
 
     repeater_client_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (repeater_client_socket < 0) {
-        printf("Can't create socket for listen from client :%s\n", strerror(errno));
-        exit(EXIT_FAILURE);
+        errmsg("Can't create socket for listen from client :%s\n", strerror(errno));
     }
 
     if (bind(repeater_client_socket, (struct sockaddr *)&repeater_client_addr,
              sizeof(repeater_client_addr)) < 0) {
-        printf("Can't bind to the port for listen from client :%s\n", strerror(errno));
-        exit(EXIT_FAILURE);
+        errmsg("Can't bind to the port for listen from client :%s\n", strerror(errno));
     }
 
     memory_t receive_msg;
@@ -188,8 +174,7 @@ static void *client_data(__attribute__((unused)) void *arg)
     receive_msg.max_size = PACKET_MAX_SIZE;
     receive_msg.data = (char *)malloc(receive_msg.max_size * sizeof(char));
     if (receive_msg.data == 0) {
-        printf("No free memory for receive_msg from client\n");
-        exit(EXIT_FAILURE);
+        errmsg("No free memory for receive_msg from client\n");
     }
 
     pthread_barrier_wait(&threads_barrier);
@@ -228,30 +213,25 @@ void init_net_data_threads(void)
 {
     id_map = malloc((USHRT_MAX + 1) * sizeof(id_map_t));
     if (id_map == NULL) {
-        printf("No free memory for id_map\n");
-        exit(EXIT_FAILURE);
+        errmsg("No free memory for id_map\n");
     }
     memset(id_map, 0, (USHRT_MAX + 1) * sizeof(id_map_t));
 
     pthread_t client_data_thread;
     if (pthread_create(&client_data_thread, NULL, client_data, NULL)) {
-        printf("Can't create client_data_thread\n");
-        exit(EXIT_FAILURE);
+        errmsg("Can't create client_data_thread\n");
     }
 
     if (pthread_detach(client_data_thread)) {
-        printf("Can't detach client_data_thread\n");
-        exit(EXIT_FAILURE);
+        errmsg("Can't detach client_data_thread\n");
     }
 
     pthread_t DNS_data_thread;
     if (pthread_create(&DNS_data_thread, NULL, DNS_data, NULL)) {
-        printf("Can't create DNS_data_thread\n");
-        exit(EXIT_FAILURE);
+        errmsg("Can't create DNS_data_thread\n");
     }
 
     if (pthread_detach(DNS_data_thread)) {
-        printf("Can't detach DNS_data_thread\n");
-        exit(EXIT_FAILURE);
+        errmsg("Can't detach DNS_data_thread\n");
     }
 }

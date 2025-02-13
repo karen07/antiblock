@@ -338,8 +338,7 @@ void dns_ans_check_test(void)
     receive_msg.max_size = PACKET_MAX_SIZE;
     receive_msg.data = (char *)malloc(receive_msg.max_size * sizeof(char));
     if (receive_msg.data == 0) {
-        printf("No free memory for receive_msg from DNS\n");
-        exit(EXIT_FAILURE);
+        errmsg("No free memory for receive_msg from DNS\n");
     }
 
     memory_t que_domain;
@@ -347,8 +346,7 @@ void dns_ans_check_test(void)
     que_domain.max_size = DOMAIN_MAX_SIZE;
     que_domain.data = (char *)malloc(que_domain.max_size * sizeof(char));
     if (que_domain.data == 0) {
-        printf("No free memory for que_domain\n");
-        exit(EXIT_FAILURE);
+        errmsg("No free memory for que_domain\n");
     }
 
     memory_t ans_domain;
@@ -356,8 +354,7 @@ void dns_ans_check_test(void)
     ans_domain.max_size = DOMAIN_MAX_SIZE;
     ans_domain.data = (char *)malloc(ans_domain.max_size * sizeof(char));
     if (ans_domain.data == 0) {
-        printf("No free memory for ans_domain\n");
-        exit(EXIT_FAILURE);
+        errmsg("No free memory for ans_domain\n");
     }
 
     memory_t cname_domain;
@@ -365,8 +362,7 @@ void dns_ans_check_test(void)
     cname_domain.max_size = DOMAIN_MAX_SIZE;
     cname_domain.data = (char *)malloc(cname_domain.max_size * sizeof(char));
     if (cname_domain.data == 0) {
-        printf("No free memory for cname_domain\n");
-        exit(EXIT_FAILURE);
+        errmsg("No free memory for cname_domain\n");
     }
 
     FILE *log_fd_tmp = log_fd;
@@ -384,149 +380,128 @@ void dns_ans_check_test(void)
     receive_msg.size = sizeof(correct_test);
     memcpy(receive_msg.data, correct_test, receive_msg.size);
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 0) {
-        printf("Test DNS correct fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test DNS correct fail\n");
     }
 
     receive_msg.size = 11;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 1) {
-        printf("Test DNS header size fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test DNS header size fail\n");
     }
     receive_msg.size = sizeof(correct_test);
 
     receive_msg.data[2] = 1;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 2) {
-        printf("Test DNS flag fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test DNS flag fail\n");
     }
     receive_msg.data[2] = correct_test[2];
 
     receive_msg.data[5] = 2;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 3) {
-        printf("Test DNS quest count fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test DNS quest count fail\n");
     }
     receive_msg.data[5] = correct_test[5];
 
     receive_msg.data[7] = 0;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 4) {
-        printf("Test DNS ans count fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test DNS ans count fail\n");
     }
     receive_msg.data[7] = correct_test[7];
 
     receive_msg.size = 26;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 5) {
-        printf("Test DNS que domain fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test DNS que domain fail\n");
     }
     receive_msg.size = sizeof(correct_test);
 
     receive_msg.size = 30;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 6) {
-        printf("Test DNS header que size fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test DNS header que size fail\n");
     }
     receive_msg.size = sizeof(correct_test);
 
     receive_msg.size = 32;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 7) {
-        printf("Test DNS ans domain fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test DNS ans domain fail\n");
     }
     receive_msg.size = sizeof(correct_test);
 
     receive_msg.size = 42;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 8) {
-        printf("Test DNS header ans size fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test DNS header ans size fail\n");
     }
     receive_msg.size = sizeof(correct_test);
 
     receive_msg.size = 66;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 9) {
-        printf("Test DNS header ans data size fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test DNS header ans data size fail\n");
     }
     receive_msg.size = sizeof(correct_test);
 
     receive_msg.data[58] = 0x3F;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 10) {
-        printf("Test DNS cname domain fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test DNS cname domain fail\n");
     }
     receive_msg.data[58] = correct_test[58];
 
     receive_msg.size = sizeof(correct_test) + 1;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 11) {
-        printf("Test DNS end fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test DNS end fail\n");
     }
     receive_msg.size = sizeof(correct_test);
 
     char *tmp_ptr;
 
     if (get_domain_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_domain) != 0) {
-        printf("Test get domain correct fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test get domain correct fail\n");
     }
 
     receive_msg.size = 12;
     if (get_domain_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_domain) != 1) {
-        printf("Test get domain first byte fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test get domain first byte fail\n");
     }
     receive_msg.size = sizeof(correct_test);
 
     que_domain.max_size = 0;
     if (get_domain_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_domain) != 2) {
-        printf("Test get domain first byte domain len fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test get domain first byte domain len fail\n");
     }
     que_domain.max_size = DOMAIN_MAX_SIZE;
 
     receive_msg.size = 32;
     if (get_domain_from_packet(&receive_msg, receive_msg.data + 31, &tmp_ptr, &que_domain) != 3) {
-        printf("Test get domain second byte fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test get domain second byte fail\n");
     }
     receive_msg.size = sizeof(correct_test);
 
     receive_msg.data[32] = 0x43;
     receive_msg.data[68] = 0x1F;
     if (get_domain_from_packet(&receive_msg, receive_msg.data + 31, &tmp_ptr, &que_domain) != 4) {
-        printf("Test get domain endless jumping fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test get domain endless jumping fail\n");
     }
     receive_msg.data[32] = correct_test[32];
     receive_msg.data[68] = correct_test[68];
 
     receive_msg.data[31] = 0x7F;
     if (get_domain_from_packet(&receive_msg, receive_msg.data + 31, &tmp_ptr, &que_domain) != 5) {
-        printf("Test get domain byte 01 10 fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test get domain byte 01 10 fail\n");
     }
     receive_msg.data[31] = correct_test[31];
 
     receive_msg.size = 13;
     if (get_domain_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_domain) != 6) {
-        printf("Test get domain data byte fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test get domain data byte fail\n");
     }
     receive_msg.size = sizeof(correct_test);
 
     que_domain.max_size = 1;
     if (get_domain_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_domain) != 7) {
-        printf("Test get domain data domain len fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test get domain data domain len fail\n");
     }
     que_domain.max_size = DOMAIN_MAX_SIZE;
 
     que_domain.max_size = 14;
     if (get_domain_from_packet(&receive_msg, receive_msg.data + 12, &tmp_ptr, &que_domain) != 8) {
-        printf("Test get domain data domain last byte fail\n");
-        exit(EXIT_FAILURE);
+        errmsg("Test get domain data domain last byte fail\n");
     }
     que_domain.max_size = DOMAIN_MAX_SIZE;
 
