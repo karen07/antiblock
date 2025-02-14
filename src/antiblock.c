@@ -113,7 +113,7 @@ static void clean_route_table(void)
             route_addr->sin_addr.s_addr = rec_ip.s_addr;
 
             if (ioctl(route_socket, SIOCDELRT, &route) < 0) {
-                printf("Ioctl can't delete %s from route table :%s\n", inet_ntoa(rec_ip),
+                errmsg("Ioctl can't delete %s from route table :%s\n", inet_ntoa(rec_ip),
                        strerror(errno));
             }
         }
@@ -418,13 +418,15 @@ int32_t main(int32_t argc, char *argv[])
                 clean_route_table();
             }
 
-            int64_t domains_read_status = domains_read();
+            int32_t domains_read_status = domains_read();
 
-            if (domains_read_status || !is_domains_file_url) {
-                sleep_circles = DOMAINS_UPDATE_TIME / STAT_PRINT_TIME;
+            if (domains_read_status) {
+                sleep_circles = DOMAINS_UPDATE_TIME;
             } else {
-                sleep_circles = DOMAINS_ERROR_UPDATE_TIME / STAT_PRINT_TIME;
+                sleep_circles = DOMAINS_ERROR_UPDATE_TIME;
             }
+
+            sleep_circles /= STAT_PRINT_TIME;
         }
 
         circles %= sleep_circles;

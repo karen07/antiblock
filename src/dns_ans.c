@@ -248,7 +248,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
                     if ((ans->ip4 != dns_ip) && (ans->ip4 != 0)) {
                         if (ioctl(route_socket, SIOCADDRT, &route) < 0) {
                             if (strcmp(strerror(errno), "File exists")) {
-                                printf("Ioctl can't add %s to route table :%s\n", inet_ntoa(rec_ip),
+                                errmsg("Ioctl can't add %s to route table :%s\n", inet_ntoa(rec_ip),
                                        strerror(errno));
                             }
                         }

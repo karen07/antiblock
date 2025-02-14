@@ -114,7 +114,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
         if (sendto(repeater_client_socket, receive_msg.data, receive_msg.size, 0,
                    (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
             stat.sended_to_client_error++;
-            printf("Can't send to client %s\n", strerror(errno));
+            errmsg("Can't send to client %s\n", strerror(errno));
         } else {
             stat.sended_to_client++;
         }
@@ -198,7 +198,7 @@ static void *client_data(__attribute__((unused)) void *arg)
         if (sendto(repeater_DNS_socket, receive_msg.data, receive_msg.size, 0,
                    (struct sockaddr *)&dns_addr, sizeof(dns_addr)) < 0) {
             stat.sended_to_dns_error++;
-            printf("Can't send to DNS :%s\n", strerror(errno));
+            errmsg("Can't send to DNS :%s\n", strerror(errno));
         } else {
             stat.sended_to_dns++;
         }
