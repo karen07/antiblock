@@ -12,4 +12,4 @@ typedef struct memory {
 extern memory_t domains;
 extern array_hashmap_t domains_map_struct;
 
-int64_t domains_read(void);
+int32_t domains_read(void);

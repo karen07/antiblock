@@ -59,7 +59,7 @@ static size_t cb(void *data, size_t size, size_t nmemb, void *clientp)
     return realsize;
 }
 
-int64_t domains_read(void)
+int32_t domains_read(void)
 {
     array_hashmap_del(&domains_map_struct);
 
@@ -169,5 +169,9 @@ int64_t domains_read(void)
         }
     }
 
-    return domains_web_file_size;
+    if (domains_web_file_size > 0 || !is_domains_file_url) {
+        return 1;
+    } else {
+        return 0;
+    }
 }
