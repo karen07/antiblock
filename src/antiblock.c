@@ -13,17 +13,9 @@ pthread_barrier_t threads_barrier;
 int32_t is_log_print;
 int32_t is_stat_print;
 
-int32_t is_domains_file_url;
-char domains_file_url[PATH_MAX];
-
-int32_t is_domains_file_path;
-char domains_file_path[PATH_MAX - 100];
-
-int32_t is_log_or_stat_folder;
 char log_or_stat_folder[PATH_MAX - 100];
 
 #ifdef TUN_MODE
-int32_t is_tun_name;
 char tun_name[IFNAMSIZ];
 
 uint32_t tun_ip = 0xFFFFFFFF;
@@ -39,11 +31,13 @@ uint16_t listen_port;
 FILE *log_fd;
 FILE *stat_fd;
 
-uint32_t gateway_ip = 0xFFFFFFFF;
-uint32_t gateway_mask;
+char *gateways_ip_and_domains_paths;
+
+int32_t gateways_ip_count;
+uint32_t gateways_ip[256];
+char *domains_paths[256];
 
 int32_t route_socket;
-struct rtentry route;
 
 void errmsg(const char *format, ...)
 {
@@ -58,27 +52,50 @@ void errmsg(const char *format, ...)
     exit(EXIT_FAILURE);
 }
 
-static void init_route_socket(void)
+void set_route(struct rtentry *route, uint32_t gateway, uint32_t dst)
 {
-    route_socket = socket(AF_INET, SOCK_DGRAM, 0);
-    if (route_socket < 0) {
-        errmsg("Can't create route_socket :%s\n", strerror(errno));
-    }
-
-    gateway_mask = inet_addr("255.255.255.255");
-
-    memset(&route, 0, sizeof(route));
+    memset(route, 0, sizeof(*route));
 
     struct sockaddr_in *route_addr;
-    route_addr = (struct sockaddr_in *)&route.rt_gateway;
+    route_addr = (struct sockaddr_in *)(&(route->rt_gateway));
     route_addr->sin_family = AF_INET;
-    route_addr->sin_addr.s_addr = gateway_ip;
+    route_addr->sin_addr.s_addr = gateway;
 
-    route_addr = (struct sockaddr_in *)&route.rt_genmask;
+    route_addr = (struct sockaddr_in *)(&(route->rt_genmask));
     route_addr->sin_family = AF_INET;
-    route_addr->sin_addr.s_addr = gateway_mask;
+    route_addr->sin_addr.s_addr = 0xFFFFFFFF;
 
-    route.rt_flags = RTF_UP | RTF_GATEWAY;
+    route_addr = (struct sockaddr_in *)(&(route->rt_dst));
+    route_addr->sin_family = AF_INET;
+    route_addr->sin_addr.s_addr = dst;
+
+    route->rt_flags = RTF_UP | RTF_GATEWAY;
+}
+
+void add_route(uint32_t gateway, uint32_t dst)
+{
+    struct rtentry route;
+
+    set_route(&route, gateway, dst);
+
+    if (ioctl(route_socket, SIOCDELRT, &route) < 0) {
+        struct in_addr rec_ip;
+        rec_ip.s_addr = dst;
+        errmsg("Ioctl can't delete %s from route table :%s\n", inet_ntoa(rec_ip), strerror(errno));
+    }
+}
+
+void del_route(uint32_t gateway, uint32_t dst)
+{
+    struct rtentry route;
+
+    set_route(&route, gateway, dst);
+
+    if (ioctl(route_socket, SIOCDELRT, &route) < 0) {
+        struct in_addr rec_ip;
+        rec_ip.s_addr = dst;
+        errmsg("Ioctl can't delete %s from route table :%s\n", inet_ntoa(rec_ip), strerror(errno));
+    }
 }
 
 static void clean_route_table(void)
@@ -104,17 +121,9 @@ static void clean_route_table(void)
 
     while (fscanf(route_fd, "%s %x %x %x %x %x %x %x %x %x %x", iface, &dest_ip, &gate_ip, &flags,
                   &refcnt, &use, &metric, &mask, &mtu, &window, &irtt) != EOF) {
-        if ((gate_ip == gateway_ip) && (mask == gateway_mask)) {
-            struct in_addr rec_ip;
-            rec_ip.s_addr = dest_ip;
-
-            struct sockaddr_in *route_addr = (struct sockaddr_in *)&route.rt_dst;
-            route_addr->sin_family = AF_INET;
-            route_addr->sin_addr.s_addr = rec_ip.s_addr;
-
-            if (ioctl(route_socket, SIOCDELRT, &route) < 0) {
-                errmsg("Ioctl can't delete %s from route table :%s\n", inet_ntoa(rec_ip),
-                       strerror(errno));
+        for (int32_t i = 0; i < gateways_ip_count; i++) {
+            if ((gate_ip == gateways_ip[i]) && (mask == 0xFFFFFFFF)) {
+                del_route(gate_ip, dest_ip);
             }
         }
     }
@@ -192,24 +201,14 @@ int32_t main(int32_t argc, char *argv[])
             printf("  Stat enabled\n");
             continue;
         }
-        if (!strcmp(argv[i], "-url")) {
+        if (!strcmp(argv[i], "-domains")) {
             if (i != argc - 1) {
-                if (strlen(argv[i + 1]) < PATH_MAX) {
-                    is_domains_file_url = 1;
-                    strcpy(domains_file_url, argv[i + 1]);
-                    printf("  Get domains from url %s\n", domains_file_url);
+                gateways_ip_and_domains_paths = (char *)malloc(strlen(argv[i + 1]) + 1);
+                if (gateways_ip_and_domains_paths == NULL) {
+                    errmsg("No free memory for gateways_ip_and_domains_paths\n");
                 }
-                i++;
-            }
-            continue;
-        }
-        if (!strcmp(argv[i], "-file")) {
-            if (i != argc - 1) {
-                if (strlen(argv[i + 1]) < PATH_MAX - 100) {
-                    is_domains_file_path = 1;
-                    strcpy(domains_file_path, argv[i + 1]);
-                    printf("  Get domains from file %s\n", domains_file_path);
-                }
+                strcpy(gateways_ip_and_domains_paths, argv[i + 1]);
+
                 i++;
             }
             continue;
@@ -217,7 +216,6 @@ int32_t main(int32_t argc, char *argv[])
         if (!strcmp(argv[i], "-output")) {
             if (i != argc - 1) {
                 if (strlen(argv[i + 1]) < PATH_MAX - 100) {
-                    is_log_or_stat_folder = 1;
                     strcpy(log_or_stat_folder, argv[i + 1]);
                     printf("  Output log or stat to %s\n", log_or_stat_folder);
                 }
@@ -257,16 +255,6 @@ int32_t main(int32_t argc, char *argv[])
             }
             continue;
         }
-        if (!strcmp(argv[i], "-gateway")) {
-            if (i != argc - 1) {
-                printf("  Gateway %s\n", argv[i + 1]);
-                if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
-                    gateway_ip = inet_addr(argv[i + 1]);
-                }
-                i++;
-            }
-            continue;
-        }
 #ifdef TUN_MODE
         if (!strcmp(argv[i], "-TUN_net")) {
             if (i != argc - 1) {
@@ -287,7 +275,6 @@ int32_t main(int32_t argc, char *argv[])
         if (!strcmp(argv[i], "-TUN_name")) {
             if (i != argc - 1) {
                 if (strlen(argv[i + 1]) < IFNAMSIZ) {
-                    is_tun_name = 1;
                     strcpy(tun_name, argv[i + 1]);
                     printf("  TUN name %s\n", tun_name);
                 }
@@ -300,25 +287,20 @@ int32_t main(int32_t argc, char *argv[])
         errmsg("Unknown command: %s\n", argv[i]);
     }
 
-    if (gateway_ip == 0xFFFFFFFF) {
-        print_help();
-        errmsg("Programm need correct Gateway IP\n");
-    }
-
 #ifdef TUN_MODE
     if (is_tun_name) {
         if (tun_ip == 0xFFFFFFFF) {
             print_help();
             errmsg("Programm need correct TUN IP\n");
         }
-        if (!tun_prefix) {
+        if (tun_prefix == 0) {
             print_help();
             errmsg("Programm need correct TUN prefix\n");
         }
     }
 
     if ((tun_ip != 0xFFFFFFFF) || (tun_prefix != 0)) {
-        if (!is_tun_name) {
+        if (is_tun_name == 0) {
             print_help();
             errmsg("Programm need TUN name\n");
         }
@@ -330,9 +312,19 @@ int32_t main(int32_t argc, char *argv[])
     }
 #endif
 
-    if (!(is_domains_file_url || is_domains_file_path)) {
+    if (gateways_ip_and_domains_paths == NULL) {
         print_help();
         errmsg("Programm need domains file url or domains file path\n");
+    }
+
+    //Parse gateways_ip_and_domains_paths
+    {
+        for ()
+    }
+
+    if (gateways_ip_count == 0) {
+        print_help();
+        errmsg("The program needs at least one pair of gateway:domains\n");
     }
 
     if (dns_ip == 0xFFFFFFFF) {
@@ -340,7 +332,7 @@ int32_t main(int32_t argc, char *argv[])
         errmsg("Programm need correct DNS IP\n");
     }
 
-    if (!dns_port) {
+    if (dns_port == 0) {
         print_help();
         errmsg("Programm need correct DNS port\n");
     }
@@ -350,13 +342,13 @@ int32_t main(int32_t argc, char *argv[])
         errmsg("Programm need correct listen IP\n");
     }
 
-    if (!listen_port) {
+    if (listen_port == 0) {
         print_help();
         errmsg("Programm need correct listen port\n");
     }
 
     if (is_log_print || is_stat_print) {
-        if (!is_log_or_stat_folder) {
+        if (log_or_stat_folder[0] == 0) {
             print_help();
             errmsg("Programm need output folder for log or statistics\n");
         }
@@ -394,7 +386,10 @@ int32_t main(int32_t argc, char *argv[])
     } else
 #endif
     {
-        init_route_socket();
+        route_socket = socket(AF_INET, SOCK_DGRAM, 0);
+        if (route_socket < 0) {
+            errmsg("Can't create route_socket :%s\n", strerror(errno));
+        }
     }
 
     init_net_data_threads();
@@ -412,7 +407,7 @@ int32_t main(int32_t argc, char *argv[])
             stat.stat_start = time(NULL);
 
 #ifdef TUN_MODE
-            if (!is_tun_name)
+            if (is_tun_name == 0)
 #endif
             {
                 clean_route_table();

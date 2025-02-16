@@ -30,17 +30,9 @@ extern pthread_barrier_t threads_barrier;
 extern int32_t is_log_print;
 extern int32_t is_stat_print;
 
-extern int32_t is_domains_file_url;
-extern char domains_file_url[PATH_MAX];
-
-extern int32_t is_domains_file_path;
-extern char domains_file_path[PATH_MAX - 100];
-
-extern int32_t is_log_or_stat_folder;
 extern char log_or_stat_folder[PATH_MAX - 100];
 
 #ifdef TUN_MODE
-extern int32_t is_tun_name;
 extern char tun_name[IFNAMSIZ];
 
 extern uint32_t tun_ip;
@@ -56,7 +48,9 @@ extern uint16_t listen_port;
 extern FILE *log_fd;
 extern FILE *stat_fd;
 
-extern int32_t route_socket;
-extern struct rtentry route;
+extern int32_t gateways_ip_count;
+extern uint32_t gateways_ip[256];
+extern char *domains_paths[256];
 
 void errmsg(const char *format, ...);
+void add_route(uint32_t gateway, uint32_t dst);
