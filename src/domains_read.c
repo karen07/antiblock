@@ -48,7 +48,7 @@ static size_t cb(void *data, size_t size, size_t nmemb, void *clientp)
     memory_t *mem = (memory_t *)clientp;
 
     char *ptr = realloc(mem->data, mem->size + realsize + 1);
-    if (!ptr)
+    if (ptr == NULL)
         return 0;
 
     mem->data = ptr;
@@ -68,32 +68,34 @@ int32_t domains_read(void)
         memset(&domains, 0, sizeof(domains));
     }
 
-    if (is_domains_file_url) {
-        curl_global_init(CURL_GLOBAL_DEFAULT);
-        CURL *curl = curl_easy_init();
-        if (curl) {
-            curl_easy_setopt(curl, CURLOPT_URL, domains_file_url);
-            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
-            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
-            curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&domains);
+    for (int32_t i = 0; i <)
 
-            CURLcode response;
-            response = curl_easy_perform(curl);
-            if (response == CURLE_COULDNT_RESOLVE_HOST) {
-                errmsg("Wrong domains url %s\n", domains_file_url);
+        if (is_domains_file_url) {
+            curl_global_init(CURL_GLOBAL_DEFAULT);
+            CURL *curl = curl_easy_init();
+            if (curl) {
+                curl_easy_setopt(curl, CURLOPT_URL, domains_file_url);
+                curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+                curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+                curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
+                curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&domains);
+
+                CURLcode response;
+                response = curl_easy_perform(curl);
+                if (response == CURLE_COULDNT_RESOLVE_HOST) {
+                    errmsg("Wrong domains url %s\n", domains_file_url);
+                }
+
+                long http_code = 0;
+                curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+                if (http_code != HTTP_OK) {
+                    errmsg("Received non 200 status code %d\n", http_code);
+                }
+
+                curl_easy_cleanup(curl);
             }
-
-            long http_code = 0;
-            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-            if (http_code != HTTP_OK) {
-                errmsg("Received non 200 status code %d\n", http_code);
-            }
-
-            curl_easy_cleanup(curl);
+            curl_global_cleanup();
         }
-        curl_global_cleanup();
-    }
 
     int64_t domains_web_file_size = domains.size;
 
@@ -106,7 +108,7 @@ int32_t domains_read(void)
         int64_t domains_file_size_add = ftell(domains_fd);
         fseek(domains_fd, 0, SEEK_SET);
         char *ptr = realloc(domains.data, domains.size + domains_file_size_add + 1);
-        if (!ptr) {
+        if (ptr == NULL) {
             errmsg("No free memory for domains_file\n");
         }
         domains.data = ptr;
@@ -119,7 +121,7 @@ int32_t domains_read(void)
     }
 
     char *ptr = realloc(domains.data, domains.size + CNAME_DOMAINS_MAP_MAX_SIZE * DOMAIN_MAX_SIZE);
-    if (!ptr) {
+    if (ptr == NULL) {
         errmsg("No free memory for cname_domains\n");
     }
     domains.data = ptr;
@@ -146,7 +148,7 @@ int32_t domains_read(void)
 
         int32_t is_thread_safety = 0;
         is_thread_safety = array_hashmap_is_thread_safety(domains_map_struct);
-        if (!is_thread_safety) {
+        if (is_thread_safety == 0) {
             errmsg("No thread safety hashmap\n");
         }
 

@@ -238,23 +238,13 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
                 } else
 #endif
                 {
-                    struct in_addr rec_ip;
-                    rec_ip.s_addr = ans->ip4;
-
-                    struct sockaddr_in *route_addr = (struct sockaddr_in *)&route.rt_dst;
-                    route_addr->sin_family = AF_INET;
-                    route_addr->sin_addr.s_addr = rec_ip.s_addr;
-
                     if ((ans->ip4 != dns_ip) && (ans->ip4 != 0)) {
-                        if (ioctl(route_socket, SIOCADDRT, &route) < 0) {
-                            if (strcmp(strerror(errno), "File exists")) {
-                                errmsg("Ioctl can't add %s to route table :%s\n", inet_ntoa(rec_ip),
-                                       strerror(errno));
-                            }
-                        }
+                        add_route(gateways_ip[0], ans->ip4);
                     }
 
                     if (log_fd) {
+                        struct in_addr rec_ip;
+                        rec_ip.s_addr = ans->ip4;
                         fprintf(log_fd, "    Blocked_IP: %s", ans_domain->data + 1);
                         fprintf(log_fd, " %s\n", inet_ntoa(rec_ip));
                     }
