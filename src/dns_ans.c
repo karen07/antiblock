@@ -95,14 +95,16 @@ static int32_t check_domain(memory_t *domain)
 
             dot_pos = &domain->data[i + 1];
 
-            int32_t find_res = array_hashmap_find_elem(domains_map_struct, dot_pos, NULL);
+            domains_and_gateway_t res_elem;
+
+            int32_t find_res = array_hashmap_find_elem(domains_map_struct, dot_pos, &res_elem);
             if (find_res == array_hashmap_elem_finded) {
-                return 1;
+                return res_elem.gateway_index;
             }
         }
     }
 
-    return 0;
+    return -1;
 }
 
 int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans_domain,
@@ -206,7 +208,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
         }
 
         if (ans_type == DNS_TypeA) {
-            if (block_ans_domain_flag) {
+            if (block_ans_domain_flag != -1) {
 #ifdef TUN_MODE
                 if (is_tun_name) {
                     uint32_t NAT_subnet_start_n = htonl(NAT_VPN.start_ip++);
@@ -239,7 +241,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
 #endif
                 {
                     if ((ans->ip4 != dns_ip) && (ans->ip4 != 0)) {
-                        add_route(gateways_ip[0], ans->ip4);
+                        add_route(gateways_ip[block_ans_domain_flag], ans->ip4);
                     }
 
                     if (log_fd) {
@@ -272,8 +274,8 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
             int32_t block_cname_domain_flag = 0;
             block_cname_domain_flag = check_domain(cname_domain);
 
-            if (block_ans_domain_flag == 1 && block_cname_domain_flag == 0) {
-                block_cname_domain_flag = 1;
+            if (block_ans_domain_flag != -1 && block_cname_domain_flag == -1) {
+                block_cname_domain_flag = 0;
                 if (domains_map_struct) {
                     if (domains.size + cname_domain->size < domains.max_size) {
                         strcpy(&(domains.data[domains.size]), cname_domain->data + 1);
@@ -286,7 +288,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
                 }
             }
 
-            if (block_cname_domain_flag) {
+            if (block_cname_domain_flag != -1) {
                 if (log_fd) {
                     fprintf(log_fd, "    Blocked_Cname: %s\n", cname_domain->data + 1);
                 }
