@@ -51,6 +51,24 @@ extern FILE *stat_fd;
 extern int32_t gateways_ip_count;
 extern uint32_t gateways_ip[256];
 extern char *domains_paths[256];
+extern int32_t readed_bytes[256];
 
 void errmsg(const char *format, ...);
 void add_route(uint32_t gateway, uint32_t dst);
+
+#ifndef _STRUCT_DOMAINS_AND_GATEWAY
+#define _STRUCT_DOMAINS_AND_GATEWAY
+typedef struct {
+    int32_t domain_offset;
+    char gateway_index;
+} domains_and_gateway_t;
+#endif
+
+#ifndef _STRUCT_MEMORY_ANTIBLOCK
+#define _STRUCT_MEMORY_ANTIBLOCK
+typedef struct memory {
+    char *data;
+    size_t size;
+    size_t max_size;
+} memory_t;
+#endif

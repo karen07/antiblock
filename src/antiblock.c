@@ -31,11 +31,10 @@ uint16_t listen_port;
 FILE *log_fd;
 FILE *stat_fd;
 
-char *gateways_ip_and_domains_paths;
-
 int32_t gateways_ip_count;
 uint32_t gateways_ip[256];
 char *domains_paths[256];
+int32_t readed_bytes[256];
 
 int32_t route_socket;
 
@@ -78,10 +77,12 @@ void add_route(uint32_t gateway, uint32_t dst)
 
     set_route(&route, gateway, dst);
 
-    if (ioctl(route_socket, SIOCDELRT, &route) < 0) {
-        struct in_addr rec_ip;
-        rec_ip.s_addr = dst;
-        errmsg("Ioctl can't delete %s from route table :%s\n", inet_ntoa(rec_ip), strerror(errno));
+    if (ioctl(route_socket, SIOCADDRT, &route) < 0) {
+        if (strcmp(strerror(errno), "File exists")) {
+            struct in_addr rec_ip;
+            rec_ip.s_addr = dst;
+            printf("Ioctl can't add %s from route table :%s\n", inet_ntoa(rec_ip), strerror(errno));
+        }
     }
 }
 
@@ -92,9 +93,12 @@ void del_route(uint32_t gateway, uint32_t dst)
     set_route(&route, gateway, dst);
 
     if (ioctl(route_socket, SIOCDELRT, &route) < 0) {
-        struct in_addr rec_ip;
-        rec_ip.s_addr = dst;
-        errmsg("Ioctl can't delete %s from route table :%s\n", inet_ntoa(rec_ip), strerror(errno));
+        if (strcmp(strerror(errno), "No such process")) {
+            struct in_addr rec_ip;
+            rec_ip.s_addr = dst;
+            printf("Ioctl can't delete %s from route table :%s\n", inet_ntoa(rec_ip),
+                   strerror(errno));
+        }
     }
 }
 
@@ -134,13 +138,11 @@ static void clean_route_table(void)
 static void print_help(void)
 {
     printf("\nCommands:\n"
-           "  At least one parameters needs to be filled:\n"
-           "    -url      https://example.com  Domains file URL\n"
-           "    -file     /example.txt         Domains file path\n"
            "  Required parameters:\n"
+           "    -domains  \"x.x.x.x https://example.com\"\n"
+           "    -domains  \"x.x.x.x /example.txt\"\n"
            "    -listen   x.x.x.x:xx           Listen address\n"
            "    -DNS      x.x.x.x:xx           DNS address\n"
-           "    -gateway  x.x.x.x              Gateway IP\n"
            "  Optional parameters:\n"
            "    -log                           Show operations log\n"
            "    -stat                          Show statistics data\n"
@@ -203,12 +205,15 @@ int32_t main(int32_t argc, char *argv[])
         }
         if (!strcmp(argv[i], "-domains")) {
             if (i != argc - 1) {
-                gateways_ip_and_domains_paths = (char *)malloc(strlen(argv[i + 1]) + 1);
-                if (gateways_ip_and_domains_paths == NULL) {
-                    errmsg("No free memory for gateways_ip_and_domains_paths\n");
+                printf("  Domains %s\n", argv[i + 1]);
+                char *space_ptr = strchr(argv[i + 1], ' ');
+                if (space_ptr) {
+                    *space_ptr = 0;
+                    gateways_ip[gateways_ip_count] = inet_addr(argv[i + 1]);
+                    domains_paths[gateways_ip_count] = space_ptr + 1;
+                    *space_ptr = ' ';
+                    gateways_ip_count++;
                 }
-                strcpy(gateways_ip_and_domains_paths, argv[i + 1]);
-
                 i++;
             }
             continue;
@@ -311,16 +316,6 @@ int32_t main(int32_t argc, char *argv[])
         errmsg("Programm need TUN net prefix 1 - 24\n");
     }
 #endif
-
-    if (gateways_ip_and_domains_paths == NULL) {
-        print_help();
-        errmsg("Programm need domains file url or domains file path\n");
-    }
-
-    //Parse gateways_ip_and_domains_paths
-    {
-        for ()
-    }
 
     if (gateways_ip_count == 0) {
         print_help();

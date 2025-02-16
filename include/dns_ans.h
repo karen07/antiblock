@@ -22,15 +22,6 @@ typedef struct dns_ans {
     uint32_t ip4;
 } __attribute__((packed)) dns_ans_t;
 
-#ifndef _STRUCT_MEMORY_ANTIBLOCK
-#define _STRUCT_MEMORY_ANTIBLOCK
-typedef struct memory {
-    char *data;
-    size_t size;
-    size_t max_size;
-} memory_t;
-#endif
-
 int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans_domain,
                       memory_t *cname_domain);
 void dns_ans_check_test(void);
