@@ -94,8 +94,6 @@ int32_t domains_read(void)
                 curl_easy_cleanup(curl);
             }
             curl_global_cleanup();
-
-            gateways_domains_offset[i] = domains.size;
         } else {
             FILE *domains_fd = fopen(gateways_domains_paths[i], "r");
             if (domains_fd == NULL) {
@@ -116,9 +114,9 @@ int32_t domains_read(void)
             domains.size += domains_file_size_add;
             domains.data[domains.size] = 0;
             fclose(domains_fd);
-
-            gateways_domains_offset[i] = domains.size;
         }
+
+        gateways_domains_offset[i] = domains.size;
     }
 
     char *ptr = realloc(domains.data, domains.size + CNAME_DOMAINS_MAP_MAX_SIZE * DOMAIN_MAX_SIZE);
@@ -167,7 +165,7 @@ int32_t domains_read(void)
 
             domain_offset = strchr(&domains.data[domain_offset + 1], 0) - domains.data + 1;
 
-            if (domain_offset == gateways_domains_offset[gateway_index]) {
+            while (domain_offset == gateways_domains_offset[gateway_index]) {
                 printf("From %s readed %d domains\n", gateways_domains_paths[gateway_index],
                        i - domains_in_part);
 
