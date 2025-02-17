@@ -83,7 +83,7 @@ int32_t get_domain_from_packet(memory_t *receive_msg, char *cur_pos_ptr, char **
     return 0;
 }
 
-static uint32_t check_domain(memory_t *domain)
+static int32_t check_domain(memory_t *domain)
 {
     char *dot_pos = NULL;
     int32_t dot_count = 0;
@@ -99,12 +99,16 @@ static uint32_t check_domain(memory_t *domain)
 
             int32_t find_res = array_hashmap_find_elem(domains_map_struct, dot_pos, &res_elem);
             if (find_res == array_hashmap_elem_finded) {
-                return res_elem;
+                for (int32_t j = 0; j < gateways_count; j++) {
+                    if (res_elem < gateways_domains_offset[j]) {
+                        return j;
+                    }
+                }
             }
         }
     }
 
-    return 0;
+    return -1;
 }
 
 int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans_domain,
@@ -186,7 +190,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
         }
         cur_pos_ptr = ans_domain_end;
 
-        int32_t block_ans_domain_flag = 0;
+        int32_t block_ans_domain_flag = -1;
         block_ans_domain_flag = check_domain(ans_domain);
         // ANS DOMAIN
 
@@ -271,7 +275,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
                 return 10;
             }
 
-            int32_t block_cname_domain_flag = 0;
+            int32_t block_cname_domain_flag = -1;
             block_cname_domain_flag = check_domain(cname_domain);
 
             if (block_ans_domain_flag != -1 && block_cname_domain_flag == -1) {
