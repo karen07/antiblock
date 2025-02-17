@@ -105,6 +105,8 @@ static int32_t check_domain(memory_t *domain)
                         return j - 1;
                     }
                 }
+
+                return 0;
             }
         }
     }
