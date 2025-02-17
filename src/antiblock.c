@@ -296,24 +296,24 @@ int32_t main(int32_t argc, char *argv[])
     if (is_tun_name) {
         if (tun_ip == 0xFFFFFFFF) {
             print_help();
-            errmsg("Programm need correct TUN IP\n");
+            errmsg("The program need correct TUN IP\n");
         }
         if (tun_prefix == 0) {
             print_help();
-            errmsg("Programm need correct TUN prefix\n");
+            errmsg("The program need correct TUN prefix\n");
         }
     }
 
     if ((tun_ip != 0xFFFFFFFF) || (tun_prefix != 0)) {
         if (is_tun_name == 0) {
             print_help();
-            errmsg("Programm need TUN name\n");
+            errmsg("The program need TUN name\n");
         }
     }
 
     if (tun_prefix > 24) {
         print_help();
-        errmsg("Programm need TUN net prefix 1 - 24\n");
+        errmsg("The program need TUN net prefix 1 - 24\n");
     }
 #endif
 
@@ -324,28 +324,28 @@ int32_t main(int32_t argc, char *argv[])
 
     if (dns_ip == 0xFFFFFFFF) {
         print_help();
-        errmsg("Programm need correct DNS IP\n");
+        errmsg("The program need correct DNS IP\n");
     }
 
     if (dns_port == 0) {
         print_help();
-        errmsg("Programm need correct DNS port\n");
+        errmsg("The program need correct DNS port\n");
     }
 
     if (listen_ip == 0xFFFFFFFF) {
         print_help();
-        errmsg("Programm need correct listen IP\n");
+        errmsg("The program need correct listen IP\n");
     }
 
     if (listen_port == 0) {
         print_help();
-        errmsg("Programm need correct listen port\n");
+        errmsg("The program need correct listen port\n");
     }
 
     if (is_log_print || is_stat_print) {
         if (log_or_stat_folder[0] == 0) {
             print_help();
-            errmsg("Programm need output folder for log or statistics\n");
+            errmsg("The program need output folder for log or statistics\n");
         }
     }
 
