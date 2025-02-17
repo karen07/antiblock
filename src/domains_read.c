@@ -16,16 +16,16 @@ array_hashmap_t domains_map_struct;
 
 static array_hashmap_hash domain_add_hash(const void *add_elem_data)
 {
-    const uint32_t *elem = add_elem_data;
-    return djb33_hash_len(&domains.data[*elem], -1);
+    const domains_gateway_t *elem = add_elem_data;
+    return djb33_hash_len(&domains.data[elem->offset], -1);
 }
 
 static array_hashmap_bool domain_add_cmp(const void *add_elem_data, const void *hashmap_elem_data)
 {
-    const uint32_t *elem1 = add_elem_data;
-    const uint32_t *elem2 = hashmap_elem_data;
+    const domains_gateway_t *elem1 = add_elem_data;
+    const domains_gateway_t *elem2 = hashmap_elem_data;
 
-    return !strcmp(&domains.data[*elem1], &domains.data[*elem2]);
+    return !strcmp(&domains.data[elem1->offset], &domains.data[elem2->offset]);
 }
 
 static array_hashmap_hash domain_find_hash(const void *find_elem_data)
@@ -37,9 +37,9 @@ static array_hashmap_hash domain_find_hash(const void *find_elem_data)
 static array_hashmap_bool domain_find_cmp(const void *find_elem_data, const void *hashmap_elem_data)
 {
     const char *elem1 = find_elem_data;
-    const uint32_t *elem2 = hashmap_elem_data;
+    const domains_gateway_t *elem2 = hashmap_elem_data;
 
-    return !strcmp(elem1, &domains.data[*elem2]);
+    return !strcmp(elem1, &domains.data[elem2->offset]);
 }
 
 static size_t cb(void *data, size_t size, size_t nmemb, void *clientp)
@@ -139,7 +139,8 @@ int32_t domains_read(void)
         }
 
         int32_t domains_map_size_cname = domains_map_size + CNAME_DOMAINS_MAP_MAX_SIZE;
-        domains_map_struct = array_hashmap_init(domains_map_size_cname, 1.0, sizeof(uint32_t));
+        domains_map_struct =
+            array_hashmap_init(domains_map_size_cname, 1.0, sizeof(domains_gateway_t));
         if (domains_map_struct == NULL) {
             errmsg("No free memory for domains_map\n");
         }
@@ -155,12 +156,14 @@ int32_t domains_read(void)
                                domain_find_cmp);
 
         uint32_t domain_offset = 0;
+        int32_t gateway_id = 0;
 
         for (int32_t i = 0; i < domains_map_size; i++) {
             for (int32_t j = 1; j <= gateways_count; j++) {
                 if ((gateways_domains_offset[j - 1] <= domain_offset) &&
                     (domain_offset < gateways_domains_offset[j])) {
-                    gateways_domains_count[j - 1]++;
+                    gateway_id = j - 1;
+                    gateways_domains_count[gateway_id]++;
                 }
             }
 
@@ -168,7 +171,11 @@ int32_t domains_read(void)
                 domain_offset += 4;
             }
 
-            array_hashmap_add_elem(domains_map_struct, &domain_offset, NULL, NULL);
+            domains_gateway_t add_elem;
+            add_elem.offset = domain_offset;
+            add_elem.gateway = gateway_id;
+
+            array_hashmap_add_elem(domains_map_struct, &add_elem, NULL, NULL);
 
             domain_offset = strchr(&domains.data[domain_offset + 1], 0) - domains.data + 1;
         }

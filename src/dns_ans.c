@@ -95,18 +95,11 @@ static int32_t check_domain(memory_t *domain)
 
             dot_pos = &domain->data[i + 1];
 
-            uint32_t res_elem;
+            domains_gateway_t res_elem;
 
             int32_t find_res = array_hashmap_find_elem(domains_map_struct, dot_pos, &res_elem);
             if (find_res == array_hashmap_elem_finded) {
-                for (int32_t j = 1; j <= gateways_count; j++) {
-                    if ((gateways_domains_offset[j - 1] <= res_elem) &&
-                        (res_elem < gateways_domains_offset[j])) {
-                        return j - 1;
-                    }
-                }
-
-                return 0;
+                return res_elem.gateway;
             }
         }
     }
@@ -282,15 +275,18 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
             block_cname_domain_flag = check_domain(cname_domain);
 
             if (block_ans_domain_flag != -1 && block_cname_domain_flag == -1) {
-                block_cname_domain_flag = 0;
+                block_cname_domain_flag = block_ans_domain_flag;
                 if (domains_map_struct) {
                     if (domains.size + cname_domain->size < domains.max_size) {
                         strcpy(&(domains.data[domains.size]), cname_domain->data + 1);
 
-                        int32_t domain_offset = domains.size;
+                        domains_gateway_t add_elem;
+                        add_elem.offset = domains.size;
+                        add_elem.gateway = block_cname_domain_flag;
+
                         domains.size += cname_domain->size;
 
-                        array_hashmap_add_elem(domains_map_struct, &domain_offset, NULL, NULL);
+                        array_hashmap_add_elem(domains_map_struct, &add_elem, NULL, NULL);
                     }
                 }
             }
