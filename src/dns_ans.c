@@ -99,9 +99,10 @@ static int32_t check_domain(memory_t *domain)
 
             int32_t find_res = array_hashmap_find_elem(domains_map_struct, dot_pos, &res_elem);
             if (find_res == array_hashmap_elem_finded) {
-                for (int32_t j = 0; j < gateways_count; j++) {
-                    if (res_elem < gateways_domains_offset[j]) {
-                        return j;
+                for (int32_t j = 1; j <= gateways_count; j++) {
+                    if ((gateways_domains_offset[j - 1] <= res_elem) &&
+                        (res_elem < gateways_domains_offset[j])) {
+                        return j - 1;
                     }
                 }
             }

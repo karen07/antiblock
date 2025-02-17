@@ -68,6 +68,8 @@ int32_t domains_read(void)
         memset(&domains, 0, sizeof(domains));
     }
 
+    gateways_domains_offset[0] = 0;
+
     for (int32_t i = 0; i < gateways_count; i++) {
         if (!memcmp(gateways_domains_paths[i], "http", 4)) {
             curl_global_init(CURL_GLOBAL_DEFAULT);
@@ -116,7 +118,7 @@ int32_t domains_read(void)
             fclose(domains_fd);
         }
 
-        gateways_domains_offset[i] = domains.size;
+        gateways_domains_offset[i + 1] = domains.size;
     }
 
     char *ptr = realloc(domains.data, domains.size + CNAME_DOMAINS_MAP_MAX_SIZE * DOMAIN_MAX_SIZE);
@@ -152,11 +154,16 @@ int32_t domains_read(void)
                                domain_find_hash, domain_find_cmp, domain_find_hash,
                                domain_find_cmp);
 
-        int32_t gateway_index = 0;
         uint32_t domain_offset = 0;
-        int32_t domains_in_part = -1;
 
         for (int32_t i = 0; i < domains_map_size; i++) {
+            for (int32_t j = 1; j <= gateways_count; j++) {
+                if ((gateways_domains_offset[j - 1] <= domain_offset) &&
+                    (domain_offset < gateways_domains_offset[j])) {
+                    gateways_domains_count[j - 1]++;
+                }
+            }
+
             if (!memcmp(&domains.data[domain_offset], "www.", 4)) {
                 domain_offset += 4;
             }
@@ -164,14 +171,11 @@ int32_t domains_read(void)
             array_hashmap_add_elem(domains_map_struct, &domain_offset, NULL, NULL);
 
             domain_offset = strchr(&domains.data[domain_offset + 1], 0) - domains.data + 1;
+        }
 
-            while (domain_offset == gateways_domains_offset[gateway_index]) {
-                printf("From %s readed %d domains\n", gateways_domains_paths[gateway_index],
-                       i - domains_in_part);
-
-                domains_in_part = i;
-                gateway_index++;
-            }
+        for (int32_t j = 0; j < gateways_count; j++) {
+            printf("From %s readed %d domains\n", gateways_domains_paths[j],
+                   gateways_domains_count[j]);
         }
     }
 
