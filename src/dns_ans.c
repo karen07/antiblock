@@ -83,7 +83,7 @@ int32_t get_domain_from_packet(memory_t *receive_msg, char *cur_pos_ptr, char **
     return 0;
 }
 
-static int32_t check_domain(memory_t *domain)
+static uint32_t check_domain(memory_t *domain)
 {
     char *dot_pos = NULL;
     int32_t dot_count = 0;
@@ -95,16 +95,16 @@ static int32_t check_domain(memory_t *domain)
 
             dot_pos = &domain->data[i + 1];
 
-            domains_and_gateway_t res_elem;
+            uint32_t res_elem;
 
             int32_t find_res = array_hashmap_find_elem(domains_map_struct, dot_pos, &res_elem);
             if (find_res == array_hashmap_elem_finded) {
-                return res_elem.gateway_index;
+                return res_elem;
             }
         }
     }
 
-    return -1;
+    return 0;
 }
 
 int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans_domain,

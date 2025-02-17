@@ -31,10 +31,10 @@ uint16_t listen_port;
 FILE *log_fd;
 FILE *stat_fd;
 
-int32_t gateways_ip_count;
-uint32_t gateways_ip[256];
-char *domains_paths[256];
-int32_t readed_bytes[256];
+int32_t gateways_count;
+uint32_t gateways_ip[GATEWAY_MAX_COUNT];
+char *gateways_domains_paths[GATEWAY_MAX_COUNT];
+uint32_t gateways_domains_offset[GATEWAY_MAX_COUNT];
 
 int32_t route_socket;
 
@@ -125,7 +125,7 @@ static void clean_route_table(void)
 
     while (fscanf(route_fd, "%s %x %x %x %x %x %x %x %x %x %x", iface, &dest_ip, &gate_ip, &flags,
                   &refcnt, &use, &metric, &mask, &mtu, &window, &irtt) != EOF) {
-        for (int32_t i = 0; i < gateways_ip_count; i++) {
+        for (int32_t i = 0; i < gateways_count; i++) {
             if ((gate_ip == gateways_ip[i]) && (mask == 0xFFFFFFFF)) {
                 del_route(gate_ip, dest_ip);
             }
@@ -209,10 +209,10 @@ int32_t main(int32_t argc, char *argv[])
                 char *space_ptr = strchr(argv[i + 1], ' ');
                 if (space_ptr) {
                     *space_ptr = 0;
-                    gateways_ip[gateways_ip_count] = inet_addr(argv[i + 1]);
-                    domains_paths[gateways_ip_count] = space_ptr + 1;
+                    gateways_ip[gateways_count] = inet_addr(argv[i + 1]);
+                    gateways_domains_paths[gateways_count] = space_ptr + 1;
                     *space_ptr = ' ';
-                    gateways_ip_count++;
+                    gateways_count++;
                 }
                 i++;
             }
@@ -317,9 +317,9 @@ int32_t main(int32_t argc, char *argv[])
     }
 #endif
 
-    if (gateways_ip_count == 0) {
+    if (gateways_count == 0) {
         print_help();
-        errmsg("The program needs at least one pair of gateway:domains\n");
+        errmsg("The program needs at least one pair of gateway domains\n");
     }
 
     if (dns_ip == 0xFFFFFFFF) {

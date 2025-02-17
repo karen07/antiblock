@@ -16,16 +16,16 @@ array_hashmap_t domains_map_struct;
 
 static array_hashmap_hash domain_add_hash(const void *add_elem_data)
 {
-    const domains_and_gateway_t *elem = add_elem_data;
-    return djb33_hash_len(&domains.data[elem->domain_offset], -1);
+    const uint32_t *elem = add_elem_data;
+    return djb33_hash_len(&domains.data[*elem], -1);
 }
 
 static array_hashmap_bool domain_add_cmp(const void *add_elem_data, const void *hashmap_elem_data)
 {
-    const domains_and_gateway_t *elem1 = add_elem_data;
-    const domains_and_gateway_t *elem2 = hashmap_elem_data;
+    const uint32_t *elem1 = add_elem_data;
+    const uint32_t *elem2 = hashmap_elem_data;
 
-    return !strcmp(&domains.data[elem1->domain_offset], &domains.data[elem2->domain_offset]);
+    return !strcmp(&domains.data[*elem1], &domains.data[*elem2]);
 }
 
 static array_hashmap_hash domain_find_hash(const void *find_elem_data)
@@ -37,9 +37,9 @@ static array_hashmap_hash domain_find_hash(const void *find_elem_data)
 static array_hashmap_bool domain_find_cmp(const void *find_elem_data, const void *hashmap_elem_data)
 {
     const char *elem1 = find_elem_data;
-    const domains_and_gateway_t *elem2 = hashmap_elem_data;
+    const uint32_t *elem2 = hashmap_elem_data;
 
-    return !strcmp(elem1, &domains.data[elem2->domain_offset]);
+    return !strcmp(elem1, &domains.data[*elem2]);
 }
 
 static size_t cb(void *data, size_t size, size_t nmemb, void *clientp)
@@ -68,12 +68,12 @@ int32_t domains_read(void)
         memset(&domains, 0, sizeof(domains));
     }
 
-    for (int32_t i = 0; i < gateways_ip_count; i++) {
-        if (!memcmp(domains_paths[i], "http", 4)) {
+    for (int32_t i = 0; i < gateways_count; i++) {
+        if (!memcmp(gateways_domains_paths[i], "http", 4)) {
             curl_global_init(CURL_GLOBAL_DEFAULT);
             CURL *curl = curl_easy_init();
             if (curl) {
-                curl_easy_setopt(curl, CURLOPT_URL, domains_paths[i]);
+                curl_easy_setopt(curl, CURLOPT_URL, gateways_domains_paths[i]);
                 curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
                 curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
                 curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
@@ -82,42 +82,42 @@ int32_t domains_read(void)
                 CURLcode response;
                 response = curl_easy_perform(curl);
                 if (response == CURLE_COULDNT_RESOLVE_HOST) {
-                    errmsg("Wrong domains url %s\n", domains_paths[i]);
+                    errmsg("Wrong domains url %s\n", gateways_domains_paths[i]);
                 }
 
                 long http_code = 0;
                 curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
                 if (http_code != HTTP_OK) {
-                    errmsg("Wrong status code %s\n", domains_paths[i]);
+                    errmsg("Wrong status code %s\n", gateways_domains_paths[i]);
                 }
 
                 curl_easy_cleanup(curl);
             }
             curl_global_cleanup();
 
-            readed_bytes[i] = domains.size;
+            gateways_domains_offset[i] = domains.size;
         } else {
-            FILE *domains_fd = fopen(domains_paths[i], "r");
+            FILE *domains_fd = fopen(gateways_domains_paths[i], "r");
             if (domains_fd == NULL) {
-                errmsg("Can't open domains file %s\n", domains_paths[i]);
+                errmsg("Can't open domains file %s\n", gateways_domains_paths[i]);
             }
             fseek(domains_fd, 0, SEEK_END);
             int64_t domains_file_size_add = ftell(domains_fd);
             fseek(domains_fd, 0, SEEK_SET);
             char *ptr = realloc(domains.data, domains.size + domains_file_size_add + 1);
             if (ptr == NULL) {
-                errmsg("No free memory for domains_file %s\n", domains_paths[i]);
+                errmsg("No free memory for domains_file %s\n", gateways_domains_paths[i]);
             }
             domains.data = ptr;
             if (fread(&(domains.data[domains.size]), 1, domains_file_size_add, domains_fd) !=
                 (size_t)domains_file_size_add) {
-                errmsg("Can't read domains file %s\n", domains_paths[i]);
+                errmsg("Can't read domains file %s\n", gateways_domains_paths[i]);
             }
             domains.size += domains_file_size_add;
             domains.data[domains.size] = 0;
             fclose(domains_fd);
 
-            readed_bytes[i] = domains.size;
+            gateways_domains_offset[i] = domains.size;
         }
     }
 
@@ -139,8 +139,7 @@ int32_t domains_read(void)
         }
 
         int32_t domains_map_size_cname = domains_map_size + CNAME_DOMAINS_MAP_MAX_SIZE;
-        domains_map_struct =
-            array_hashmap_init(domains_map_size_cname, 1.0, sizeof(domains_and_gateway_t));
+        domains_map_struct = array_hashmap_init(domains_map_size_cname, 1.0, sizeof(uint32_t));
         if (domains_map_struct == NULL) {
             errmsg("No free memory for domains_map\n");
         }
@@ -156,7 +155,7 @@ int32_t domains_read(void)
                                domain_find_cmp);
 
         int32_t gateway_index = 0;
-        int32_t domain_offset = 0;
+        uint32_t domain_offset = 0;
         int32_t domains_in_part = -1;
 
         for (int32_t i = 0; i < domains_map_size; i++) {
@@ -164,16 +163,12 @@ int32_t domains_read(void)
                 domain_offset += 4;
             }
 
-            domains_and_gateway_t add_elem;
-            add_elem.domain_offset = domain_offset;
-            add_elem.gateway_index = gateway_index;
-
-            array_hashmap_add_elem(domains_map_struct, &add_elem, NULL, NULL);
+            array_hashmap_add_elem(domains_map_struct, &domain_offset, NULL, NULL);
 
             domain_offset = strchr(&domains.data[domain_offset + 1], 0) - domains.data + 1;
 
-            if (domain_offset == readed_bytes[gateway_index]) {
-                printf("From %s readed %d domains\n", domains_paths[gateway_index],
+            if (domain_offset == gateways_domains_offset[gateway_index]) {
+                printf("From %s readed %d domains\n", gateways_domains_paths[gateway_index],
                        i - domains_in_part);
 
                 domains_in_part = i;
