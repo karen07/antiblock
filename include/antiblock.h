@@ -34,6 +34,14 @@ typedef struct memory {
 } memory_t;
 #endif
 
+#ifndef _STRUCT_DOMAINS_GATEWAY
+#define _STRUCT_DOMAINS_GATEWAY
+typedef struct domains_gateway {
+    unsigned int offset : 26;
+    unsigned int gateway : 6;
+} domains_gateway_t;
+#endif
+
 extern pthread_barrier_t threads_barrier;
 
 extern int32_t is_log_print;
