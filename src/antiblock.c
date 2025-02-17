@@ -32,9 +32,12 @@ FILE *log_fd;
 FILE *stat_fd;
 
 int32_t gateways_count;
+
 uint32_t gateways_ip[GATEWAY_MAX_COUNT];
 char *gateways_domains_paths[GATEWAY_MAX_COUNT];
+
 uint32_t gateways_domains_offset[GATEWAY_MAX_COUNT];
+int32_t gateways_domains_count[GATEWAY_MAX_COUNT];
 
 int32_t route_socket;
 

@@ -59,9 +59,12 @@ extern FILE *stat_fd;
 
 #define GATEWAY_MAX_COUNT 256
 extern int32_t gateways_count;
+
 extern uint32_t gateways_ip[GATEWAY_MAX_COUNT];
 extern char *gateways_domains_paths[GATEWAY_MAX_COUNT];
+
 extern uint32_t gateways_domains_offset[GATEWAY_MAX_COUNT];
+extern int32_t gateways_domains_count[GATEWAY_MAX_COUNT];
 
 void errmsg(const char *format, ...);
 void add_route(uint32_t gateway, uint32_t dst);
