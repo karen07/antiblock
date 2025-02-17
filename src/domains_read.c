@@ -172,11 +172,10 @@ int32_t domains_read(void)
 
             domain_offset = strchr(&domains.data[domain_offset + 1], 0) - domains.data + 1;
         }
+    }
 
-        for (int32_t j = 0; j < gateways_count; j++) {
-            printf("From %s readed %d domains\n", gateways_domains_paths[j],
-                   gateways_domains_count[j]);
-        }
+    for (int32_t j = 0; j < gateways_count; j++) {
+        printf("From %s readed %d domains\n", gateways_domains_paths[j], gateways_domains_count[j]);
     }
 
     return 1;
