@@ -210,7 +210,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
         if (ans_type == DNS_TypeA) {
             if (block_ans_domain_flag != -1) {
 #ifdef TUN_MODE
-                if (is_tun_name) {
+                if (tun_name[0]) {
                     uint32_t NAT_subnet_start_n = htonl(NAT_VPN.start_ip++);
 
                     if (NAT_VPN.start_ip == NAT_VPN.end_ip) {

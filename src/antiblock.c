@@ -306,7 +306,7 @@ int32_t main(int32_t argc, char *argv[])
     }
 
 #ifdef TUN_MODE
-    if (is_tun_name) {
+    if (tun_name[0]) {
         if (tun_ip == 0xFFFFFFFF) {
             print_help();
             errmsg("The program need correct TUN IP\n");
@@ -318,7 +318,7 @@ int32_t main(int32_t argc, char *argv[])
     }
 
     if ((tun_ip != 0xFFFFFFFF) || (tun_prefix != 0)) {
-        if (is_tun_name == 0) {
+        if (tun_name[0]) {
             print_help();
             errmsg("The program need TUN name\n");
         }
@@ -395,14 +395,14 @@ int32_t main(int32_t argc, char *argv[])
 
     int32_t threads_barrier_count = 3;
 #ifdef TUN_MODE
-    threads_barrier_count += is_tun_name;
+    threads_barrier_count += (tun_name[0] != 0);
 #endif
     if (pthread_barrier_init(&threads_barrier, NULL, threads_barrier_count)) {
         errmsg("Can't create threads_barrier\n");
     }
 
 #ifdef TUN_MODE
-    if (is_tun_name) {
+    if (tun_name[0]) {
         init_tun_thread();
     } else
 #endif
@@ -428,7 +428,7 @@ int32_t main(int32_t argc, char *argv[])
             stat.stat_start = time(NULL);
 
 #ifdef TUN_MODE
-            if (is_tun_name == 0)
+            if (tun_name[0] == 0)
 #endif
             {
                 clean_route_table();
