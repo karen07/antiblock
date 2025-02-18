@@ -75,4 +75,6 @@ extern uint32_t gateways_domains_offset[GATEWAY_MAX_COUNT];
 extern int32_t gateways_domains_count[GATEWAY_MAX_COUNT];
 
 void errmsg(const char *format, ...);
+#ifndef TUN_MODE
 void add_route(uint32_t gateway, uint32_t dst);
+#endif

@@ -210,47 +210,44 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
         if (ans_type == DNS_TypeA) {
             if (block_ans_domain_flag != -1) {
 #ifdef TUN_MODE
-                if (tun_name[0]) {
-                    uint32_t NAT_subnet_start_n = htonl(NAT_VPN.start_ip++);
+                uint32_t NAT_subnet_start_n = htonl(NAT_VPN.start_ip++);
 
-                    if (NAT_VPN.start_ip == NAT_VPN.end_ip) {
-                        subnet_init(&NAT_VPN);
-                    }
-
-                    ip_ip_map_t add_elem;
-                    add_elem.ip_local = NAT_subnet_start_n;
-                    add_elem.ip_global = ans->ip4;
-
-                    array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL,
-                                           array_hashmap_save_new_func);
-
-                    ans->ip4 = NAT_subnet_start_n;
-
-                    if (log_fd) {
-                        struct in_addr new_ip;
-                        new_ip.s_addr = add_elem.ip_local;
-
-                        struct in_addr old_ip;
-                        old_ip.s_addr = add_elem.ip_global;
-
-                        fprintf(log_fd, "    Blocked_IP: %s", ans_domain->data + 1);
-                        fprintf(log_fd, " %s", inet_ntoa(old_ip));
-                        fprintf(log_fd, " %s\n", inet_ntoa(new_ip));
-                    }
-                } else
-#endif
-                {
-                    if ((ans->ip4 != dns_ip) && (ans->ip4 != 0)) {
-                        add_route(gateways_ip[block_ans_domain_flag], ans->ip4);
-                    }
-
-                    if (log_fd) {
-                        struct in_addr rec_ip;
-                        rec_ip.s_addr = ans->ip4;
-                        fprintf(log_fd, "    Blocked_IP: %s", ans_domain->data + 1);
-                        fprintf(log_fd, " %s\n", inet_ntoa(rec_ip));
-                    }
+                if (NAT_VPN.start_ip == NAT_VPN.end_ip) {
+                    subnet_init(&NAT_VPN);
                 }
+
+                ip_ip_map_t add_elem;
+                add_elem.ip_local = NAT_subnet_start_n;
+                add_elem.ip_global = ans->ip4;
+
+                array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL,
+                                       array_hashmap_save_new_func);
+
+                ans->ip4 = NAT_subnet_start_n;
+
+                if (log_fd) {
+                    struct in_addr new_ip;
+                    new_ip.s_addr = add_elem.ip_local;
+
+                    struct in_addr old_ip;
+                    old_ip.s_addr = add_elem.ip_global;
+
+                    fprintf(log_fd, "    Blocked_IP: %s", ans_domain->data + 1);
+                    fprintf(log_fd, " %s", inet_ntoa(old_ip));
+                    fprintf(log_fd, " %s\n", inet_ntoa(new_ip));
+                }
+#else
+                if ((ans->ip4 != dns_ip) && (ans->ip4 != 0)) {
+                    add_route(gateways_ip[block_ans_domain_flag], ans->ip4);
+                }
+
+                if (log_fd) {
+                    struct in_addr rec_ip;
+                    rec_ip.s_addr = ans->ip4;
+                    fprintf(log_fd, "    Blocked_IP: %s", ans_domain->data + 1);
+                    fprintf(log_fd, " %s\n", inet_ntoa(rec_ip));
+                }
+#endif
             } else {
                 if (log_fd) {
                     struct in_addr new_ip;
