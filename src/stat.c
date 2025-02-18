@@ -42,27 +42,24 @@ void stat_print(void)
     fprintf(stat_fd, "\n");
 
 #ifdef TUN_MODE
-    if (tun_name[0]) {
-        double nat_sended_to_dev_size_gb = stat.nat_sended_to_dev_size / 1024 / 1024 / 1024;
-        fprintf(stat_fd, "NAT sended to internet        : %d ptks\n", stat.nat_sended_to_dev);
-        fprintf(stat_fd, "NAT sended to internet size   : %lf GB\n", nat_sended_to_dev_size_gb);
+    double nat_sended_to_dev_size_gb = stat.nat_sended_to_dev_size / 1024 / 1024 / 1024;
+    fprintf(stat_fd, "NAT sended to internet        : %d ptks\n", stat.nat_sended_to_dev);
+    fprintf(stat_fd, "NAT sended to internet size   : %lf GB\n", nat_sended_to_dev_size_gb);
 
-        fprintf(stat_fd, "\n");
+    fprintf(stat_fd, "\n");
 
-        double nat_sended_to_client_size_gb = stat.nat_sended_to_client_size / 1024 / 1024 / 1024;
-        fprintf(stat_fd, "NAT sended to client          : %d ptks\n", stat.nat_sended_to_client);
-        fprintf(stat_fd, "NAT sended to client size     : %lf GB\n", nat_sended_to_client_size_gb);
+    double nat_sended_to_client_size_gb = stat.nat_sended_to_client_size / 1024 / 1024 / 1024;
+    fprintf(stat_fd, "NAT sended to client          : %d ptks\n", stat.nat_sended_to_client);
+    fprintf(stat_fd, "NAT sended to client size     : %lf GB\n", nat_sended_to_client_size_gb);
 
-        fprintf(stat_fd, "\n");
+    fprintf(stat_fd, "\n");
 
-        fprintf(stat_fd, "NAT sended to internet errors : %d ptks\n", stat.nat_sended_to_dev_error);
-        fprintf(stat_fd, "NAT sended to client errors   : %d ptks\n",
-                stat.nat_sended_to_client_error);
+    fprintf(stat_fd, "NAT sended to internet errors : %d ptks\n", stat.nat_sended_to_dev_error);
+    fprintf(stat_fd, "NAT sended to client errors   : %d ptks\n", stat.nat_sended_to_client_error);
 
-        fprintf(stat_fd, "\n");
+    fprintf(stat_fd, "\n");
 
-        fprintf(stat_fd, "NAT records count             : %d\n", stat.nat_records);
-    }
+    fprintf(stat_fd, "NAT records count             : %d\n", stat.nat_records);
 #endif
 
     fflush(stat_fd);

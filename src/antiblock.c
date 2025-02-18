@@ -39,7 +39,9 @@ char *gateways_domains_paths[GATEWAY_MAX_COUNT];
 uint32_t gateways_domains_offset[GATEWAY_MAX_COUNT];
 int32_t gateways_domains_count[GATEWAY_MAX_COUNT];
 
+#ifndef TUN_MODE
 int32_t route_socket;
+#endif
 
 void errmsg(const char *format, ...)
 {
@@ -54,6 +56,7 @@ void errmsg(const char *format, ...)
     exit(EXIT_FAILURE);
 }
 
+#ifndef TUN_MODE
 void set_route(struct rtentry *route, uint32_t gateway, uint32_t dst)
 {
     memset(route, 0, sizeof(*route));
@@ -137,6 +140,7 @@ static void clean_route_table(void)
 
     fclose(route_fd);
 }
+#endif
 
 static void print_help(void)
 {
@@ -170,7 +174,9 @@ static void main_catch_function(int32_t signo)
     } else if (signo == SIGTERM) {
         printf("SIGTERM catched main\n");
     }
+#ifndef TUN_MODE
     clean_route_table();
+#endif
     fflush(stdout);
     if (stat_fd) {
         fflush(stat_fd);
@@ -306,22 +312,19 @@ int32_t main(int32_t argc, char *argv[])
     }
 
 #ifdef TUN_MODE
-    if (tun_name[0]) {
-        if (tun_ip == 0xFFFFFFFF) {
-            print_help();
-            errmsg("The program need correct TUN IP\n");
-        }
-        if (tun_prefix == 0) {
-            print_help();
-            errmsg("The program need correct TUN prefix\n");
-        }
+    if (tun_name[0] == 0) {
+        print_help();
+        errmsg("The program need TUN_name\n");
     }
 
-    if ((tun_ip != 0xFFFFFFFF) || (tun_prefix != 0)) {
-        if (tun_name[0]) {
-            print_help();
-            errmsg("The program need TUN name\n");
-        }
+    if (tun_ip == 0xFFFFFFFF) {
+        print_help();
+        errmsg("The program need correct TUN IP\n");
+    }
+
+    if (tun_prefix == 0) {
+        print_help();
+        errmsg("The program need correct TUN prefix\n");
     }
 
     if (tun_prefix > 24) {
@@ -395,23 +398,20 @@ int32_t main(int32_t argc, char *argv[])
 
     int32_t threads_barrier_count = 3;
 #ifdef TUN_MODE
-    threads_barrier_count += (tun_name[0] != 0);
+    threads_barrier_count += 1;
 #endif
     if (pthread_barrier_init(&threads_barrier, NULL, threads_barrier_count)) {
         errmsg("Can't create threads_barrier\n");
     }
 
 #ifdef TUN_MODE
-    if (tun_name[0]) {
-        init_tun_thread();
-    } else
-#endif
-    {
-        route_socket = socket(AF_INET, SOCK_DGRAM, 0);
-        if (route_socket < 0) {
-            errmsg("Can't create route_socket :%s\n", strerror(errno));
-        }
+    init_tun_thread();
+#else
+    route_socket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (route_socket < 0) {
+        errmsg("Can't create route_socket :%s\n", strerror(errno));
     }
+#endif
 
     init_net_data_threads();
 
@@ -427,12 +427,9 @@ int32_t main(int32_t argc, char *argv[])
             memset(&stat, 0, sizeof(stat));
             stat.stat_start = time(NULL);
 
-#ifdef TUN_MODE
-            if (tun_name[0] == 0)
+#ifndef TUN_MODE
+            clean_route_table();
 #endif
-            {
-                clean_route_table();
-            }
 
             int32_t domains_read_status = domains_read();
 
