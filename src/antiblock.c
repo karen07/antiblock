@@ -195,6 +195,10 @@ int32_t main(int32_t argc, char *argv[])
 
     printf("Launch parameters:\n");
 
+    for (int i = 0; i < GATEWAY_MAX_COUNT; i++) {
+        gateways_ip[i] = 0xFFFFFFFF;
+    }
+
     for (int32_t i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-log")) {
             is_log_print = 1;
@@ -212,8 +216,10 @@ int32_t main(int32_t argc, char *argv[])
                 char *space_ptr = strchr(argv[i + 1], ' ');
                 if (space_ptr) {
                     *space_ptr = 0;
-                    gateways_ip[gateways_count] = inet_addr(argv[i + 1]);
-                    gateways_domains_paths[gateways_count] = space_ptr + 1;
+                    if (gateways_count < GATEWAY_MAX_COUNT) {
+                        gateways_ip[gateways_count] = inet_addr(argv[i + 1]);
+                        gateways_domains_paths[gateways_count] = space_ptr + 1;
+                    }
                     *space_ptr = ' ';
                     gateways_count++;
                 }
@@ -322,7 +328,20 @@ int32_t main(int32_t argc, char *argv[])
 
     if (gateways_count == 0) {
         print_help();
-        errmsg("The program needs at least one pair of gateway domains\n");
+        errmsg("The program needs at least one correct pair of \"gateway domains\"\n");
+    }
+
+    if (!(gateways_count < GATEWAY_MAX_COUNT)) {
+        print_help();
+        errmsg("The program needs a maximum of %d pair of \"gateway domains\"\n",
+               GATEWAY_MAX_COUNT - 1);
+    }
+
+    for (int i = 0; i < gateways_count; i++) {
+        if ((gateways_ip[i] == 0xFFFFFFFF) || (gateways_domains_paths[i][0] == 0)) {
+            print_help();
+            errmsg("The program needs at least one correct pair of \"gateway domains\"\n");
+        }
     }
 
     if (dns_ip == 0xFFFFFFFF) {

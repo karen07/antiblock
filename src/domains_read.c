@@ -47,14 +47,14 @@ static size_t cb(void *data, size_t size, size_t nmemb, void *clientp)
     size_t realsize = size * nmemb;
     memory_t *mem = (memory_t *)clientp;
 
-    char *ptr = realloc(mem->data, mem->size + realsize + 1);
+    mem->max_size += realsize;
+    char *ptr = realloc(mem->data, mem->max_size);
     if (ptr == NULL)
         return 0;
-
     mem->data = ptr;
+
     memcpy(&(mem->data[mem->size]), data, realsize);
-    mem->size += realsize;
-    mem->data[mem->size] = 0;
+    mem->size = mem->max_size;
 
     return realsize;
 }
@@ -101,32 +101,53 @@ int32_t domains_read(void)
             if (domains_fd == NULL) {
                 errmsg("Can't open domains file %s\n", gateways_domains_paths[i]);
             }
+
             fseek(domains_fd, 0, SEEK_END);
             int64_t domains_file_size_add = ftell(domains_fd);
             fseek(domains_fd, 0, SEEK_SET);
-            char *ptr = realloc(domains.data, domains.size + domains_file_size_add + 1);
-            if (ptr == NULL) {
+
+            domains.max_size += domains_file_size_add;
+            domains.data = realloc(domains.data, domains.max_size);
+            if (domains.data == NULL) {
                 errmsg("No free memory for domains_file %s\n", gateways_domains_paths[i]);
             }
-            domains.data = ptr;
+
             if (fread(&(domains.data[domains.size]), 1, domains_file_size_add, domains_fd) !=
                 (size_t)domains_file_size_add) {
                 errmsg("Can't read domains file %s\n", gateways_domains_paths[i]);
             }
-            domains.size += domains_file_size_add;
-            domains.data[domains.size] = 0;
+            domains.size = domains.max_size;
+
             fclose(domains_fd);
         }
 
-        gateways_domains_offset[i + 1] = domains.size;
+        if (!(domains.size < MB_64_BYTES)) {
+            errmsg("The total size of all domains must be less than 64 MB\n");
+        }
+
+        if (domains.data[domains.max_size - 1] != '\n') {
+            domains.max_size += 1;
+            domains.data = realloc(domains.data, domains.max_size);
+            if (domains.data == NULL) {
+                errmsg("No free memory for domains_file %s\n", gateways_domains_paths[i]);
+            }
+
+            domains.data[domains.max_size - 1] = '\n';
+            domains.size = domains.max_size;
+        }
+
+        gateways_domains_offset[i + 1] = domains.max_size;
     }
 
-    char *ptr = realloc(domains.data, domains.size + CNAME_DOMAINS_MAP_MAX_SIZE * DOMAIN_MAX_SIZE);
-    if (ptr == NULL) {
+    domains.max_size += CNAME_DOMAINS_MAP_MAX_SIZE * DOMAIN_MAX_SIZE;
+    domains.data = realloc(domains.data, domains.max_size);
+    if (domains.data == NULL) {
         errmsg("No free memory for cname_domains\n");
     }
-    domains.data = ptr;
-    domains.max_size = domains.size + CNAME_DOMAINS_MAP_MAX_SIZE * DOMAIN_MAX_SIZE;
+
+    if (!(domains.max_size < MB_64_BYTES)) {
+        errmsg("The total size of all domains and CNAME domains must be less than 64 MB\n");
+    }
 
     if (domains.size > 0) {
         int32_t domains_map_size = 0;

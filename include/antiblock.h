@@ -65,7 +65,7 @@ extern uint16_t listen_port;
 extern FILE *log_fd;
 extern FILE *stat_fd;
 
-#define GATEWAY_MAX_COUNT 256
+#define GATEWAY_MAX_COUNT 61
 extern int32_t gateways_count;
 
 extern uint32_t gateways_ip[GATEWAY_MAX_COUNT];
