@@ -140,21 +140,25 @@ static void clean_route_table(void)
 
 static void print_help(void)
 {
-    printf("\nCommands:\n"
-           "  Required parameters:\n"
-           "    -domains  \"x.x.x.x https://example.com\"\n"
-           "    -domains  \"x.x.x.x /example.txt\"\n"
-           "    -listen   x.x.x.x:xx           Listen address\n"
-           "    -DNS      x.x.x.x:xx           DNS address\n"
-           "  Optional parameters:\n"
-           "    -log                           Show operations log\n"
-           "    -stat                          Show statistics data\n"
-           "    -output   /example/            Log or statistics output folder\n"
+    printf(
+        "\nCommands:\n"
+        "  At least one parameters needs to be filled:\n"
+        "    -domains  \"x.x.x.x https://test1.com\"  Route domains from path/url through gateway\n"
+        "    -domains  \"x.x.x.x /test1.txt\"         Route domains from path/url through gateway\n"
+        "    -domains  \"x.x.x.x /test2.txt\"         Route domains from path/url through gateway\n"
+        "    -domains  \"x.x.x.x https://test2.com\"  Route domains from path/url through gateway\n"
+        "    ........\n"
+        "  Required parameters:\n"
+        "    -listen    x.x.x.x:xx                  Listen address\n"
+        "    -DNS       x.x.x.x:xx                  DNS address\n"
 #ifdef TUN_MODE
-           "-TUN_net x.x.x.x/xx           TUN net\n"
-           "-TUN_name example             TUN name\n"
+        "    -TUN_net   x.x.x.x/xx                  TUN net\n"
+        "    -TUN_name  example                     TUN name\n"
 #endif
-    );
+        "  Optional parameters:\n"
+        "    -output    /test/                      Log or statistics output folder\n"
+        "    -log                                   Show operations log\n"
+        "    -stat                                  Show statistics data\n");
 }
 
 static void main_catch_function(int32_t signo)
