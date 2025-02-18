@@ -42,7 +42,7 @@ void stat_print(void)
     fprintf(stat_fd, "\n");
 
 #ifdef TUN_MODE
-    if (is_tun_name) {
+    if (tun_name[0]) {
         double nat_sended_to_dev_size_gb = stat.nat_sended_to_dev_size / 1024 / 1024 / 1024;
         fprintf(stat_fd, "NAT sended to internet        : %d ptks\n", stat.nat_sended_to_dev);
         fprintf(stat_fd, "NAT sended to internet size   : %lf GB\n", nat_sended_to_dev_size_gb);
