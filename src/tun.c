@@ -25,14 +25,12 @@ void subnet_init(subnet_range_t *subnet)
     subnet->end_ip = (ntohl(subnet->network_ip) & netMask) + subnet->subnet_size - 2;
 }
 
-static int32_t tun_alloc(char *dev, int32_t flags)
+int32_t tun_alloc(char *dev, int32_t flags)
 {
     struct ifreq ifr;
     int32_t fd, err;
-    char *clonedev = "/dev/net/tun";
 
-    if ((fd = open(clonedev, O_RDWR)) < 0) {
-        printf("Opening /dev/net/tun error\n");
+    if ((fd = open("/dev/net/tun", O_RDWR)) < 0) {
         return fd;
     }
 
@@ -45,19 +43,11 @@ static int32_t tun_alloc(char *dev, int32_t flags)
     }
 
     if ((err = ioctl(fd, TUNSETIFF, (void *)&ifr)) < 0) {
-        printf("ioctl(TUNSETIFF) error\n");
         close(fd);
         return err;
     }
 
     strcpy(dev, ifr.ifr_name);
-
-    /*
-    int32_t status = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
-    if (status == -1) {
-        printf("Set O_NONBLOCK error\n");
-    }
-    */
 
     return fd;
 }
@@ -120,15 +110,7 @@ static array_hashmap_bool nat_cmp(const void *elem_data, const void *hashmap_ele
 
 static void tun_catch_function(__attribute__((unused)) int32_t signo)
 {
-    printf("SIGSEGV catched tun\n");
-    fflush(stdout);
-    if (stat_fd) {
-        fflush(stat_fd);
-    }
-    if (log_fd) {
-        fflush(log_fd);
-    }
-    exit(EXIT_FAILURE);
+    errmsg("SIGSEGV catched tun\n");
 }
 
 static void *tun(__attribute__((unused)) void *arg)
@@ -137,45 +119,48 @@ static void *tun(__attribute__((unused)) void *arg)
         errmsg("Can't set signal handler tun\n");
     }
 
-    int32_t tap_fd;
-    char *buffer = (char *)malloc(PACKET_MAX_SIZE * sizeof(char));
-    char *pseudogram = (char *)malloc(PACKET_MAX_SIZE * sizeof(char));
+    char *tap_buffer = NULL;
+    char *tun_buffer = NULL;
+    char *pseudogram = NULL;
 
-    tap_fd = tun_alloc(tun_name, IFF_TUN | IFF_MULTI_QUEUE);
+    tap_buffer = (char *)malloc(PACKET_MAX_SIZE * sizeof(char));
+    tun_buffer = (char *)malloc(PACKET_MAX_SIZE * sizeof(char));
+    pseudogram = (char *)malloc(PACKET_MAX_SIZE * sizeof(char));
 
+    int32_t tap_fd = 0;
+    int32_t tun_fd = 0;
+
+    char tap_name[IFNAMSIZ * 2];
+    sprintf(tap_name, "%s_TAP", tun_name);
+    tap_fd = tun_alloc(tap_name, IFF_TAP | IFF_NO_PI);
     if (tap_fd < 0) {
-        errmsg("Can't allocate TUN interface\n");
+        errmsg("Can't allocate TAP interface\n");
     }
 
-    struct in_addr NAT_subnet_start_addr;
-    NAT_subnet_start_addr.s_addr = htonl(NAT_VPN.start_ip);
-
-    struct in_addr NAT_subnet_end_addr;
-    NAT_subnet_end_addr.s_addr = htonl(NAT_VPN.end_ip);
-
-    printf("TUN dev %s allocated", tun_name);
-    printf(" %s-", inet_ntoa(NAT_subnet_start_addr));
-    printf("%s\n", inet_ntoa(NAT_subnet_end_addr));
+    tun_fd = tun_alloc(tun_name, IFF_TUN);
+    if (tun_fd < 0) {
+        errmsg("Can't allocate TUN interface\n");
+    }
 
     pthread_barrier_wait(&threads_barrier);
 
     uint32_t nat_icmp_client_ip = 0;
 
     while (true) {
-        int32_t nread = read(tap_fd, buffer, PACKET_MAX_SIZE);
+        int32_t nread = read(tun_fd, tun_buffer, PACKET_MAX_SIZE);
 
         if (nread < 1) {
             continue;
         }
 
-        tun_header_t *tun_header = (tun_header_t *)buffer;
+        struct tun_pi *tun_header = (struct tun_pi *)tun_buffer;
 
         int32_t proto_L3 = ntohs(tun_header->proto);
         if (proto_L3 != ETH_P_IP) {
             continue;
         }
 
-        char *L3_start_pointer = buffer + sizeof(tun_header_t);
+        char *L3_start_pointer = tun_buffer + sizeof(struct tun_pi);
         struct iphdr *iph = (struct iphdr *)L3_start_pointer;
 
         char proto_L4 = iph->protocol;
@@ -221,7 +206,13 @@ static void *tun(__attribute__((unused)) void *arg)
             iph->check = 0;
             iph->check = checksum(L3_start_pointer, iph->ihl << 2);
 
-            write(tap_fd, buffer, nread);
+            memcpy(tap_buffer + sizeof(struct ethhdr), L3_start_pointer,
+                   nread - sizeof(struct tun_pi));
+
+            struct ethhdr *ethh = (struct ethhdr *)tap_buffer;
+            ethh->h_proto = htons(ETH_P_IP);
+
+            write(tap_fd, tap_buffer, nread - sizeof(struct tun_pi) + sizeof(struct ethhdr));
 
             continue;
         }
@@ -419,8 +410,15 @@ static void *tun(__attribute__((unused)) void *arg)
 
         iph->check = checksum(L3_start_pointer, iph->ihl << 2);
 
-        write(tap_fd, buffer, nread);
+        memcpy(tap_buffer + sizeof(struct ethhdr), L3_start_pointer, nread - sizeof(struct tun_pi));
+
+        struct ethhdr *ethh = (struct ethhdr *)tap_buffer;
+        ethh->h_proto = htons(ETH_P_IP);
+
+        write(tap_fd, tap_buffer, nread - sizeof(struct tun_pi) + sizeof(struct ethhdr));
     }
+
+    return NULL;
 }
 
 void init_tun_thread(void)
