@@ -2,11 +2,6 @@
 
 #ifdef TUN_MODE
 
-typedef struct tun_header {
-    uint16_t flags;
-    uint16_t proto;
-} __attribute__((packed)) tun_header_t;
-
 typedef struct pseudo_header {
     uint32_t source_address;
     uint32_t dest_address;

@@ -205,7 +205,7 @@ int32_t main(int32_t argc, char *argv[])
 
     printf("Launch parameters:\n");
 
-    for (int i = 0; i < GATEWAY_MAX_COUNT; i++) {
+    for (int32_t i = 0; i < GATEWAY_MAX_COUNT; i++) {
         gateways_ip[i] = 0xFFFFFFFF;
     }
 
@@ -344,7 +344,7 @@ int32_t main(int32_t argc, char *argv[])
                GATEWAY_MAX_COUNT - 1);
     }
 
-    for (int i = 0; i < gateways_count; i++) {
+    for (int32_t i = 0; i < gateways_count; i++) {
         if ((gateways_ip[i] == 0xFFFFFFFF) || (gateways_domains_paths[i][0] == 0)) {
             print_help();
             errmsg("The program needs at least one correct pair of \"gateway domains\"\n");
@@ -396,6 +396,8 @@ int32_t main(int32_t argc, char *argv[])
         }
     }
 
+    printf("\n");
+
     int32_t threads_barrier_count = 3;
 #ifdef TUN_MODE
     threads_barrier_count += 1;
@@ -416,8 +418,6 @@ int32_t main(int32_t argc, char *argv[])
     init_net_data_threads();
 
     pthread_barrier_wait(&threads_barrier);
-
-    printf("\n");
 
     int32_t circles = 0;
     int32_t sleep_circles = 0;
