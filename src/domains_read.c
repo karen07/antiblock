@@ -179,6 +179,10 @@ int32_t domains_read(void)
         uint32_t domain_offset = 0;
         int32_t gateway_id = 0;
 
+        for (int32_t j = 0; j < gateways_count; j++) {
+            gateways_domains_count[j] = 0;
+        }
+
         for (int32_t i = 0; i < domains_map_size; i++) {
             for (int32_t j = 1; j <= gateways_count; j++) {
                 if ((gateways_domains_offset[j - 1] <= domain_offset) &&
