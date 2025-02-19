@@ -1,28 +1,25 @@
 #include <pthread.h>
 #include <stdint.h>
-#include <linux/limits.h>
-#include <linux/if.h>
 #include <stdio.h>
-#include <fcntl.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <stdarg.h>
 #include <sys/ioctl.h>
 #include <errno.h>
-#ifdef TUN_MODE
-#include <linux/if_tun.h>
-#endif
 #include <limits.h>
-#include <sys/time.h>
-#include <linux/ip.h>
-#include <linux/tcp.h>
-#include <linux/udp.h>
 #include <signal.h>
 #include <net/route.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef TUN_MODE
+#include <linux/if_tun.h>
+#include <linux/ip.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
+#include <linux/if.h>
+#include <fcntl.h>
+#endif
 #include "array_hashmap.h"
 
 #ifndef _STRUCT_MEMORY_ANTIBLOCK
