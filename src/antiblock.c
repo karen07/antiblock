@@ -189,7 +189,7 @@ int32_t main(int32_t argc, char *argv[])
 {
     printf("\nAntiBlock started " ANTIBLOCK_VERSION "\n\n");
     printf("AntiBlock program proxies DNS requests. The IP addresses of the specified domains\n"
-           "are added to the routing table for routing through the specified interface.\n\n");
+           "are added to the routing table for routing through the specified interfaces.\n\n");
 
     if (signal(SIGINT, main_catch_function) == SIG_ERR) {
         errmsg("Can't set SIGINT signal handler main\n");
