@@ -115,7 +115,7 @@ static void clean_route_table(void)
 
     fseek(route_fd, 128, SEEK_SET);
 
-    char iface[128];
+    char iface[IFNAMSIZ];
     uint32_t dest_ip;
     uint32_t gate_ip;
     uint32_t flags;
