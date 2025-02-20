@@ -42,7 +42,7 @@ typedef struct subnet_range {
 
 extern array_hashmap_t ip_ip_map_struct;
 
-extern subnet_range_t NAT_VPN;
+extern subnet_range_t NAT;
 
 void init_tun_thread(void);
 void subnet_init(subnet_range_t *subnet);

@@ -13,7 +13,7 @@
 array_hashmap_t ip_ip_map_struct;
 static array_hashmap_t nat_map_struct;
 
-subnet_range_t NAT_VPN;
+subnet_range_t NAT;
 
 void subnet_init(subnet_range_t *subnet)
 {
@@ -463,11 +463,11 @@ static void *tun(__attribute__((unused)) void *arg)
 
 void init_tun_thread(void)
 {
-    NAT_VPN.network_ip = tun_ip;
-    NAT_VPN.network_prefix = tun_prefix;
-    subnet_init(&NAT_VPN);
+    NAT.network_ip = tun_ip;
+    NAT.network_prefix = tun_prefix;
+    subnet_init(&NAT);
 
-    ip_ip_map_struct = array_hashmap_init(NAT_VPN.subnet_size, 1.0, sizeof(ip_ip_map_t));
+    ip_ip_map_struct = array_hashmap_init(NAT.subnet_size, 1.0, sizeof(ip_ip_map_t));
     if (ip_ip_map_struct == NULL) {
         errmsg("No free memory for ip_ip_map_struct\n");
     }
@@ -475,12 +475,11 @@ void init_tun_thread(void)
     array_hashmap_set_func(ip_ip_map_struct, ip_ip_hash, ip_ip_cmp, ip_ip_hash, ip_ip_cmp,
                            ip_ip_hash, ip_ip_cmp);
 
-    /*
-    ip_ip_map_t add_elem;
-    add_elem.ip_local = htonl(NAT_subnet_start++);
-    add_elem.ip_global = inet_addr("192.168.1.10");
-    array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, array_hashmap_save_new_func);
-    */
+    //uint32_t NAT_subnet_start_n = htonl(NAT.start_ip++);
+    //ip_ip_map_t add_elem;
+    //add_elem.ip_local = NAT_subnet_start_n;
+    //add_elem.ip_global = inet_addr("192.168.1.10");
+    //array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, array_hashmap_save_new_func);
 
     nat_map_struct = array_hashmap_init(NAT_MAP_MAX_SIZE, 1.0, sizeof(nat_map_t));
     if (nat_map_struct == NULL) {
