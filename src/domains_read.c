@@ -68,14 +68,14 @@ int32_t domains_read(void)
         memset(&domains, 0, sizeof(domains));
     }
 
-    gateways_domains_offset[0] = 0;
+    gateway_domains_offset[0] = 0;
 
     for (int32_t i = 0; i < gateways_count; i++) {
-        if (!memcmp(gateways_domains_paths[i], "http", 4)) {
+        if (!memcmp(gateway_domains_paths[i], "http", 4)) {
             curl_global_init(CURL_GLOBAL_DEFAULT);
             CURL *curl = curl_easy_init();
             if (curl) {
-                curl_easy_setopt(curl, CURLOPT_URL, gateways_domains_paths[i]);
+                curl_easy_setopt(curl, CURLOPT_URL, gateway_domains_paths[i]);
                 curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
                 curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
                 curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
@@ -84,22 +84,22 @@ int32_t domains_read(void)
                 CURLcode response;
                 response = curl_easy_perform(curl);
                 if (response == CURLE_COULDNT_RESOLVE_HOST) {
-                    errmsg("Wrong domains url %s\n", gateways_domains_paths[i]);
+                    errmsg("Wrong domains url %s\n", gateway_domains_paths[i]);
                 }
 
                 long http_code = 0;
                 curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
                 if (http_code != HTTP_OK) {
-                    errmsg("Wrong status code %s\n", gateways_domains_paths[i]);
+                    errmsg("Wrong status code %s\n", gateway_domains_paths[i]);
                 }
 
                 curl_easy_cleanup(curl);
             }
             curl_global_cleanup();
         } else {
-            FILE *domains_fd = fopen(gateways_domains_paths[i], "r");
+            FILE *domains_fd = fopen(gateway_domains_paths[i], "r");
             if (domains_fd == NULL) {
-                errmsg("Can't open domains file %s\n", gateways_domains_paths[i]);
+                errmsg("Can't open domains file %s\n", gateway_domains_paths[i]);
             }
 
             fseek(domains_fd, 0, SEEK_END);
@@ -109,12 +109,12 @@ int32_t domains_read(void)
             domains.max_size += domains_file_size_add;
             domains.data = realloc(domains.data, domains.max_size);
             if (domains.data == NULL) {
-                errmsg("No free memory for domains_file %s\n", gateways_domains_paths[i]);
+                errmsg("No free memory for domains_file %s\n", gateway_domains_paths[i]);
             }
 
             if (fread(&(domains.data[domains.size]), 1, domains_file_size_add, domains_fd) !=
                 (size_t)domains_file_size_add) {
-                errmsg("Can't read domains file %s\n", gateways_domains_paths[i]);
+                errmsg("Can't read domains file %s\n", gateway_domains_paths[i]);
             }
             domains.size = domains.max_size;
 
@@ -129,14 +129,14 @@ int32_t domains_read(void)
             domains.max_size += 1;
             domains.data = realloc(domains.data, domains.max_size);
             if (domains.data == NULL) {
-                errmsg("No free memory for domains_file %s\n", gateways_domains_paths[i]);
+                errmsg("No free memory for domains_file %s\n", gateway_domains_paths[i]);
             }
 
             domains.data[domains.max_size - 1] = '\n';
             domains.size = domains.max_size;
         }
 
-        gateways_domains_offset[i + 1] = domains.max_size;
+        gateway_domains_offset[i + 1] = domains.max_size;
     }
 
     domains.max_size += CNAME_DOMAINS_MAP_MAX_SIZE * DOMAIN_MAX_SIZE;
@@ -180,15 +180,15 @@ int32_t domains_read(void)
         int32_t gateway_id = 0;
 
         for (int32_t j = 0; j < gateways_count; j++) {
-            gateways_domains_count[j] = 0;
+            gateway_domains_count[j] = 0;
         }
 
         for (int32_t i = 0; i < domains_map_size; i++) {
             for (int32_t j = 1; j <= gateways_count; j++) {
-                if ((gateways_domains_offset[j - 1] <= domain_offset) &&
-                    (domain_offset < gateways_domains_offset[j])) {
+                if ((gateway_domains_offset[j - 1] <= domain_offset) &&
+                    (domain_offset < gateway_domains_offset[j])) {
                     gateway_id = j - 1;
-                    gateways_domains_count[gateway_id]++;
+                    gateway_domains_count[gateway_id]++;
                 }
             }
 
@@ -207,7 +207,7 @@ int32_t domains_read(void)
     }
 
     for (int32_t j = 0; j < gateways_count; j++) {
-        printf("From %s readed %d domains\n", gateways_domains_paths[j], gateways_domains_count[j]);
+        printf("From %s readed %d domains\n", gateway_domains_paths[j], gateway_domains_count[j]);
     }
 
     return 1;

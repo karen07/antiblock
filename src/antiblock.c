@@ -33,11 +33,11 @@ FILE *stat_fd;
 
 int32_t gateways_count;
 
-uint32_t gateways_ip[GATEWAY_MAX_COUNT];
-char *gateways_domains_paths[GATEWAY_MAX_COUNT];
+char gateway_name[GATEWAY_MAX_COUNT][IFNAMSIZ];
+char *gateway_domains_paths[GATEWAY_MAX_COUNT];
 
-uint32_t gateways_domains_offset[GATEWAY_MAX_COUNT];
-int32_t gateways_domains_count[GATEWAY_MAX_COUNT];
+uint32_t gateway_domains_offset[GATEWAY_MAX_COUNT];
+int32_t gateway_domains_count[GATEWAY_MAX_COUNT];
 
 #ifndef TUN_MODE
 int32_t route_socket;
@@ -57,31 +57,29 @@ void errmsg(const char *format, ...)
 }
 
 #ifndef TUN_MODE
-void set_route(struct rtentry *route, uint32_t gateway, uint32_t dst)
+void set_route(struct rtentry *route, int32_t gateway_index, uint32_t dst)
 {
     memset(route, 0, sizeof(*route));
 
     struct sockaddr_in *route_addr;
-    route_addr = (struct sockaddr_in *)(&(route->rt_gateway));
-    route_addr->sin_family = AF_INET;
-    route_addr->sin_addr.s_addr = gateway;
-
-    route_addr = (struct sockaddr_in *)(&(route->rt_genmask));
-    route_addr->sin_family = AF_INET;
-    route_addr->sin_addr.s_addr = 0xFFFFFFFF;
 
     route_addr = (struct sockaddr_in *)(&(route->rt_dst));
     route_addr->sin_family = AF_INET;
     route_addr->sin_addr.s_addr = dst;
 
-    route->rt_flags = RTF_UP | RTF_GATEWAY;
+    route_addr = (struct sockaddr_in *)(&(route->rt_genmask));
+    route_addr->sin_family = AF_INET;
+    route_addr->sin_addr.s_addr = 0xFFFFFFFF;
+
+    route->rt_dev = gateway_name[gateway_index];
+    route->rt_flags = RTF_UP;
 }
 
-void add_route(uint32_t gateway, uint32_t dst)
+void add_route(int32_t gateway_index, uint32_t dst)
 {
     struct rtentry route;
 
-    set_route(&route, gateway, dst);
+    set_route(&route, gateway_index, dst);
 
     if (ioctl(route_socket, SIOCADDRT, &route) < 0) {
         if (strcmp(strerror(errno), "File exists")) {
@@ -92,11 +90,11 @@ void add_route(uint32_t gateway, uint32_t dst)
     }
 }
 
-void del_route(uint32_t gateway, uint32_t dst)
+void del_route(int32_t gateway_index, uint32_t dst)
 {
     struct rtentry route;
 
-    set_route(&route, gateway, dst);
+    set_route(&route, gateway_index, dst);
 
     if (ioctl(route_socket, SIOCDELRT, &route) < 0) {
         if (strcmp(strerror(errno), "No such process")) {
@@ -132,7 +130,7 @@ static void clean_route_table(void)
     while (fscanf(route_fd, "%s %x %x %x %x %x %x %x %x %x %x", iface, &dest_ip, &gate_ip, &flags,
                   &refcnt, &use, &metric, &mask, &mtu, &window, &irtt) != EOF) {
         for (int32_t i = 0; i < gateways_count; i++) {
-            if ((gate_ip == gateways_ip[i]) && (mask == 0xFFFFFFFF)) {
+            if ((!strcmp(iface, gateway_name[i])) && (mask == 0xFFFFFFFF)) {
                 del_route(gate_ip, dest_ip);
             }
         }
@@ -205,10 +203,6 @@ int32_t main(int32_t argc, char *argv[])
 
     printf("Launch parameters:\n");
 
-    for (int32_t i = 0; i < GATEWAY_MAX_COUNT; i++) {
-        gateways_ip[i] = 0xFFFFFFFF;
-    }
-
     for (int32_t i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-log")) {
             is_log_print = 1;
@@ -227,8 +221,10 @@ int32_t main(int32_t argc, char *argv[])
                 if (space_ptr) {
                     *space_ptr = 0;
                     if (gateways_count < GATEWAY_MAX_COUNT) {
-                        gateways_ip[gateways_count] = inet_addr(argv[i + 1]);
-                        gateways_domains_paths[gateways_count] = space_ptr + 1;
+                        if (strlen(argv[i + 1]) < IFNAMSIZ) {
+                            strcpy(gateway_name[gateways_count], argv[i + 1]);
+                        }
+                        gateway_domains_paths[gateways_count] = space_ptr + 1;
                     }
                     *space_ptr = ' ';
                     gateways_count++;
@@ -345,7 +341,7 @@ int32_t main(int32_t argc, char *argv[])
     }
 
     for (int32_t i = 0; i < gateways_count; i++) {
-        if ((gateways_ip[i] == 0xFFFFFFFF) || (gateways_domains_paths[i][0] == 0)) {
+        if ((gateway_name[i][0] == 0) || (gateway_domains_paths[i][0] == 0)) {
             print_help();
             errmsg("The program needs at least one correct pair of \"gateway domains\"\n");
         }
