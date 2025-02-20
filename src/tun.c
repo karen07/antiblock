@@ -28,28 +28,63 @@ void subnet_init(subnet_range_t *subnet)
 int32_t tun_alloc(char *dev, int32_t flags)
 {
     struct ifreq ifr;
-    int32_t fd, err;
+    int32_t fd_create;
+    int32_t fd_setip;
+    int32_t err;
+    struct sockaddr_in sin;
 
-    if ((fd = open("/dev/net/tun", O_RDWR)) < 0) {
-        return fd;
+    if ((fd_create = open("/dev/net/tun", O_RDWR)) < 0) {
+        return fd_create;
     }
 
     memset(&ifr, 0, sizeof(ifr));
-
     ifr.ifr_flags = flags;
+    strncpy(ifr.ifr_name, dev, IFNAMSIZ);
 
-    if (*dev) {
-        strncpy(ifr.ifr_name, dev, IFNAMSIZ);
-    }
-
-    if ((err = ioctl(fd, TUNSETIFF, (void *)&ifr)) < 0) {
-        close(fd);
+    if ((err = ioctl(fd_create, TUNSETIFF, (void *)&ifr)) < 0) {
         return err;
     }
 
-    strcpy(dev, ifr.ifr_name);
+    if ((fd_setip = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        return fd_setip;
+    }
 
-    return fd;
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, dev, IFNAMSIZ);
+
+    if ((err = ioctl(fd_setip, SIOCGIFFLAGS, &ifr)) < 0) {
+        return err;
+    }
+
+    if (!(ifr.ifr_flags & IFF_UP)) {
+        ifr.ifr_flags |= IFF_UP;
+        if ((err = ioctl(fd_setip, SIOCSIFFLAGS, &ifr)) < 0) {
+            return err;
+        }
+    }
+
+    memset(&sin, 0, sizeof(struct sockaddr_in));
+    sin.sin_family = AF_INET;
+    sin.sin_addr.s_addr = tun_ip;
+    memcpy(&ifr.ifr_addr, &sin, sizeof(struct sockaddr));
+
+    if ((err = ioctl(fd_setip, SIOCSIFADDR, &ifr)) < 0) {
+        return err;
+    }
+
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, dev, IFNAMSIZ);
+
+    memset(&sin, 0, sizeof(struct sockaddr_in));
+    sin.sin_family = AF_INET;
+    sin.sin_addr.s_addr = htonl(0xFFFFFFFF << (32 - tun_prefix) & 0xFFFFFFFF);
+    memcpy(&ifr.ifr_netmask, &sin, sizeof(struct sockaddr));
+
+    if ((err = ioctl(fd_setip, SIOCSIFNETMASK, &ifr)) < 0) {
+        return err;
+    }
+
+    return fd_create;
 }
 
 static uint16_t checksum(char *buf, uint32_t size)
@@ -119,23 +154,23 @@ static void *tun(__attribute__((unused)) void *arg)
         errmsg("Can't set signal handler tun\n");
     }
 
-    char *tap_buffer = NULL;
+    //char *tap_buffer = NULL;
     char *tun_buffer = NULL;
     char *pseudogram = NULL;
 
-    tap_buffer = (char *)malloc(PACKET_MAX_SIZE * sizeof(char));
+    //tap_buffer = (char *)malloc(PACKET_MAX_SIZE * sizeof(char));
     tun_buffer = (char *)malloc(PACKET_MAX_SIZE * sizeof(char));
     pseudogram = (char *)malloc(PACKET_MAX_SIZE * sizeof(char));
 
-    int32_t tap_fd = 0;
+    //int32_t tap_fd = 0;
     int32_t tun_fd = 0;
 
-    char tap_name[IFNAMSIZ * 2];
-    sprintf(tap_name, "%s_TAP", tun_name);
-    tap_fd = tun_alloc(tap_name, IFF_TAP | IFF_NO_PI);
-    if (tap_fd < 0) {
-        errmsg("Can't allocate TAP interface\n");
-    }
+    //char tap_name[IFNAMSIZ * 2];
+    //sprintf(tap_name, "%s_TAP", tun_name);
+    //tap_fd = tun_alloc(tap_name, IFF_TAP | IFF_NO_PI);
+    //if (tap_fd < 0) {
+    //    errmsg("Can't allocate TAP interface\n");
+    //}
 
     tun_fd = tun_alloc(tun_name, IFF_TUN);
     if (tun_fd < 0) {
@@ -206,13 +241,15 @@ static void *tun(__attribute__((unused)) void *arg)
             iph->check = 0;
             iph->check = checksum(L3_start_pointer, iph->ihl << 2);
 
-            memcpy(tap_buffer + sizeof(struct ethhdr), L3_start_pointer,
-                   nread - sizeof(struct tun_pi));
+            //memcpy(tap_buffer + sizeof(struct ethhdr), L3_start_pointer,
+            //       nread - sizeof(struct tun_pi));
+            //struct ethhdr *ethh = (struct ethhdr *)tap_buffer;
+            //ethh->h_proto = htons(ETH_P_IP);
+            //memset(ethh->h_dest, 0xFF, 6);
+            //memset(ethh->h_source, 0xFF, 6);
+            //write(tap_fd, tap_buffer, nread - sizeof(struct tun_pi) + sizeof(struct ethhdr));
 
-            struct ethhdr *ethh = (struct ethhdr *)tap_buffer;
-            ethh->h_proto = htons(ETH_P_IP);
-
-            write(tap_fd, tap_buffer, nread - sizeof(struct tun_pi) + sizeof(struct ethhdr));
+            write(tun_fd, tun_buffer, nread);
 
             continue;
         }
@@ -410,12 +447,15 @@ static void *tun(__attribute__((unused)) void *arg)
 
         iph->check = checksum(L3_start_pointer, iph->ihl << 2);
 
-        memcpy(tap_buffer + sizeof(struct ethhdr), L3_start_pointer, nread - sizeof(struct tun_pi));
+        //memcpy(tap_buffer + sizeof(struct ethhdr), L3_start_pointer,
+        //       nread - sizeof(struct tun_pi));
+        //struct ethhdr *ethh = (struct ethhdr *)tap_buffer;
+        //ethh->h_proto = htons(ETH_P_IP);
+        //memset(ethh->h_dest, 0xFF, 6);
+        //memset(ethh->h_source, 0xFF, 6);
+        //write(tap_fd, tap_buffer, nread - sizeof(struct tun_pi) + sizeof(struct ethhdr));
 
-        struct ethhdr *ethh = (struct ethhdr *)tap_buffer;
-        ethh->h_proto = htons(ETH_P_IP);
-
-        write(tap_fd, tap_buffer, nread - sizeof(struct tun_pi) + sizeof(struct ethhdr));
+        write(tun_fd, tun_buffer, nread);
     }
 
     return NULL;
