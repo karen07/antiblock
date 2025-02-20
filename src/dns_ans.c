@@ -238,7 +238,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
                 }
 #else
                 if ((ans->ip4 != dns_ip) && (ans->ip4 != 0)) {
-                    add_route(gateways_ip[block_ans_domain_flag], ans->ip4);
+                    add_route(block_ans_domain_flag, ans->ip4);
                 }
 
                 if (log_fd) {
