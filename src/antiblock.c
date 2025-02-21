@@ -155,22 +155,22 @@ static void print_help(void)
     printf(
         "\nCommands:\n"
         "  At least one parameters needs to be filled:\n"
-        "    -domains  \"DNS1 gateway1 https://test1.com\"  Route domains from path/url through gateway\n"
-        "    -domains  \"DNS2 gateway2 /test1.txt\"         Route domains from path/url through gateway\n"
-        "    -domains  \"DNS3 gateway3 /test2.txt\"         Route domains from path/url through gateway\n"
-        "    -domains  \"DNS4 gateway4 https://test2.com\"  Route domains from path/url through gateway\n"
-        "    ........\n"
+        "    -r  \"DNS1 gateway1 https://test1.com\"  Route domains from path/url through gateway\n"
+        "    -r  \"DNS2 gateway2 /test1.txt\"         Route domains from path/url through gateway\n"
+        "    -r  \"DNS3 gateway3 /test2.txt\"         Route domains from path/url through gateway\n"
+        "    -r  \"DNS4 gateway4 https://test2.com\"  Route domains from path/url through gateway\n"
+        "    ................\n"
         "  Required parameters:\n"
-        "    -listen    x.x.x.x:xx                Listen address\n"
-        "    -DNS       x.x.x.x:xx                DNS address\n"
+        "    -l  \"x.x.x.x:xx\"                       Listen address\n"
+        "    -d  \"x.x.x.x:xx\"                       DNS address\n"
 #ifdef TUN_MODE
         "    -TUN_net   x.x.x.x/xx                TUN net\n"
         "    -TUN_name  example                   TUN name\n"
 #endif
         "  Optional parameters:\n"
-        "    -output    /test/                    Log or statistics output folder\n"
-        "    -log                                 Show operations log\n"
-        "    -stat                                Show statistics data\n");
+        "    -o  \"/test/\"                           Log or statistics output folder\n"
+        "    --log                                  Show operations log\n"
+        "    --stat                                 Show statistics data\n");
 }
 
 static void main_catch_function(int32_t signo)
@@ -210,19 +210,19 @@ int32_t main(int32_t argc, char *argv[])
     printf("Launch parameters:\n");
 
     for (int32_t i = 1; i < argc; i++) {
-        if (!strcmp(argv[i], "-log")) {
+        if (!strcmp(argv[i], "--log")) {
             is_log_print = 1;
-            printf("  Log enabled\n");
+            printf("  Log     enabled\n");
             continue;
         }
-        if (!strcmp(argv[i], "-stat")) {
+        if (!strcmp(argv[i], "--stat")) {
             is_stat_print = 1;
-            printf("  Stat enabled\n");
+            printf("  Stat    enabled\n");
             continue;
         }
-        if (!strcmp(argv[i], "-domains")) {
+        if (!strcmp(argv[i], "-r")) {
             if (i != argc - 1) {
-                printf("  Domains %s\n", argv[i + 1]);
+                printf("  Routes  \"%s\"\n", argv[i + 1]);
                 char *first_space_ptr = strchr(argv[i + 1], ' ');
                 if (first_space_ptr) {
                     *first_space_ptr = 0;
@@ -256,19 +256,19 @@ int32_t main(int32_t argc, char *argv[])
             }
             continue;
         }
-        if (!strcmp(argv[i], "-output")) {
+        if (!strcmp(argv[i], "-o")) {
             if (i != argc - 1) {
                 if (strlen(argv[i + 1]) < PATH_MAX - 100) {
                     strcpy(log_or_stat_folder, argv[i + 1]);
-                    printf("  Output log or stat to %s\n", log_or_stat_folder);
+                    printf("  Output  log or stat to \"%s\"\n", log_or_stat_folder);
                 }
                 i++;
             }
             continue;
         }
-        if (!strcmp(argv[i], "-DNS")) {
+        if (!strcmp(argv[i], "-d")) {
             if (i != argc - 1) {
-                printf("  DNS %s\n", argv[i + 1]);
+                printf("  DNS     \"%s\"\n", argv[i + 1]);
                 char *colon_ptr = strchr(argv[i + 1], ':');
                 if (colon_ptr) {
                     uint16_t tmp_port = 0;
@@ -285,9 +285,9 @@ int32_t main(int32_t argc, char *argv[])
             }
             continue;
         }
-        if (!strcmp(argv[i], "-listen")) {
+        if (!strcmp(argv[i], "-l")) {
             if (i != argc - 1) {
-                printf("  Listen %s\n", argv[i + 1]);
+                printf("  Listen  \"%s\"\n", argv[i + 1]);
                 char *colon_ptr = strchr(argv[i + 1], ':');
                 if (colon_ptr) {
                     uint16_t tmp_port = 0;
