@@ -10,7 +10,7 @@
 
 statistics_t stat;
 
-void stat_print(void)
+void stat_print(FILE *stat_fd)
 {
     ftruncate(fileno(stat_fd), 0);
     fseek(stat_fd, 0, SEEK_SET);
