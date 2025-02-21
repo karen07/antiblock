@@ -152,25 +152,24 @@ static void clean_route_table(void)
 
 static void print_help(void)
 {
-    printf(
-        "\nCommands:\n"
-        "  At least one parameters needs to be filled:\n"
-        "    -r  \"DNS1 gateway1 https://test1.com\"  Route domains from path/url through gateway\n"
-        "    -r  \"DNS2 gateway2 /test1.txt\"         Route domains from path/url through gateway\n"
-        "    -r  \"DNS3 gateway3 /test2.txt\"         Route domains from path/url through gateway\n"
-        "    -r  \"DNS4 gateway4 https://test2.com\"  Route domains from path/url through gateway\n"
-        "    ................\n"
-        "  Required parameters:\n"
-        "    -l  \"x.x.x.x:xx\"                       Listen address\n"
-        "    -d  \"x.x.x.x:xx\"                       DNS address\n"
+    printf("\nCommands:\n"
+           "  At least one parameters needs to be filled:\n"
+           "    -r  \"gateway1 https://test1.com\"  Route domains from path/url through gateway\n"
+           "    -r  \"gateway2 /test1.txt\"         Route domains from path/url through gateway\n"
+           "    -r  \"gateway2 /test2.txt\"         Route domains from path/url through gateway\n"
+           "    -r  \"gateway1 https://test2.com\"  Route domains from path/url through gateway\n"
+           "    ................................\n"
+           "  Required parameters:\n"
+           "    -l  \"x.x.x.x:xx\"                  Listen address\n"
+           "    -d  \"x.x.x.x:xx\"                  DNS address\n"
 #ifdef TUN_MODE
-        "    -TUN_net   x.x.x.x/xx                TUN net\n"
-        "    -TUN_name  example                   TUN name\n"
+           "    -TUN_net   x.x.x.x/xx                TUN net\n"
+           "    -TUN_name  example                   TUN name\n"
 #endif
-        "  Optional parameters:\n"
-        "    -o  \"/test/\"                           Log or statistics output folder\n"
-        "    --log                                  Show operations log\n"
-        "    --stat                                 Show statistics data\n");
+           "  Optional parameters:\n"
+           "    -o  \"/test/\"                      Log or statistics output folder\n"
+           "    --log                             Show operations log\n"
+           "    --stat                            Show statistics data\n");
 }
 
 static void main_catch_function(int32_t signo)
@@ -206,6 +205,10 @@ int32_t main(int32_t argc, char *argv[])
     int32_t is_stat_print = 0;
     char log_or_stat_folder[PATH_MAX - 100];
     memset(log_or_stat_folder, 0, PATH_MAX - 100);
+    listen_addr.sin_addr.s_addr = 0xFFFFFFFF;
+    for (int32_t i = 0; i < GATEWAY_MAX_COUNT + 1; i++) {
+        dns_addr[i].sin_addr.s_addr = 0xFFFFFFFF;
+    }
 
     printf("Launch parameters:\n");
 
@@ -226,6 +229,7 @@ int32_t main(int32_t argc, char *argv[])
                 char *first_space_ptr = strchr(argv[i + 1], ' ');
                 if (first_space_ptr) {
                     *first_space_ptr = 0;
+#ifdef MULTIPLE_DNS
                     char *colon_ptr = strchr(argv[i + 1], ':');
                     if (colon_ptr) {
                         uint16_t tmp_port = 0;
@@ -251,6 +255,17 @@ int32_t main(int32_t argc, char *argv[])
                         *second_space_ptr = ' ';
                         gateways_count++;
                     }
+#else
+                    *first_space_ptr = 0;
+                    if (gateways_count < GATEWAY_MAX_COUNT) {
+                        if (strlen(argv[i + 1]) < IFNAMSIZ) {
+                            strcpy(gateway_name[gateways_count], argv[i + 1]);
+                        }
+                        gateway_domains_paths[gateways_count] = first_space_ptr + 1;
+                    }
+                    *first_space_ptr = ' ';
+                    gateways_count++;
+#endif
                 }
                 i++;
             }
@@ -375,6 +390,12 @@ int32_t main(int32_t argc, char *argv[])
             errmsg("The program needs correct pairs of \"gateway domains\"\n");
         }
     }
+
+#ifndef MULTIPLE_DNS
+    for (int32_t i = 1; i < GATEWAY_MAX_COUNT + 1; i++) {
+        dns_addr[i] = dns_addr[0];
+    }
+#endif
 
     for (int32_t i = 0; i < gateways_count + 1; i++) {
         if (dns_addr[i].sin_addr.s_addr == 0xFFFFFFFF) {
