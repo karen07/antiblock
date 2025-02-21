@@ -14,15 +14,7 @@ static int32_t repeater_client_socket;
 
 static void DNS_data_catch_function(__attribute__((unused)) int32_t signo)
 {
-    printf("SIGSEGV catched DNS_data\n");
-    fflush(stdout);
-    if (stat_fd) {
-        fflush(stat_fd);
-    }
-    if (log_fd) {
-        fflush(log_fd);
-    }
-    exit(EXIT_FAILURE);
+    errmsg("SIGSEGV catched DNS_data\n");
 }
 
 static void *DNS_data(__attribute__((unused)) void *arg)
@@ -130,15 +122,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
 
 static void client_data_catch_function(__attribute__((unused)) int32_t signo)
 {
-    printf("SIGSEGV catched client_data\n");
-    fflush(stdout);
-    if (stat_fd) {
-        fflush(stat_fd);
-    }
-    if (log_fd) {
-        fflush(log_fd);
-    }
-    exit(EXIT_FAILURE);
+    errmsg("SIGSEGV catched client_data\n");
 }
 
 static void *client_data(__attribute__((unused)) void *arg)

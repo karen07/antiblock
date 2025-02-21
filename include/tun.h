@@ -2,11 +2,6 @@
 
 #ifdef TUN_MODE
 
-typedef struct tun_header {
-    uint16_t flags;
-    uint16_t proto;
-} __attribute__((packed)) tun_header_t;
-
 typedef struct pseudo_header {
     uint32_t source_address;
     uint32_t dest_address;
@@ -47,7 +42,7 @@ typedef struct subnet_range {
 
 extern array_hashmap_t ip_ip_map_struct;
 
-extern subnet_range_t NAT_VPN;
+extern subnet_range_t NAT;
 
 void init_tun_thread(void);
 void subnet_init(subnet_range_t *subnet);
