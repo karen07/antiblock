@@ -22,9 +22,6 @@ uint32_t tun_ip = 0xFFFFFFFF;
 uint32_t tun_prefix;
 #endif
 
-uint32_t dns_ip = 0xFFFFFFFF;
-uint16_t dns_port;
-
 uint32_t listen_ip = 0xFFFFFFFF;
 uint16_t listen_port;
 
