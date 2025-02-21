@@ -131,15 +131,11 @@ static void *client_data(__attribute__((unused)) void *arg)
         errmsg("Can't set signal handler client_data\n");
     }
 
-    struct sockaddr_in repeater_client_addr, dns_addr, receive_client_addr;
+    struct sockaddr_in repeater_client_addr, receive_client_addr;
 
     repeater_client_addr.sin_family = AF_INET;
     repeater_client_addr.sin_port = htons(listen_port);
     repeater_client_addr.sin_addr.s_addr = listen_ip;
-
-    dns_addr.sin_family = AF_INET;
-    dns_addr.sin_port = htons(dns_port);
-    dns_addr.sin_addr.s_addr = dns_ip;
 
     uint32_t receive_client_addr_length = sizeof(receive_client_addr);
 
@@ -161,6 +157,14 @@ static void *client_data(__attribute__((unused)) void *arg)
         errmsg("No free memory for receive_msg from client\n");
     }
 
+    memory_t que_domain;
+    que_domain.size = 0;
+    que_domain.max_size = DOMAIN_MAX_SIZE;
+    que_domain.data = (char *)malloc(que_domain.max_size * sizeof(char));
+    if (que_domain.data == 0) {
+        errmsg("No free memory for que_domain\n");
+    }
+
     pthread_barrier_wait(&threads_barrier);
 
     while (true) {
@@ -173,6 +177,9 @@ static void *client_data(__attribute__((unused)) void *arg)
             continue;
         }
 
+        int32_t dns_id;
+        dns_id = dns_ans_check(&receive_msg, &que_domain, NULL, NULL) + 1;
+
         dns_header_t *header = (dns_header_t *)receive_msg.data;
         uint16_t id = ntohs(header->id);
 
@@ -180,7 +187,7 @@ static void *client_data(__attribute__((unused)) void *arg)
         id_map[id].port = receive_client_addr.sin_port;
 
         if (sendto(repeater_DNS_socket, receive_msg.data, receive_msg.size, 0,
-                   (struct sockaddr *)&dns_addr, sizeof(dns_addr)) < 0) {
+                   (struct sockaddr *)&dns_addr[dns_id], sizeof(dns_addr[dns_id])) < 0) {
             stat.sended_to_dns_error++;
             errmsg("Can't send to DNS :%s\n", strerror(errno));
         } else {

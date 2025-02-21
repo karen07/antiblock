@@ -53,9 +53,6 @@ extern uint32_t tun_ip;
 extern uint32_t tun_prefix;
 #endif
 
-extern uint32_t dns_ip;
-extern uint16_t dns_port;
-
 extern uint32_t listen_ip;
 extern uint16_t listen_port;
 
@@ -70,6 +67,8 @@ extern char *gateway_domains_paths[GATEWAY_MAX_COUNT];
 
 extern uint32_t gateway_domains_offset[GATEWAY_MAX_COUNT];
 extern int32_t gateway_domains_count[GATEWAY_MAX_COUNT];
+
+extern struct sockaddr_in dns_addr[GATEWAY_MAX_COUNT + 1];
 
 void errmsg(const char *format, ...);
 #ifndef TUN_MODE

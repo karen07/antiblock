@@ -121,12 +121,12 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
 
     dns_header_t *header = (dns_header_t *)cur_pos_ptr;
 
-    uint16_t first_bit_mark = FIRST_BIT_UINT16;
-    uint16_t flags = ntohs(header->flags);
-    if ((flags & first_bit_mark) == 0) {
-        stat.request_parsing_error++;
-        return 2;
-    }
+    //uint16_t first_bit_mark = FIRST_BIT_UINT16;
+    //uint16_t flags = ntohs(header->flags);
+    //if ((flags & first_bit_mark) == 0) {
+    //    stat.request_parsing_error++;
+    //    return 2;
+    //}
 
     uint16_t quest_count = ntohs(header->quest);
     if (quest_count != 1) {
@@ -134,9 +134,9 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
     }
 
     uint16_t ans_count = ntohs(header->ans);
-    if (ans_count == 0) {
-        return 4;
-    }
+    //if (ans_count == 0) {
+    //    return 4;
+    //}
 
     cur_pos_ptr += sizeof(dns_header_t);
     // DNS HEADER
@@ -150,7 +150,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
     }
     cur_pos_ptr = que_domain_end;
 
-    __attribute__((unused)) int32_t block_que_domain_flag = check_domain(que_domain);
+    int32_t block_que_domain_flag = check_domain(que_domain);
     // QUE DOMAIN
 
     // QUE DATA
@@ -237,9 +237,9 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
                     fprintf(log_fd, " %s\n", inet_ntoa(new_ip));
                 }
 #else
-                if ((ans->ip4 != dns_ip) && (ans->ip4 != 0)) {
-                    add_route(block_ans_domain_flag, ans->ip4);
-                }
+                //if ((ans->ip4 != dns_ip) && (ans->ip4 != 0)) {
+                add_route(block_ans_domain_flag, ans->ip4);
+                //}
 
                 if (log_fd) {
                     struct in_addr rec_ip;
@@ -320,7 +320,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
         }
     }
 
-    return 0;
+    return block_que_domain_flag;
 }
 
 void dns_ans_check_test(void)
@@ -371,7 +371,7 @@ void dns_ans_check_test(void)
 
     receive_msg.size = sizeof(correct_test);
     memcpy(receive_msg.data, correct_test, receive_msg.size);
-    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 0) {
+    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != -1) {
         errmsg("Test DNS correct fail\n");
     }
 
@@ -381,11 +381,11 @@ void dns_ans_check_test(void)
     }
     receive_msg.size = sizeof(correct_test);
 
-    receive_msg.data[2] = 1;
-    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 2) {
-        errmsg("Test DNS flag fail\n");
-    }
-    receive_msg.data[2] = correct_test[2];
+    //receive_msg.data[2] = 1;
+    //if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 2) {
+    //    errmsg("Test DNS flag fail\n");
+    //}
+    //receive_msg.data[2] = correct_test[2];
 
     receive_msg.data[5] = 2;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 3) {
@@ -393,11 +393,11 @@ void dns_ans_check_test(void)
     }
     receive_msg.data[5] = correct_test[5];
 
-    receive_msg.data[7] = 0;
-    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 4) {
-        errmsg("Test DNS ans count fail\n");
-    }
-    receive_msg.data[7] = correct_test[7];
+    //receive_msg.data[7] = 0;
+    //if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 4) {
+    //    errmsg("Test DNS ans count fail\n");
+    //}
+    //receive_msg.data[7] = correct_test[7];
 
     receive_msg.size = 26;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != 5) {

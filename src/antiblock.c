@@ -39,6 +39,8 @@ char *gateway_domains_paths[GATEWAY_MAX_COUNT];
 uint32_t gateway_domains_offset[GATEWAY_MAX_COUNT];
 int32_t gateway_domains_count[GATEWAY_MAX_COUNT];
 
+struct sockaddr_in dns_addr[GATEWAY_MAX_COUNT + 1];
+
 #ifndef TUN_MODE
 int32_t route_socket;
 #endif
@@ -145,10 +147,10 @@ static void print_help(void)
     printf(
         "\nCommands:\n"
         "  At least one parameters needs to be filled:\n"
-        "    -domains  \"test1 https://test1.com\"  Route domains from path/url through gateway\n"
-        "    -domains  \"test2 /test1.txt\"         Route domains from path/url through gateway\n"
-        "    -domains  \"test3 /test2.txt\"         Route domains from path/url through gateway\n"
-        "    -domains  \"test4 https://test2.com\"  Route domains from path/url through gateway\n"
+        "    -domains  \"DNS1 gateway1 https://test1.com\"  Route domains from path/url through gateway\n"
+        "    -domains  \"DNS2 gateway2 /test1.txt\"         Route domains from path/url through gateway\n"
+        "    -domains  \"DNS3 gateway3 /test2.txt\"         Route domains from path/url through gateway\n"
+        "    -domains  \"DNS4 gateway4 https://test2.com\"  Route domains from path/url through gateway\n"
         "    ........\n"
         "  Required parameters:\n"
         "    -listen    x.x.x.x:xx                Listen address\n"
@@ -219,17 +221,34 @@ int32_t main(int32_t argc, char *argv[])
         if (!strcmp(argv[i], "-domains")) {
             if (i != argc - 1) {
                 printf("  Domains %s\n", argv[i + 1]);
-                char *space_ptr = strchr(argv[i + 1], ' ');
-                if (space_ptr) {
-                    *space_ptr = 0;
-                    if (gateways_count < GATEWAY_MAX_COUNT) {
-                        if (strlen(argv[i + 1]) < IFNAMSIZ) {
-                            strcpy(gateway_name[gateways_count], argv[i + 1]);
+                char *first_space_ptr = strchr(argv[i + 1], ' ');
+                if (first_space_ptr) {
+                    *first_space_ptr = 0;
+                    char *colon_ptr = strchr(argv[i + 1], ':');
+                    if (colon_ptr) {
+                        dns_addr[gateways_count + 1].sin_family = AF_INET;
+                        uint16_t tmp_port = 0;
+                        sscanf(colon_ptr + 1, "%hu", &tmp_port);
+                        dns_addr[gateways_count + 1].sin_port = htons(tmp_port);
+                        *colon_ptr = 0;
+                        if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
+                            dns_addr[gateways_count + 1].sin_addr.s_addr = inet_addr(argv[i + 1]);
                         }
-                        gateway_domains_paths[gateways_count] = space_ptr + 1;
+                        *colon_ptr = ':';
                     }
-                    *space_ptr = ' ';
-                    gateways_count++;
+                    char *second_space_ptr = strchr(first_space_ptr + 1, ' ');
+                    if (second_space_ptr) {
+                        *second_space_ptr = 0;
+                        if (gateways_count < GATEWAY_MAX_COUNT) {
+                            if (strlen(argv[i + 1]) < IFNAMSIZ) {
+                                strcpy(gateway_name[gateways_count], argv[i + 1]);
+                            }
+                            gateway_domains_paths[gateways_count] = second_space_ptr + 1;
+                        }
+                        *second_space_ptr = ' ';
+                        gateways_count++;
+                    }
+                    *first_space_ptr = ' ';
                 }
                 i++;
             }
@@ -250,10 +269,13 @@ int32_t main(int32_t argc, char *argv[])
                 printf("  DNS %s\n", argv[i + 1]);
                 char *colon_ptr = strchr(argv[i + 1], ':');
                 if (colon_ptr) {
-                    sscanf(colon_ptr + 1, "%hu", &dns_port);
+                    dns_addr[0].sin_family = AF_INET;
+                    uint16_t tmp_port = 0;
+                    sscanf(colon_ptr + 1, "%hu", &tmp_port);
+                    dns_addr[0].sin_port = htons(tmp_port);
                     *colon_ptr = 0;
                     if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
-                        dns_ip = inet_addr(argv[i + 1]);
+                        dns_addr[0].sin_addr.s_addr = inet_addr(argv[i + 1]);
                     }
                     *colon_ptr = ':';
                 }
@@ -345,18 +367,19 @@ int32_t main(int32_t argc, char *argv[])
     for (int32_t i = 0; i < gateways_count; i++) {
         if ((gateway_name[i][0] == 0) || (gateway_domains_paths[i][0] == 0)) {
             print_help();
-            errmsg("The program needs at least one correct pair of \"gateway domains\"\n");
+            errmsg("The program needs correct pairs of \"gateway domains\"\n");
         }
     }
 
-    if (dns_ip == 0xFFFFFFFF) {
-        print_help();
-        errmsg("The program need correct DNS IP\n");
-    }
-
-    if (dns_port == 0) {
-        print_help();
-        errmsg("The program need correct DNS port\n");
+    for (int32_t i = 0; i < gateways_count + 1; i++) {
+        if (dns_addr[i].sin_addr.s_addr == 0xFFFFFFFF) {
+            print_help();
+            errmsg("The program need correct DNS IP\n");
+        }
+        if (dns_addr[i].sin_port == 0) {
+            print_help();
+            errmsg("The program need correct DNS port\n");
+        }
     }
 
     if (listen_ip == 0xFFFFFFFF) {

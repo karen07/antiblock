@@ -118,11 +118,7 @@ static array_hashmap_bool ip_ip_cmp(const void *elem_data, const void *hashmap_e
     const ip_ip_map_t *elem1 = elem_data;
     const ip_ip_map_t *elem2 = hashmap_elem_data;
 
-    if (elem1->ip_local == elem2->ip_local) {
-        return 1;
-    } else {
-        return 0;
-    }
+    return elem1->ip_local == elem2->ip_local;
 }
 
 static array_hashmap_hash nat_hash(const void *elem_data)
@@ -136,11 +132,7 @@ static array_hashmap_bool nat_cmp(const void *elem_data, const void *hashmap_ele
     const nat_map_t *elem1 = elem_data;
     const nat_map_t *elem2 = hashmap_elem_data;
 
-    if (memcmp(&elem1->key, &elem2->key, sizeof(elem1->key)) == 0) {
-        return 1;
-    } else {
-        return 0;
-    }
+    return !memcmp(&elem1->key, &elem2->key, sizeof(elem1->key));
 }
 
 static void tun_catch_function(__attribute__((unused)) int32_t signo)
