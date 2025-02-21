@@ -437,7 +437,7 @@ int32_t main(int32_t argc, char *argv[])
 #else
     route_socket = socket(AF_INET, SOCK_DGRAM, 0);
     if (route_socket < 0) {
-        errmsg("Can't create route_socket :%s\n", strerror(errno));
+        errmsg("Can't create route_socket \"%s\"\n", strerror(errno));
     }
 #endif
 
