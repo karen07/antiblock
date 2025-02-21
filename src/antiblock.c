@@ -238,6 +238,7 @@ int32_t main(int32_t argc, char *argv[])
                         }
                         *colon_ptr = ':';
                     }
+                    *first_space_ptr = ' ';
                     char *second_space_ptr = strchr(first_space_ptr + 1, ' ');
                     if (second_space_ptr) {
                         *second_space_ptr = 0;
@@ -250,7 +251,6 @@ int32_t main(int32_t argc, char *argv[])
                         *second_space_ptr = ' ';
                         gateways_count++;
                     }
-                    *first_space_ptr = ' ';
                 }
                 i++;
             }
