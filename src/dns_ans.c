@@ -23,6 +23,18 @@
 
 #define CHECK_DOMAIN_NOT_BLOCKED -1
 
+#define DNS_ANS_CHECK_HEADER_SIZE_ERROR -2
+#define DNS_ANS_CHECK_RES_TYPE_ERROR -3
+#define DNS_ANS_CHECK_QUE_COUNT_ERROR -4
+#define DNS_ANS_CHECK_ANS_COUNT_ERROR -5
+#define DNS_ANS_CHECK_QUE_URL_GET_ERROR -6
+#define DNS_ANS_CHECK_QUE_DATA_GET_ERROR -7
+#define DNS_ANS_CHECK_ANS_URL_GET_ERROR -8
+#define DNS_ANS_CHECK_ANS_DATA_GET_ERROR -9
+#define DNS_ANS_CHECK_ANS_LEN_ERROR -10
+#define DNS_ANS_CHECK_CNAME_URL_GET_ERROR -11
+#define DNS_ANS_CHECK_NOT_END_ERROR -12
+
 int32_t get_domain_from_packet(memory_t *receive_msg, char *cur_pos_ptr, char **new_cur_pos_ptr,
                                memory_t *domain)
 {
@@ -118,18 +130,6 @@ static int32_t check_domain(memory_t *domain)
 
     return CHECK_DOMAIN_NOT_BLOCKED;
 }
-
-#define DNS_ANS_CHECK_HEADER_SIZE_ERROR -2
-#define DNS_ANS_CHECK_RES_TYPE_ERROR -3
-#define DNS_ANS_CHECK_QUE_COUNT_ERROR -4
-#define DNS_ANS_CHECK_ANS_COUNT_ERROR -5
-#define DNS_ANS_CHECK_QUE_URL_GET_ERROR -6
-#define DNS_ANS_CHECK_QUE_DATA_GET_ERROR -7
-#define DNS_ANS_CHECK_ANS_URL_GET_ERROR -8
-#define DNS_ANS_CHECK_ANS_DATA_GET_ERROR -9
-#define DNS_ANS_CHECK_ANS_LEN_ERROR -10
-#define DNS_ANS_CHECK_CNAME_URL_GET_ERROR -11
-#define DNS_ANS_CHECK_NOT_END_ERROR -12
 
 int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans_domain,
                       memory_t *cname_domain)

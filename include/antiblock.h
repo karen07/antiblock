@@ -41,11 +41,6 @@ typedef struct domains_gateway {
 
 extern pthread_barrier_t threads_barrier;
 
-extern int32_t is_log_print;
-extern int32_t is_stat_print;
-
-extern char log_or_stat_folder[PATH_MAX - 100];
-
 #ifdef TUN_MODE
 extern char tun_name[IFNAMSIZ];
 
@@ -53,11 +48,9 @@ extern uint32_t tun_ip;
 extern uint32_t tun_prefix;
 #endif
 
-extern uint32_t listen_ip;
-extern uint16_t listen_port;
+extern struct sockaddr_in listen_addr;
 
 extern FILE *log_fd;
-extern FILE *stat_fd;
 
 #define GATEWAY_MAX_COUNT 61
 extern int32_t gateways_count;
@@ -65,7 +58,7 @@ extern int32_t gateways_count;
 extern char gateway_name[GATEWAY_MAX_COUNT][IFNAMSIZ];
 extern char *gateway_domains_paths[GATEWAY_MAX_COUNT];
 
-extern uint32_t gateway_domains_offset[GATEWAY_MAX_COUNT];
+extern uint32_t gateway_domains_offset[GATEWAY_MAX_COUNT + 1];
 extern int32_t gateway_domains_count[GATEWAY_MAX_COUNT];
 
 extern struct sockaddr_in dns_addr[GATEWAY_MAX_COUNT + 1];

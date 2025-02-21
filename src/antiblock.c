@@ -10,11 +10,6 @@
 
 pthread_barrier_t threads_barrier;
 
-int32_t is_log_print;
-int32_t is_stat_print;
-
-char log_or_stat_folder[PATH_MAX - 100];
-
 #ifdef TUN_MODE
 char tun_name[IFNAMSIZ];
 
@@ -22,25 +17,26 @@ uint32_t tun_ip = 0xFFFFFFFF;
 uint32_t tun_prefix;
 #endif
 
-uint32_t listen_ip = 0xFFFFFFFF;
-uint16_t listen_port;
+struct sockaddr_in listen_addr;
 
 FILE *log_fd;
-FILE *stat_fd;
+static FILE *stat_fd;
 
 int32_t gateways_count;
 
 char gateway_name[GATEWAY_MAX_COUNT][IFNAMSIZ];
 char *gateway_domains_paths[GATEWAY_MAX_COUNT];
 
-uint32_t gateway_domains_offset[GATEWAY_MAX_COUNT];
+uint32_t gateway_domains_offset[GATEWAY_MAX_COUNT + 1];
 int32_t gateway_domains_count[GATEWAY_MAX_COUNT];
 
 struct sockaddr_in dns_addr[GATEWAY_MAX_COUNT + 1];
 
 #ifndef TUN_MODE
-int32_t route_socket;
+static int32_t route_socket;
 #endif
+
+static void clean_route_table(void);
 
 void errmsg(const char *format, ...)
 {
@@ -52,11 +48,25 @@ void errmsg(const char *format, ...)
     vprintf(format, args);
     va_end(args);
 
+#ifndef TUN_MODE
+    clean_route_table();
+#endif
+
+    if (stat_fd) {
+        stat_print(stat_fd);
+    }
+
+    if (log_fd) {
+        fflush(log_fd);
+    }
+
+    fflush(stdout);
+
     exit(EXIT_FAILURE);
 }
 
 #ifndef TUN_MODE
-void set_route(struct rtentry *route, int32_t gateway_index, uint32_t dst)
+static void set_route(struct rtentry *route, int32_t gateway_index, uint32_t dst)
 {
     memset(route, 0, sizeof(*route));
 
@@ -84,13 +94,13 @@ void add_route(int32_t gateway_index, uint32_t dst)
         if (strcmp(strerror(errno), "File exists")) {
             struct in_addr rec_ip;
             rec_ip.s_addr = dst;
-            printf("Ioctl can't add %s %s to route table :%s\n", inet_ntoa(rec_ip),
+            printf("Ioctl can't add %s for routing via %s \"%s\"\n", inet_ntoa(rec_ip),
                    gateway_name[gateway_index], strerror(errno));
         }
     }
 }
 
-void del_route(int32_t gateway_index, uint32_t dst)
+static void del_route(int32_t gateway_index, uint32_t dst)
 {
     struct rtentry route;
 
@@ -100,8 +110,8 @@ void del_route(int32_t gateway_index, uint32_t dst)
         if (strcmp(strerror(errno), "No such process")) {
             struct in_addr rec_ip;
             rec_ip.s_addr = dst;
-            printf("Ioctl can't delete %s from route table :%s\n", inet_ntoa(rec_ip),
-                   strerror(errno));
+            printf("Ioctl can't delete %s for routing via %s \"%s\"\n", inet_ntoa(rec_ip),
+                   gateway_name[gateway_index], strerror(errno));
         }
     }
 }
@@ -166,23 +176,12 @@ static void print_help(void)
 static void main_catch_function(int32_t signo)
 {
     if (signo == SIGINT) {
-        printf("SIGINT catched main\n");
+        errmsg("SIGINT catched main\n");
     } else if (signo == SIGSEGV) {
-        printf("SIGSEGV catched main\n");
+        errmsg("SIGSEGV catched main\n");
     } else if (signo == SIGTERM) {
-        printf("SIGTERM catched main\n");
+        errmsg("SIGTERM catched main\n");
     }
-#ifndef TUN_MODE
-    clean_route_table();
-#endif
-    fflush(stdout);
-    if (stat_fd) {
-        fflush(stat_fd);
-    }
-    if (log_fd) {
-        fflush(log_fd);
-    }
-    exit(EXIT_SUCCESS);
 }
 
 int32_t main(int32_t argc, char *argv[])
@@ -202,6 +201,11 @@ int32_t main(int32_t argc, char *argv[])
     if (signal(SIGTERM, main_catch_function) == SIG_ERR) {
         errmsg("Can't set SIGTERM signal handler main\n");
     }
+
+    int32_t is_log_print = 0;
+    int32_t is_stat_print = 0;
+    char log_or_stat_folder[PATH_MAX - 100];
+    memset(log_or_stat_folder, 0, PATH_MAX - 100);
 
     printf("Launch parameters:\n");
 
@@ -286,10 +290,13 @@ int32_t main(int32_t argc, char *argv[])
                 printf("  Listen %s\n", argv[i + 1]);
                 char *colon_ptr = strchr(argv[i + 1], ':');
                 if (colon_ptr) {
-                    sscanf(colon_ptr + 1, "%hu", &listen_port);
+                    uint16_t tmp_port = 0;
+                    sscanf(colon_ptr + 1, "%hu", &tmp_port);
                     *colon_ptr = 0;
                     if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
-                        listen_ip = inet_addr(argv[i + 1]);
+                        listen_addr.sin_family = AF_INET;
+                        listen_addr.sin_port = htons(tmp_port);
+                        listen_addr.sin_addr.s_addr = inet_addr(argv[i + 1]);
                     }
                     *colon_ptr = ':';
                 }
@@ -380,12 +387,12 @@ int32_t main(int32_t argc, char *argv[])
         }
     }
 
-    if (listen_ip == 0xFFFFFFFF) {
+    if (listen_addr.sin_addr.s_addr == 0xFFFFFFFF) {
         print_help();
         errmsg("The program need correct listen IP\n");
     }
 
-    if (listen_port == 0) {
+    if (listen_addr.sin_port == 0) {
         print_help();
         errmsg("The program need correct listen port\n");
     }
@@ -450,7 +457,8 @@ int32_t main(int32_t argc, char *argv[])
             clean_route_table();
 #endif
 
-            int32_t domains_read_status = domains_read();
+            int32_t domains_read_status = 0;
+            domains_read_status = domains_read();
 
             if (domains_read_status) {
                 sleep_circles = DOMAINS_UPDATE_TIME;
@@ -463,11 +471,11 @@ int32_t main(int32_t argc, char *argv[])
 
         circles %= sleep_circles;
 
-        if (is_stat_print) {
-            stat_print();
+        if (stat_fd) {
+            stat_print(stat_fd);
         }
 
-        if (is_log_print) {
+        if (log_fd) {
             fflush(log_fd);
         }
 

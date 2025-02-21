@@ -26,4 +26,4 @@ typedef struct statistics {
 
 extern statistics_t stat;
 
-void stat_print(void);
+void stat_print(FILE *stat_fd);

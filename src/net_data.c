@@ -25,9 +25,8 @@ static void *DNS_data(__attribute__((unused)) void *arg)
 
     struct sockaddr_in repeater_DNS_addr, receive_DNS_addr, client_addr;
 
-    repeater_DNS_addr.sin_family = AF_INET;
-    repeater_DNS_addr.sin_port = htons(listen_port + 1);
-    repeater_DNS_addr.sin_addr.s_addr = listen_ip;
+    repeater_DNS_addr = listen_addr;
+    repeater_DNS_addr.sin_port = htons(ntohs(repeater_DNS_addr.sin_port) + 1);
 
     uint32_t receive_DNS_addr_length = sizeof(receive_DNS_addr);
 
@@ -131,11 +130,7 @@ static void *client_data(__attribute__((unused)) void *arg)
         errmsg("Can't set signal handler client_data\n");
     }
 
-    struct sockaddr_in repeater_client_addr, receive_client_addr;
-
-    repeater_client_addr.sin_family = AF_INET;
-    repeater_client_addr.sin_port = htons(listen_port);
-    repeater_client_addr.sin_addr.s_addr = listen_ip;
+    struct sockaddr_in receive_client_addr;
 
     uint32_t receive_client_addr_length = sizeof(receive_client_addr);
 
@@ -144,8 +139,7 @@ static void *client_data(__attribute__((unused)) void *arg)
         errmsg("Can't create socket for listen from client :%s\n", strerror(errno));
     }
 
-    if (bind(repeater_client_socket, (struct sockaddr *)&repeater_client_addr,
-             sizeof(repeater_client_addr)) < 0) {
+    if (bind(repeater_client_socket, (struct sockaddr *)&listen_addr, sizeof(listen_addr)) < 0) {
         errmsg("Can't bind to the port for listen from client :%s\n", strerror(errno));
     }
 
@@ -179,6 +173,10 @@ static void *client_data(__attribute__((unused)) void *arg)
 
         int32_t dns_id;
         dns_id = dns_ans_check(&receive_msg, &que_domain, NULL, NULL) + 1;
+
+        if (dns_id < 0) {
+            dns_id = 0;
+        }
 
         dns_header_t *header = (dns_header_t *)receive_msg.data;
         uint16_t id = ntohs(header->id);
