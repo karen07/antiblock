@@ -84,7 +84,8 @@ void add_route(int32_t gateway_index, uint32_t dst)
         if (strcmp(strerror(errno), "File exists")) {
             struct in_addr rec_ip;
             rec_ip.s_addr = dst;
-            printf("Ioctl can't add %s from route table :%s\n", inet_ntoa(rec_ip), strerror(errno));
+            printf("Ioctl can't add %s %s to route table :%s\n", inet_ntoa(rec_ip),
+                   gateway_name[gateway_index], strerror(errno));
         }
     }
 }
@@ -237,8 +238,8 @@ int32_t main(int32_t argc, char *argv[])
                     if (second_space_ptr) {
                         *second_space_ptr = 0;
                         if (gateways_count < GATEWAY_MAX_COUNT) {
-                            if (strlen(argv[i + 1]) < IFNAMSIZ) {
-                                strcpy(gateway_name[gateways_count], argv[i + 1]);
+                            if (strlen(first_space_ptr + 1) < IFNAMSIZ) {
+                                strcpy(gateway_name[gateways_count], first_space_ptr + 1);
                             }
                             gateway_domains_paths[gateways_count] = second_space_ptr + 1;
                         }
