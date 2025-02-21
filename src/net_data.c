@@ -32,12 +32,12 @@ static void *DNS_data(__attribute__((unused)) void *arg)
 
     repeater_DNS_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (repeater_DNS_socket < 0) {
-        errmsg("Can't create socket for listen from DNS :%s\n", strerror(errno));
+        errmsg("Can't create socket for listen from DNS \"%s\"\n", strerror(errno));
     }
 
     if (bind(repeater_DNS_socket, (struct sockaddr *)&repeater_DNS_addr,
              sizeof(repeater_DNS_addr)) < 0) {
-        errmsg("Can't bind to the port for listen from DNS :%s\n", strerror(errno));
+        errmsg("Can't bind to the port for listen from DNS \"%s\"\n", strerror(errno));
     }
 
     memory_t receive_msg;
@@ -105,7 +105,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
         if (sendto(repeater_client_socket, receive_msg.data, receive_msg.size, 0,
                    (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
             stat.sended_to_client_error++;
-            errmsg("Can't send to client %s\n", strerror(errno));
+            errmsg("Can't send to client \"%s\"\n", strerror(errno));
         } else {
             stat.sended_to_client++;
         }
@@ -136,11 +136,11 @@ static void *client_data(__attribute__((unused)) void *arg)
 
     repeater_client_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (repeater_client_socket < 0) {
-        errmsg("Can't create socket for listen from client :%s\n", strerror(errno));
+        errmsg("Can't create socket for listen from client \"%s\"\n", strerror(errno));
     }
 
     if (bind(repeater_client_socket, (struct sockaddr *)&listen_addr, sizeof(listen_addr)) < 0) {
-        errmsg("Can't bind to the port for listen from client :%s\n", strerror(errno));
+        errmsg("Can't bind to the port for listen from client \"%s\"\n", strerror(errno));
     }
 
     memory_t receive_msg;
@@ -187,7 +187,7 @@ static void *client_data(__attribute__((unused)) void *arg)
         if (sendto(repeater_DNS_socket, receive_msg.data, receive_msg.size, 0,
                    (struct sockaddr *)&dns_addr[dns_id], sizeof(dns_addr[dns_id])) < 0) {
             stat.sended_to_dns_error++;
-            errmsg("Can't send to DNS :%s\n", strerror(errno));
+            errmsg("Can't send to DNS \"%s\"\n", strerror(errno));
         } else {
             stat.sended_to_dns++;
         }
