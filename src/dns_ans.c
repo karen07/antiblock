@@ -95,14 +95,16 @@ static int32_t check_domain(memory_t *domain)
 
             dot_pos = &domain->data[i + 1];
 
-            int32_t find_res = array_hashmap_find_elem(domains_map_struct, dot_pos, NULL);
+            domains_gateway_t res_elem;
+
+            int32_t find_res = array_hashmap_find_elem(domains_map_struct, dot_pos, &res_elem);
             if (find_res == array_hashmap_elem_finded) {
-                return 1;
+                return res_elem.gateway;
             }
         }
     }
 
-    return 0;
+    return -1;
 }
 
 int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans_domain,
@@ -184,7 +186,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
         }
         cur_pos_ptr = ans_domain_end;
 
-        int32_t block_ans_domain_flag = 0;
+        int32_t block_ans_domain_flag = -1;
         block_ans_domain_flag = check_domain(ans_domain);
         // ANS DOMAIN
 
@@ -206,59 +208,46 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
         }
 
         if (ans_type == DNS_TypeA) {
-            if (block_ans_domain_flag) {
+            if (block_ans_domain_flag != -1) {
 #ifdef TUN_MODE
-                if (is_tun_name) {
-                    uint32_t NAT_subnet_start_n = htonl(NAT_VPN.start_ip++);
+                uint32_t NAT_subnet_start_n = htonl(NAT.start_ip++);
 
-                    if (NAT_VPN.start_ip == NAT_VPN.end_ip) {
-                        subnet_init(&NAT_VPN);
-                    }
+                if (NAT.start_ip == NAT.end_ip) {
+                    subnet_init(&NAT);
+                }
 
-                    ip_ip_map_t add_elem;
-                    add_elem.ip_local = NAT_subnet_start_n;
-                    add_elem.ip_global = ans->ip4;
+                ip_ip_map_t add_elem;
+                add_elem.ip_local = NAT_subnet_start_n;
+                add_elem.ip_global = ans->ip4;
 
-                    array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL,
-                                           array_hashmap_save_new_func);
+                array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL,
+                                       array_hashmap_save_new_func);
 
-                    ans->ip4 = NAT_subnet_start_n;
+                ans->ip4 = NAT_subnet_start_n;
 
-                    if (log_fd) {
-                        struct in_addr new_ip;
-                        new_ip.s_addr = add_elem.ip_local;
+                if (log_fd) {
+                    struct in_addr new_ip;
+                    new_ip.s_addr = add_elem.ip_local;
 
-                        struct in_addr old_ip;
-                        old_ip.s_addr = add_elem.ip_global;
+                    struct in_addr old_ip;
+                    old_ip.s_addr = add_elem.ip_global;
 
-                        fprintf(log_fd, "    Blocked_IP: %s", ans_domain->data + 1);
-                        fprintf(log_fd, " %s", inet_ntoa(old_ip));
-                        fprintf(log_fd, " %s\n", inet_ntoa(new_ip));
-                    }
-                } else
-#endif
-                {
+                    fprintf(log_fd, "    Blocked_IP: %s", ans_domain->data + 1);
+                    fprintf(log_fd, " %s", inet_ntoa(old_ip));
+                    fprintf(log_fd, " %s\n", inet_ntoa(new_ip));
+                }
+#else
+                if ((ans->ip4 != dns_ip) && (ans->ip4 != 0)) {
+                    add_route(block_ans_domain_flag, ans->ip4);
+                }
+
+                if (log_fd) {
                     struct in_addr rec_ip;
                     rec_ip.s_addr = ans->ip4;
-
-                    struct sockaddr_in *route_addr = (struct sockaddr_in *)&route.rt_dst;
-                    route_addr->sin_family = AF_INET;
-                    route_addr->sin_addr.s_addr = rec_ip.s_addr;
-
-                    if ((ans->ip4 != dns_ip) && (ans->ip4 != 0)) {
-                        if (ioctl(route_socket, SIOCADDRT, &route) < 0) {
-                            if (strcmp(strerror(errno), "File exists")) {
-                                errmsg("Ioctl can't add %s to route table :%s\n", inet_ntoa(rec_ip),
-                                       strerror(errno));
-                            }
-                        }
-                    }
-
-                    if (log_fd) {
-                        fprintf(log_fd, "    Blocked_IP: %s", ans_domain->data + 1);
-                        fprintf(log_fd, " %s\n", inet_ntoa(rec_ip));
-                    }
+                    fprintf(log_fd, "    Blocked_IP: %s", ans_domain->data + 1);
+                    fprintf(log_fd, " %s\n", inet_ntoa(rec_ip));
                 }
+#endif
             } else {
                 if (log_fd) {
                     struct in_addr new_ip;
@@ -279,24 +268,27 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
                 return 10;
             }
 
-            int32_t block_cname_domain_flag = 0;
+            int32_t block_cname_domain_flag = -1;
             block_cname_domain_flag = check_domain(cname_domain);
 
-            if (block_ans_domain_flag == 1 && block_cname_domain_flag == 0) {
-                block_cname_domain_flag = 1;
+            if (block_ans_domain_flag != -1 && block_cname_domain_flag == -1) {
+                block_cname_domain_flag = block_ans_domain_flag;
                 if (domains_map_struct) {
                     if (domains.size + cname_domain->size < domains.max_size) {
                         strcpy(&(domains.data[domains.size]), cname_domain->data + 1);
 
-                        int32_t domain_offset = domains.size;
+                        domains_gateway_t add_elem;
+                        add_elem.offset = domains.size;
+                        add_elem.gateway = block_cname_domain_flag;
+
                         domains.size += cname_domain->size;
 
-                        array_hashmap_add_elem(domains_map_struct, &domain_offset, NULL, NULL);
+                        array_hashmap_add_elem(domains_map_struct, &add_elem, NULL, NULL);
                     }
                 }
             }
 
-            if (block_cname_domain_flag) {
+            if (block_cname_domain_flag != -1) {
                 if (log_fd) {
                     fprintf(log_fd, "    Blocked_Cname: %s\n", cname_domain->data + 1);
                 }
