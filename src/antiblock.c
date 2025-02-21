@@ -224,12 +224,12 @@ int32_t main(int32_t argc, char *argv[])
                     *first_space_ptr = 0;
                     char *colon_ptr = strchr(argv[i + 1], ':');
                     if (colon_ptr) {
-                        dns_addr[gateways_count + 1].sin_family = AF_INET;
                         uint16_t tmp_port = 0;
                         sscanf(colon_ptr + 1, "%hu", &tmp_port);
-                        dns_addr[gateways_count + 1].sin_port = htons(tmp_port);
                         *colon_ptr = 0;
                         if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
+                            dns_addr[gateways_count + 1].sin_family = AF_INET;
+                            dns_addr[gateways_count + 1].sin_port = htons(tmp_port);
                             dns_addr[gateways_count + 1].sin_addr.s_addr = inet_addr(argv[i + 1]);
                         }
                         *colon_ptr = ':';
@@ -267,12 +267,12 @@ int32_t main(int32_t argc, char *argv[])
                 printf("  DNS %s\n", argv[i + 1]);
                 char *colon_ptr = strchr(argv[i + 1], ':');
                 if (colon_ptr) {
-                    dns_addr[0].sin_family = AF_INET;
                     uint16_t tmp_port = 0;
                     sscanf(colon_ptr + 1, "%hu", &tmp_port);
-                    dns_addr[0].sin_port = htons(tmp_port);
                     *colon_ptr = 0;
                     if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
+                        dns_addr[0].sin_family = AF_INET;
+                        dns_addr[0].sin_port = htons(tmp_port);
                         dns_addr[0].sin_addr.s_addr = inet_addr(argv[i + 1]);
                     }
                     *colon_ptr = ':';
