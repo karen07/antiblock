@@ -68,6 +68,9 @@ int32_t domains_read(void)
         memset(&domains, 0, sizeof(domains));
     }
 
+    uint32_t gateway_domains_offset[GATEWAY_MAX_COUNT + 1];
+    int32_t gateway_domains_count[GATEWAY_MAX_COUNT];
+
     gateway_domains_offset[0] = 0;
 
     for (int32_t i = 0; i < gateways_count; i++) {
@@ -121,8 +124,9 @@ int32_t domains_read(void)
             fclose(domains_fd);
         }
 
-        if (!(domains.size < MB_64_BYTES)) {
-            errmsg("The total size of all domains must be less than 64 MB\n");
+        if (!(domains.size < (1 << OFFSET_BITS_COUNT))) {
+            errmsg("The total size of all domains must be less than %d MB\n",
+                   (1 << OFFSET_BITS_COUNT) / 1024 / 1024);
         }
 
         if (domains.data) {
@@ -147,8 +151,9 @@ int32_t domains_read(void)
         errmsg("No free memory for cname_domains\n");
     }
 
-    if (!(domains.max_size < MB_64_BYTES)) {
-        errmsg("The total size of all domains and CNAME domains must be less than 64 MB\n");
+    if (!(domains.size < (1 << OFFSET_BITS_COUNT))) {
+        errmsg("The total size of all domains must be less than %d MB\n",
+               (1 << OFFSET_BITS_COUNT) / 1024 / 1024);
     }
 
     if (domains.size > 0) {

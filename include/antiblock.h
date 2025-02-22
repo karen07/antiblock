@@ -32,11 +32,14 @@ typedef struct memory {
 } memory_t;
 #endif
 
+#define GATEWAY_BITS_COUNT 5
+#define OFFSET_BITS_COUNT (32 - GATEWAY_BITS_COUNT)
+
 #ifndef _STRUCT_DOMAINS_GATEWAY
 #define _STRUCT_DOMAINS_GATEWAY
 typedef struct domains_gateway {
-    unsigned int offset : 26;
-    unsigned int gateway : 6;
+    unsigned int offset : OFFSET_BITS_COUNT;
+    unsigned int gateway : GATEWAY_BITS_COUNT;
 } domains_gateway_t;
 #endif
 
@@ -51,16 +54,14 @@ extern struct sockaddr_in listen_addr;
 
 extern FILE *log_fd;
 
-#define GATEWAY_MAX_COUNT 61
+#define GATEWAY_MAX_COUNT (1 << GATEWAY_BITS_COUNT)
+
+#define DNS_COUNT (gateways_count + 1)
+#define DNS_MAX_COUNT (GATEWAY_MAX_COUNT + 1)
+
 extern int32_t gateways_count;
-
-extern char gateway_name[GATEWAY_MAX_COUNT][IFNAMSIZ];
 extern char *gateway_domains_paths[GATEWAY_MAX_COUNT];
-
-extern uint32_t gateway_domains_offset[GATEWAY_MAX_COUNT + 1];
-extern int32_t gateway_domains_count[GATEWAY_MAX_COUNT];
-
-extern struct sockaddr_in dns_addr[GATEWAY_MAX_COUNT + 1];
+extern struct sockaddr_in dns_addr[DNS_MAX_COUNT];
 
 void errmsg(const char *format, ...);
 #ifndef TUN_MODE

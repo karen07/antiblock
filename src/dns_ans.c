@@ -15,6 +15,7 @@
 #define GET_DOMAIN_FIRST_BYTE_ERROR 1
 #define GET_DOMAIN_SECOND_BYTE_ERROR 3
 #define GET_DOMAIN_LAST_CH_DOMAIN_ERROR 2
+#define GET_DOMAIN_MAX_JUMP_COUNT 100
 #define GET_DOMAIN_JUMP_COUNT_ERROR 4
 #define GET_DOMAIN_TWO_BITS_ERROR 5
 #define GET_DOMAIN_CH_BYTE_ERROR 6
@@ -75,7 +76,7 @@ int32_t get_domain_from_packet(memory_t *receive_msg, char *cur_pos_ptr, char **
                 uint8_t second_byte_data = *(cur_pos_ptr + 1);
                 int32_t padding = 256 * first_byte_data + second_byte_data;
                 cur_pos_ptr = receive_msg->data + padding;
-                if (jump_count++ > 100) {
+                if (jump_count++ > GET_DOMAIN_MAX_JUMP_COUNT) {
                     return GET_DOMAIN_JUMP_COUNT_ERROR;
                 }
             } else {
@@ -263,7 +264,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
 #else
 
                 int32_t correct_ip4_flag = 1;
-                for (int j = 0; j < gateways_count + 1; j++) {
+                for (int j = 0; j < DNS_COUNT; j++) {
                     if ((ans->ip4 == dns_addr[j].sin_addr.s_addr) || (ans->ip4 == 0)) {
                         correct_ip4_flag = 0;
                     }

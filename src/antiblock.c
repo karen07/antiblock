@@ -11,24 +11,20 @@
 pthread_barrier_t threads_barrier;
 
 #ifdef TUN_MODE
-uint32_t tun_ip = 0xFFFFFFFF;
+uint32_t tun_ip = INADDR_NONE;
 uint32_t tun_prefix;
 #endif
 
 struct sockaddr_in listen_addr;
 
 FILE *log_fd;
-static FILE *stat_fd;
+FILE *stat_fd;
 
 int32_t gateways_count;
-
-char gateway_name[GATEWAY_MAX_COUNT][IFNAMSIZ];
 char *gateway_domains_paths[GATEWAY_MAX_COUNT];
+struct sockaddr_in dns_addr[DNS_MAX_COUNT];
 
-uint32_t gateway_domains_offset[GATEWAY_MAX_COUNT + 1];
-int32_t gateway_domains_count[GATEWAY_MAX_COUNT];
-
-struct sockaddr_in dns_addr[GATEWAY_MAX_COUNT + 1];
+static char gateway_name[GATEWAY_MAX_COUNT][IFNAMSIZ];
 
 #ifndef TUN_MODE
 static int32_t route_socket;
@@ -75,7 +71,7 @@ static void set_route(struct rtentry *route, int32_t gateway_index, uint32_t dst
 
     route_addr = (struct sockaddr_in *)(&(route->rt_genmask));
     route_addr->sin_family = AF_INET;
-    route_addr->sin_addr.s_addr = 0xFFFFFFFF;
+    route_addr->sin_addr.s_addr = INADDR_NONE;
 
     route->rt_dev = gateway_name[gateway_index];
     route->rt_flags = RTF_UP;
@@ -137,7 +133,7 @@ static void clean_route_table(void)
     while (fscanf(route_fd, "%s %x %x %x %x %x %x %x %x %x %x", iface, &dest_ip, &gate_ip, &flags,
                   &refcnt, &use, &metric, &mask, &mtu, &window, &irtt) != EOF) {
         for (int32_t i = 0; i < gateways_count; i++) {
-            if ((!strcmp(iface, gateway_name[i])) && (mask == 0xFFFFFFFF)) {
+            if ((!strcmp(iface, gateway_name[i])) && (mask == INADDR_NONE)) {
                 del_route(gate_ip, dest_ip);
             }
         }
@@ -201,9 +197,9 @@ int32_t main(int32_t argc, char *argv[])
     int32_t is_stat_print = 0;
     char log_or_stat_folder[PATH_MAX - 100];
     memset(log_or_stat_folder, 0, PATH_MAX - 100);
-    listen_addr.sin_addr.s_addr = 0xFFFFFFFF;
-    for (int32_t i = 0; i < GATEWAY_MAX_COUNT + 1; i++) {
-        dns_addr[i].sin_addr.s_addr = 0xFFFFFFFF;
+    listen_addr.sin_addr.s_addr = INADDR_NONE;
+    for (int32_t i = 0; i < DNS_MAX_COUNT; i++) {
+        dns_addr[i].sin_addr.s_addr = INADDR_NONE;
     }
 
     printf("Launch parameters:\n");
@@ -232,9 +228,9 @@ int32_t main(int32_t argc, char *argv[])
                         sscanf(colon_ptr + 1, "%hu", &tmp_port);
                         *colon_ptr = 0;
                         if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
-                            dns_addr[gateways_count + 1].sin_family = AF_INET;
-                            dns_addr[gateways_count + 1].sin_port = htons(tmp_port);
-                            dns_addr[gateways_count + 1].sin_addr.s_addr = inet_addr(argv[i + 1]);
+                            dns_addr[DNS_COUNT].sin_family = AF_INET;
+                            dns_addr[DNS_COUNT].sin_port = htons(tmp_port);
+                            dns_addr[DNS_COUNT].sin_addr.s_addr = inet_addr(argv[i + 1]);
                         }
                         *colon_ptr = ':';
                     }
@@ -316,7 +312,7 @@ int32_t main(int32_t argc, char *argv[])
             continue;
         }
 #ifdef TUN_MODE
-        if (!strcmp(argv[i], "-TUN_net")) {
+        if (!strcmp(argv[i], "-n")) {
             if (i != argc - 1) {
                 printf("  TUN net %s\n", argv[i + 1]);
                 char *slash_ptr = strchr(argv[i + 1], '/');
@@ -338,7 +334,7 @@ int32_t main(int32_t argc, char *argv[])
     }
 
 #ifdef TUN_MODE
-    if (tun_ip == 0xFFFFFFFF) {
+    if (tun_ip == INADDR_NONE) {
         print_help();
         errmsg("The program need correct TUN IP\n");
     }
@@ -359,10 +355,11 @@ int32_t main(int32_t argc, char *argv[])
         errmsg("The program needs at least one correct pair of \"gateway domains\"\n");
     }
 
-    if (!(gateways_count < GATEWAY_MAX_COUNT)) {
+    if (gateways_count > GATEWAY_MAX_COUNT) {
+        gateways_count = GATEWAY_MAX_COUNT;
         print_help();
         errmsg("The program needs a maximum of %d pair of \"gateway domains\"\n",
-               GATEWAY_MAX_COUNT - 1);
+               GATEWAY_MAX_COUNT);
     }
 
     for (int32_t i = 0; i < gateways_count; i++) {
@@ -373,13 +370,13 @@ int32_t main(int32_t argc, char *argv[])
     }
 
 #ifndef MULTIPLE_DNS
-    for (int32_t i = 1; i < GATEWAY_MAX_COUNT + 1; i++) {
+    for (int32_t i = 1; i < DNS_COUNT; i++) {
         dns_addr[i] = dns_addr[0];
     }
 #endif
 
-    for (int32_t i = 0; i < gateways_count + 1; i++) {
-        if (dns_addr[i].sin_addr.s_addr == 0xFFFFFFFF) {
+    for (int32_t i = 0; i < DNS_COUNT; i++) {
+        if (dns_addr[i].sin_addr.s_addr == INADDR_NONE) {
             print_help();
             errmsg("The program need correct DNS IP\n");
         }
@@ -389,7 +386,7 @@ int32_t main(int32_t argc, char *argv[])
         }
     }
 
-    if (listen_addr.sin_addr.s_addr == 0xFFFFFFFF) {
+    if (listen_addr.sin_addr.s_addr == INADDR_NONE) {
         print_help();
         errmsg("The program need correct listen IP\n");
     }
