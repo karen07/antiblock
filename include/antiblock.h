@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <linux/if.h>
+#define TUN_MODE
 #ifdef TUN_MODE
 #include <linux/if_tun.h>
 #include <linux/ip.h>
@@ -42,8 +43,6 @@ typedef struct domains_gateway {
 extern pthread_barrier_t threads_barrier;
 
 #ifdef TUN_MODE
-extern char tun_name[IFNAMSIZ];
-
 extern uint32_t tun_ip;
 extern uint32_t tun_prefix;
 #endif
