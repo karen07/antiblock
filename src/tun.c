@@ -17,7 +17,7 @@ subnet_range_t NAT;
 
 void subnet_init(subnet_range_t *subnet)
 {
-    uint32_t netMask = (0xFFFFFFFF << (32 - (subnet->network_prefix + 1)) & 0xFFFFFFFF);
+    uint32_t netMask = (INADDR_NONE << (32 - (subnet->network_prefix + 1)) & INADDR_NONE);
     subnet->start_ip = (ntohl(subnet->network_ip) & netMask) + 2;
 
     subnet->subnet_size = 1;
@@ -77,7 +77,7 @@ int32_t tun_alloc(char *dev, int32_t flags)
 
     memset(&sin, 0, sizeof(struct sockaddr_in));
     sin.sin_family = AF_INET;
-    sin.sin_addr.s_addr = htonl(0xFFFFFFFF << (32 - tun_prefix) & 0xFFFFFFFF);
+    sin.sin_addr.s_addr = htonl(INADDR_NONE << (32 - tun_prefix) & INADDR_NONE);
     memcpy(&ifr.ifr_netmask, &sin, sizeof(struct sockaddr));
 
     if ((err = ioctl(fd_setip, SIOCSIFNETMASK, &ifr)) < 0) {
