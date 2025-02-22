@@ -222,5 +222,7 @@ int32_t domains_read(void)
         printf("From %s readed %d domains\n", gateway_domains_paths[j], gateway_domains_count[j]);
     }
 
+    printf("\n");
+
     return status;
 }
