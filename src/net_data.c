@@ -12,17 +12,8 @@ static id_map_t *id_map;
 static int32_t repeater_DNS_socket;
 static int32_t repeater_client_socket;
 
-static void DNS_data_catch_function(__attribute__((unused)) int32_t signo)
-{
-    errmsg("SIGSEGV catched DNS_data\n");
-}
-
 static void *DNS_data(__attribute__((unused)) void *arg)
 {
-    if (signal(SIGSEGV, DNS_data_catch_function) == SIG_ERR) {
-        errmsg("Can't set signal handler DNS_data\n");
-    }
-
     struct sockaddr_in repeater_DNS_addr, receive_DNS_addr, client_addr;
 
     repeater_DNS_addr = listen_addr;
@@ -105,7 +96,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
         if (sendto(repeater_client_socket, receive_msg.data, receive_msg.size, 0,
                    (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
             stat.sended_to_client_error++;
-            errmsg("Can't send to client \"%s\"\n", strerror(errno));
+            printf("Can't send to client \"%s\"\n", strerror(errno));
         } else {
             stat.sended_to_client++;
         }
@@ -119,17 +110,8 @@ static void *DNS_data(__attribute__((unused)) void *arg)
     return NULL;
 }
 
-static void client_data_catch_function(__attribute__((unused)) int32_t signo)
-{
-    errmsg("SIGSEGV catched client_data\n");
-}
-
 static void *client_data(__attribute__((unused)) void *arg)
 {
-    if (signal(SIGSEGV, client_data_catch_function) == SIG_ERR) {
-        errmsg("Can't set signal handler client_data\n");
-    }
-
     struct sockaddr_in receive_client_addr;
 
     uint32_t receive_client_addr_length = sizeof(receive_client_addr);
@@ -187,7 +169,7 @@ static void *client_data(__attribute__((unused)) void *arg)
         if (sendto(repeater_DNS_socket, receive_msg.data, receive_msg.size, 0,
                    (struct sockaddr *)&dns_addr[dns_id], sizeof(dns_addr[dns_id])) < 0) {
             stat.sended_to_dns_error++;
-            errmsg("Can't send to DNS \"%s\"\n", strerror(errno));
+            printf("Can't send to DNS \"%s\"\n", strerror(errno));
         } else {
             stat.sended_to_dns++;
         }
