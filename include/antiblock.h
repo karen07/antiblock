@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <linux/if.h>
-#define TUN_MODE
+//#define TUN_MODE
 #ifdef TUN_MODE
 #include <linux/if_tun.h>
 #include <linux/ip.h>
