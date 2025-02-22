@@ -11,8 +11,6 @@
 pthread_barrier_t threads_barrier;
 
 #ifdef TUN_MODE
-char tun_name[IFNAMSIZ];
-
 uint32_t tun_ip = 0xFFFFFFFF;
 uint32_t tun_prefix;
 #endif
@@ -34,9 +32,8 @@ struct sockaddr_in dns_addr[GATEWAY_MAX_COUNT + 1];
 
 #ifndef TUN_MODE
 static int32_t route_socket;
-#endif
-
 static void clean_route_table(void);
+#endif
 
 void errmsg(const char *format, ...)
 {
@@ -163,8 +160,7 @@ static void print_help(void)
            "    -l  \"x.x.x.x:xx\"                  Listen address\n"
            "    -d  \"x.x.x.x:xx\"                  DNS address\n"
 #ifdef TUN_MODE
-           "    -TUN_net   x.x.x.x/xx                TUN net\n"
-           "    -TUN_name  example                   TUN name\n"
+           "    -n  \"x.x.x.x/xx\"                  TUN net\n"
 #endif
            "  Optional parameters:\n"
            "    -o  \"/test/\"                      Log or statistics output folder\n"
@@ -336,27 +332,12 @@ int32_t main(int32_t argc, char *argv[])
             }
             continue;
         }
-        if (!strcmp(argv[i], "-TUN_name")) {
-            if (i != argc - 1) {
-                if (strlen(argv[i + 1]) < IFNAMSIZ) {
-                    strcpy(tun_name, argv[i + 1]);
-                    printf("  TUN name %s\n", tun_name);
-                }
-                i++;
-            }
-            continue;
-        }
 #endif
         print_help();
         errmsg("Unknown command: %s\n", argv[i]);
     }
 
 #ifdef TUN_MODE
-    if (tun_name[0] == 0) {
-        print_help();
-        errmsg("The program need TUN_name\n");
-    }
-
     if (tun_ip == 0xFFFFFFFF) {
         print_help();
         errmsg("The program need correct TUN IP\n");

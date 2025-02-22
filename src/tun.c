@@ -148,14 +148,12 @@ static void *tun(__attribute__((unused)) void *arg)
     //int32_t tap_fd = 0;
     int32_t tun_fd = 0;
 
-    //char tap_name[IFNAMSIZ * 2];
-    //sprintf(tap_name, "%s_TAP", tun_name);
-    //tap_fd = tun_alloc(tap_name, IFF_TAP | IFF_NO_PI);
+    //tap_fd = tun_alloc("AntiBlock_NAT_TAP", IFF_TAP | IFF_NO_PI);
     //if (tap_fd < 0) {
     //    errmsg("Can't allocate TAP interface\n");
     //}
 
-    tun_fd = tun_alloc(tun_name, IFF_TUN);
+    tun_fd = tun_alloc("AntiBlock_NAT", IFF_TUN);
     if (tun_fd < 0) {
         errmsg("Can't allocate TUN interface\n");
     }
