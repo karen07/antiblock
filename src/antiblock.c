@@ -267,7 +267,7 @@ int32_t main(int32_t argc, char *argv[])
             if (i != argc - 1) {
                 if (strlen(argv[i + 1]) < PATH_MAX - 100) {
                     strcpy(log_or_stat_folder, argv[i + 1]);
-                    printf("  Output  log or stat to \"%s\"\n", log_or_stat_folder);
+                    printf("  Output  \"%s\"\n", log_or_stat_folder);
                 }
                 i++;
             }
@@ -314,7 +314,7 @@ int32_t main(int32_t argc, char *argv[])
 #ifdef TUN_MODE
         if (!strcmp(argv[i], "-n")) {
             if (i != argc - 1) {
-                printf("  TUN net %s\n", argv[i + 1]);
+                printf("  TUN     \"%s\"\n", argv[i + 1]);
                 char *slash_ptr = strchr(argv[i + 1], '/');
                 if (slash_ptr) {
                     sscanf(slash_ptr + 1, "%u", &tun_prefix);
