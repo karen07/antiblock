@@ -84,13 +84,13 @@ int32_t domains_read(void)
                 CURLcode response;
                 response = curl_easy_perform(curl);
                 if (response == CURLE_COULDNT_RESOLVE_HOST) {
-                    errmsg("Wrong domains url %s\n", gateway_domains_paths[i]);
+                    printf("Wrong domains url %s\n", gateway_domains_paths[i]);
                 }
 
                 long http_code = 0;
                 curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
                 if (http_code != HTTP_OK) {
-                    errmsg("Wrong status code %s\n", gateway_domains_paths[i]);
+                    printf("Wrong status code %s\n", gateway_domains_paths[i]);
                 }
 
                 curl_easy_cleanup(curl);
@@ -125,15 +125,17 @@ int32_t domains_read(void)
             errmsg("The total size of all domains must be less than 64 MB\n");
         }
 
-        if (domains.data[domains.max_size - 1] != '\n') {
-            domains.max_size += 1;
-            domains.data = realloc(domains.data, domains.max_size);
-            if (domains.data == NULL) {
-                errmsg("No free memory for domains_file %s\n", gateway_domains_paths[i]);
-            }
+        if (domains.data) {
+            if (domains.data[domains.max_size - 1] != '\n') {
+                domains.max_size += 1;
+                domains.data = realloc(domains.data, domains.max_size);
+                if (domains.data == NULL) {
+                    errmsg("No free memory for domains_file %s\n", gateway_domains_paths[i]);
+                }
 
-            domains.data[domains.max_size - 1] = '\n';
-            domains.size = domains.max_size;
+                domains.data[domains.max_size - 1] = '\n';
+                domains.size = domains.max_size;
+            }
         }
 
         gateway_domains_offset[i + 1] = domains.max_size;
@@ -206,9 +208,14 @@ int32_t domains_read(void)
         }
     }
 
+    int32_t status = 1;
+
     for (int32_t j = 0; j < gateways_count; j++) {
+        if ((!memcmp(gateway_domains_paths[j], "http", 4)) && (gateway_domains_count[j] == 0)) {
+            status = 0;
+        }
         printf("From %s readed %d domains\n", gateway_domains_paths[j], gateway_domains_count[j]);
     }
 
-    return 1;
+    return status;
 }

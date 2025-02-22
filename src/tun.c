@@ -135,17 +135,8 @@ static array_hashmap_bool nat_cmp(const void *elem_data, const void *hashmap_ele
     return !memcmp(&elem1->key, &elem2->key, sizeof(elem1->key));
 }
 
-static void tun_catch_function(__attribute__((unused)) int32_t signo)
-{
-    errmsg("SIGSEGV catched tun\n");
-}
-
 static void *tun(__attribute__((unused)) void *arg)
 {
-    if (signal(SIGSEGV, tun_catch_function) == SIG_ERR) {
-        errmsg("Can't set signal handler tun\n");
-    }
-
     //char *tap_buffer = NULL;
     char *tun_buffer = NULL;
     char *pseudogram = NULL;
