@@ -8,8 +8,6 @@
 #include "tun.h"
 #include "domains_read.h"
 
-pthread_barrier_t threads_barrier;
-
 FILE *log_fd;
 FILE *stat_fd;
 
@@ -19,6 +17,7 @@ char *gateway_domains_paths[GATEWAY_MAX_COUNT];
 static char gateway_name[GATEWAY_MAX_COUNT][IFNAMSIZ];
 
 #ifndef PCAP_MODE
+pthread_barrier_t threads_barrier;
 struct sockaddr_in listen_addr;
 struct sockaddr_in dns_addr[DNS_MAX_COUNT];
 #endif
@@ -434,16 +433,15 @@ int32_t main(int32_t argc, char *argv[])
 
     printf("\n");
 
+#ifndef PCAP_MODE
     int32_t threads_barrier_count = 3;
 #ifdef TUN_MODE
     threads_barrier_count += 1;
 #endif
-#ifdef PCAP_MODE
-    threads_barrier_count = 1;
-#endif
     if (pthread_barrier_init(&threads_barrier, NULL, threads_barrier_count)) {
         errmsg("Can't create threads_barrier\n");
     }
+#endif
 
 #ifdef TUN_MODE
     init_tun_thread();
@@ -456,7 +454,9 @@ int32_t main(int32_t argc, char *argv[])
 
     init_net_data_threads();
 
+#ifndef PCAP_MODE
     pthread_barrier_wait(&threads_barrier);
+#endif
 
     int32_t circles = 0;
     int32_t sleep_circles = 0;
