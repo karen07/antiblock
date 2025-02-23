@@ -221,8 +221,8 @@ void callback(__attribute__((unused)) u_char *useless,
 {
     char *L2_start_pointer = (char *)packet;
     struct ethhdr *ethh = (struct ethhdr *)L2_start_pointer;
-    uint16_t ether_type = ntohs(ethh->h_proto);
-    if (ether_type != ETH_P_IP) {
+    uint16_t proto_L3 = ntohs(ethh->h_proto);
+    if (proto_L3 != ETH_P_IP) {
         return;
     }
 
@@ -248,7 +248,7 @@ void callback(__attribute__((unused)) u_char *useless,
 static void *PCAP(__attribute__((unused)) void *arg)
 {
     pcap_t *handle;
-    char dev[] = "br0";
+    char dev[] = "br-lan";
     char errbuf[PCAP_ERRBUF_SIZE];
     struct bpf_program fp;
     char filter_exp[] = "udp and src port 53";

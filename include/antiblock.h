@@ -15,7 +15,7 @@
 #include <unistd.h>
 
 //#define MULTIPLE_DNS
-//#define PCAP_MODE
+#define PCAP_MODE
 //#define TUN_MODE
 
 #ifdef PCAP_MODE
@@ -56,8 +56,6 @@ typedef struct domains_gateway {
 } domains_gateway_t;
 #endif
 
-extern pthread_barrier_t threads_barrier;
-
 extern FILE *log_fd;
 extern FILE *stat_fd;
 
@@ -73,6 +71,7 @@ extern uint32_t tun_prefix;
 #define DNS_COUNT (gateways_count + 1)
 #define DNS_MAX_COUNT (GATEWAY_MAX_COUNT + 1)
 
+extern pthread_barrier_t threads_barrier;
 extern struct sockaddr_in listen_addr;
 extern struct sockaddr_in dns_addr[DNS_MAX_COUNT];
 #endif
