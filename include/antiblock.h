@@ -15,8 +15,9 @@
 #include <unistd.h>
 
 //#define MULTIPLE_DNS
-
 //#define PCAP_MODE
+//#define TUN_MODE
+
 #ifdef PCAP_MODE
 #include <linux/if_ether.h>
 #include <linux/ip.h>
@@ -24,7 +25,6 @@
 #include <pcap.h>
 #endif
 
-//#define TUN_MODE
 #ifdef TUN_MODE
 #include <fcntl.h>
 #include <linux/if_tun.h>
