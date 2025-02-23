@@ -264,11 +264,16 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
 #else
 
                 int32_t correct_ip4_flag = 1;
+                if (ans->ip4 == 0) {
+                    correct_ip4_flag = 0;
+                }
+#ifndef PCAP_MODE
                 for (int32_t j = 0; j < DNS_COUNT; j++) {
-                    if ((ans->ip4 == dns_addr[j].sin_addr.s_addr) || (ans->ip4 == 0)) {
+                    if (ans->ip4 == dns_addr[j].sin_addr.s_addr) {
                         correct_ip4_flag = 0;
                     }
                 }
+#endif
                 if (correct_ip4_flag) {
                     add_route(block_ans_domain_flag, ans->ip4);
                 }

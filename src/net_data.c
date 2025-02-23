@@ -8,6 +8,8 @@
 #include "tun.h"
 #include "domains_read.h"
 
+#ifndef PCAP_MODE
+
 static id_map_t *id_map;
 static int32_t repeater_DNS_socket;
 static int32_t repeater_client_socket;
@@ -206,3 +208,114 @@ void init_net_data_threads(void)
         errmsg("Can't detach DNS_data_thread\n");
     }
 }
+
+#else
+
+memory_t receive_msg;
+memory_t que_domain;
+memory_t ans_domain;
+memory_t cname_domain;
+
+void callback(__attribute__((unused)) u_char *useless,
+              __attribute__((unused)) const struct pcap_pkthdr *pkthdr, const u_char *packet)
+{
+    char *L2_start_pointer = (char *)packet;
+    struct ethhdr *ethh = (struct ethhdr *)L2_start_pointer;
+    uint16_t ether_type = ntohs(ethh->h_proto);
+    if (ether_type != ETH_P_IP) {
+        return;
+    }
+
+    char *L3_start_pointer = L2_start_pointer + sizeof(struct ethhdr);
+    struct iphdr *iph = (struct iphdr *)L3_start_pointer;
+    char proto_L4 = iph->protocol;
+    if (proto_L4 != IPPROTO_UDP) {
+        return;
+    }
+
+    char *L4_start_pointer = L3_start_pointer + sizeof(struct iphdr);
+    struct udphdr *udph = (struct udphdr *)L4_start_pointer;
+    if (ntohs(udph->source) != 53) {
+        return;
+    }
+
+    receive_msg.size = ntohs(udph->len);
+    receive_msg.data = L4_start_pointer + sizeof(struct udphdr);
+
+    dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain);
+}
+
+static void *PCAP(__attribute__((unused)) void *arg)
+{
+    pcap_t *handle;
+    char dev[] = "br0";
+    char errbuf[PCAP_ERRBUF_SIZE];
+    struct bpf_program fp;
+    char filter_exp[] = "udp and src port 53";
+    bpf_u_int32 mask;
+    bpf_u_int32 net;
+
+    if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) {
+        printf("Couldn't get netmask for device %s: %s\n", dev, errbuf);
+        net = 0;
+        mask = 0;
+    }
+    handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
+    if (handle == NULL) {
+        printf("Couldn't open device %s: %s\n", dev, errbuf);
+    }
+    if (pcap_compile(handle, &fp, filter_exp, 0, net) == -1) {
+        printf("Couldn't parse filter %s: %s\n", filter_exp, pcap_geterr(handle));
+    }
+    if (pcap_setfilter(handle, &fp) == -1) {
+        printf("Couldn't install filter %s: %s\n", filter_exp, pcap_geterr(handle));
+    }
+
+    receive_msg.size = 0;
+    receive_msg.max_size = PACKET_MAX_SIZE;
+    receive_msg.data = (char *)malloc(receive_msg.max_size * sizeof(char));
+    if (receive_msg.data == 0) {
+        errmsg("No free memory for receive_msg from DNS\n");
+    }
+
+    que_domain.size = 0;
+    que_domain.max_size = DOMAIN_MAX_SIZE;
+    que_domain.data = (char *)malloc(que_domain.max_size * sizeof(char));
+    if (que_domain.data == 0) {
+        errmsg("No free memory for que_domain\n");
+    }
+
+    ans_domain.size = 0;
+    ans_domain.max_size = DOMAIN_MAX_SIZE;
+    ans_domain.data = (char *)malloc(ans_domain.max_size * sizeof(char));
+    if (ans_domain.data == 0) {
+        errmsg("No free memory for ans_domain\n");
+    }
+
+    cname_domain.size = 0;
+    cname_domain.max_size = DOMAIN_MAX_SIZE;
+    cname_domain.data = (char *)malloc(cname_domain.max_size * sizeof(char));
+    if (cname_domain.data == 0) {
+        errmsg("No free memory for cname_domain\n");
+    }
+
+    dns_ans_check_test();
+
+    pcap_loop(handle, 0, callback, NULL);
+
+    return NULL;
+}
+
+void init_net_data_threads(void)
+{
+    pthread_t PCAP_thread;
+    if (pthread_create(&PCAP_thread, NULL, PCAP, NULL)) {
+        errmsg("Can't create client_data_thread\n");
+    }
+
+    if (pthread_detach(PCAP_thread)) {
+        errmsg("Can't detach client_data_thread\n");
+    }
+}
+
+#endif
