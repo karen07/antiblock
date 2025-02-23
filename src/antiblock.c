@@ -10,21 +10,23 @@
 
 pthread_barrier_t threads_barrier;
 
-#ifdef TUN_MODE
-uint32_t tun_ip = INADDR_NONE;
-uint32_t tun_prefix;
-#endif
-
-struct sockaddr_in listen_addr;
-
 FILE *log_fd;
 FILE *stat_fd;
 
 int32_t gateways_count;
 char *gateway_domains_paths[GATEWAY_MAX_COUNT];
-struct sockaddr_in dns_addr[DNS_MAX_COUNT];
 
 static char gateway_name[GATEWAY_MAX_COUNT][IFNAMSIZ];
+
+#ifndef PCAP_MODE
+struct sockaddr_in listen_addr;
+struct sockaddr_in dns_addr[DNS_MAX_COUNT];
+#endif
+
+#ifdef TUN_MODE
+uint32_t tun_ip = INADDR_NONE;
+uint32_t tun_prefix;
+#endif
 
 #ifndef TUN_MODE
 static int32_t route_socket;
@@ -153,8 +155,10 @@ static void print_help(void)
            "    -r  \"gateway1 https://test2.com\"  Route domains from path/url through gateway\n"
            "    ................................\n"
            "  Required parameters:\n"
+#ifndef PCAP_MODE
            "    -l  \"x.x.x.x:xx\"                  Listen address\n"
            "    -d  \"x.x.x.x:xx\"                  DNS address\n"
+#endif
 #ifdef TUN_MODE
            "    -n  \"x.x.x.x/xx\"                  TUN net\n"
 #endif
@@ -197,10 +201,13 @@ int32_t main(int32_t argc, char *argv[])
     int32_t is_stat_print = 0;
     char log_or_stat_folder[PATH_MAX - 100];
     memset(log_or_stat_folder, 0, PATH_MAX - 100);
+
+#ifndef PCAP_MODE
     listen_addr.sin_addr.s_addr = INADDR_NONE;
     for (int32_t i = 0; i < DNS_MAX_COUNT; i++) {
         dns_addr[i].sin_addr.s_addr = INADDR_NONE;
     }
+#endif
 
     printf("Launch parameters:\n");
 
@@ -273,6 +280,7 @@ int32_t main(int32_t argc, char *argv[])
             }
             continue;
         }
+#ifndef PCAP_MODE
         if (!strcmp(argv[i], "-d")) {
             if (i != argc - 1) {
                 printf("  DNS     \"%s\"\n", argv[i + 1]);
@@ -311,6 +319,7 @@ int32_t main(int32_t argc, char *argv[])
             }
             continue;
         }
+#endif
 #ifdef TUN_MODE
         if (!strcmp(argv[i], "-n")) {
             if (i != argc - 1) {
@@ -369,6 +378,7 @@ int32_t main(int32_t argc, char *argv[])
         }
     }
 
+#ifndef PCAP_MODE
 #ifndef MULTIPLE_DNS
     for (int32_t i = 1; i < DNS_COUNT; i++) {
         dns_addr[i] = dns_addr[0];
@@ -395,6 +405,7 @@ int32_t main(int32_t argc, char *argv[])
         print_help();
         errmsg("The program need correct listen port\n");
     }
+#endif
 
     if (is_log_print || is_stat_print) {
         if (log_or_stat_folder[0] == 0) {
@@ -426,6 +437,9 @@ int32_t main(int32_t argc, char *argv[])
     int32_t threads_barrier_count = 3;
 #ifdef TUN_MODE
     threads_barrier_count += 1;
+#endif
+#ifdef PCAP_MODE
+    threads_barrier_count = 1;
 #endif
     if (pthread_barrier_init(&threads_barrier, NULL, threads_barrier_count)) {
         errmsg("Can't create threads_barrier\n");

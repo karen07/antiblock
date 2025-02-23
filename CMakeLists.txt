@@ -20,7 +20,7 @@ endif()
 
 file(GLOB SRC "src/*.c")
 add_executable(${PROJECT_NAME} ${SRC})
-target_link_libraries(${PROJECT_NAME} hashmap curl)
+target_link_libraries(${PROJECT_NAME} hashmap curl pcap)
 
 install(TARGETS ${PROJECT_NAME} DESTINATION /usr/bin)
 
