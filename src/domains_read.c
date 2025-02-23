@@ -65,12 +65,11 @@ int32_t domains_read(void)
 
     if (domains.data) {
         free(domains.data);
-        memset(&domains, 0, sizeof(domains));
     }
 
-    uint32_t gateway_domains_offset[GATEWAY_MAX_COUNT + 1];
-    int32_t gateway_domains_count[GATEWAY_MAX_COUNT];
+    memset(&domains, 0, sizeof(domains));
 
+    uint32_t gateway_domains_offset[GATEWAY_MAX_COUNT + 1];
     gateway_domains_offset[0] = 0;
 
     for (int32_t i = 0; i < gateways_count; i++) {
@@ -129,7 +128,7 @@ int32_t domains_read(void)
                    (1 << OFFSET_BITS_COUNT) / 1024 / 1024);
         }
 
-        if (domains.data) {
+        if (domains.data && domains.max_size) {
             if (domains.data[domains.max_size - 1] != '\n') {
                 domains.max_size += 1;
                 domains.data = realloc(domains.data, domains.max_size);
@@ -155,6 +154,9 @@ int32_t domains_read(void)
         errmsg("The total size of all domains must be less than %d MB\n",
                (1 << OFFSET_BITS_COUNT) / 1024 / 1024);
     }
+
+    int32_t gateway_domains_count[GATEWAY_MAX_COUNT];
+    memset(gateway_domains_count, 0, sizeof(int32_t) * GATEWAY_MAX_COUNT);
 
     if (domains.size > 0) {
         int32_t domains_map_size = 0;
@@ -185,10 +187,6 @@ int32_t domains_read(void)
 
         uint32_t domain_offset = 0;
         int32_t gateway_id = 0;
-
-        for (int32_t j = 0; j < gateways_count; j++) {
-            gateway_domains_count[j] = 0;
-        }
 
         for (int32_t i = 0; i < domains_map_size; i++) {
             for (int32_t j = 1; j <= gateways_count; j++) {
