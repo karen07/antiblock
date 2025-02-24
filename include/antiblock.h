@@ -23,6 +23,7 @@
 #include <linux/ip.h>
 #include <linux/udp.h>
 #include <pcap.h>
+#include <pcap/sll.h>
 #endif
 
 #ifdef TUN_MODE
