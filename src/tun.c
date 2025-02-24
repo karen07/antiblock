@@ -207,7 +207,7 @@ static void *tun(__attribute__((unused)) void *arg)
                 find_elem_ip_ip_flag =
                     array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
                 if (find_elem_ip_ip_flag != array_hashmap_elem_finded) {
-                    stat.nat_sended_to_dev_error++;
+                    statistics_data.nat_sended_to_dev_error++;
                     continue;
                 }
 
@@ -285,7 +285,7 @@ static void *tun(__attribute__((unused)) void *arg)
             find_elem_nat_flag =
                 array_hashmap_find_elem(nat_map_struct, &find_elem_nat, &res_elem_nat);
             if (find_elem_nat_flag != array_hashmap_elem_finded) {
-                stat.nat_sended_to_client_error++;
+                statistics_data.nat_sended_to_client_error++;
 
                 continue;
             }
@@ -297,8 +297,8 @@ static void *tun(__attribute__((unused)) void *arg)
 
             in_out_flag = 0;
 
-            stat.nat_sended_to_client++;
-            stat.nat_sended_to_client_size += nread;
+            statistics_data.nat_sended_to_client++;
+            statistics_data.nat_sended_to_client_size += nread;
         } else {
             ip_ip_map_t find_elem_ip_ip;
             find_elem_ip_ip.ip_local = iph->daddr;
@@ -309,7 +309,7 @@ static void *tun(__attribute__((unused)) void *arg)
             find_elem_ip_ip_flag =
                 array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
             if (find_elem_ip_ip_flag != array_hashmap_elem_finded) {
-                stat.nat_sended_to_dev_error++;
+                statistics_data.nat_sended_to_dev_error++;
                 continue;
             }
 
@@ -333,7 +333,7 @@ static void *tun(__attribute__((unused)) void *arg)
                     array_hashmap_add_elem(nat_map_struct, &add_elem_nat, &res_elem_nat, NULL);
                 if (add_elem_nat_flag == array_hashmap_elem_finded) {
                     correct_new_srt_port = 0;
-                    stat.nat_records++;
+                    statistics_data.nat_records++;
                 }
                 if (add_elem_nat_flag == 0) {
                     if ((add_elem_nat.value.old_src_ip == res_elem_nat.value.old_src_ip) &&
@@ -350,8 +350,8 @@ static void *tun(__attribute__((unused)) void *arg)
 
             in_out_flag = 1;
 
-            stat.nat_sended_to_dev++;
-            stat.nat_sended_to_dev_size += nread;
+            statistics_data.nat_sended_to_dev++;
+            statistics_data.nat_sended_to_dev_size += nread;
         }
 
         if (log_fd && 0) {

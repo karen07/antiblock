@@ -463,8 +463,8 @@ int32_t main(int32_t argc, char *argv[])
 
     while (true) {
         if (circles++ == 0) {
-            memset(&stat, 0, sizeof(stat));
-            stat.stat_start = time(NULL);
+            memset(&statistics_data, 0, sizeof(statistics_data));
+            statistics_data.stat_start = time(NULL);
 
 #ifndef TUN_MODE
             clean_route_table();
