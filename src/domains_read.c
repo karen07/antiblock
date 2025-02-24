@@ -65,9 +65,11 @@ int32_t domains_read(void)
 
     if (domains.data) {
         free(domains.data);
-        memset(&domains, 0, sizeof(domains));
     }
 
+    memset(&domains, 0, sizeof(domains));
+
+    uint32_t gateway_domains_offset[GATEWAY_MAX_COUNT + 1];
     gateway_domains_offset[0] = 0;
 
     for (int32_t i = 0; i < gateways_count; i++) {
@@ -84,13 +86,13 @@ int32_t domains_read(void)
                 CURLcode response;
                 response = curl_easy_perform(curl);
                 if (response == CURLE_COULDNT_RESOLVE_HOST) {
-                    errmsg("Wrong domains url %s\n", gateway_domains_paths[i]);
+                    printf("Wrong domains url %s\n", gateway_domains_paths[i]);
                 }
 
                 long http_code = 0;
                 curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
                 if (http_code != HTTP_OK) {
-                    errmsg("Wrong status code %s\n", gateway_domains_paths[i]);
+                    printf("Wrong status code %s\n", gateway_domains_paths[i]);
                 }
 
                 curl_easy_cleanup(curl);
@@ -121,19 +123,22 @@ int32_t domains_read(void)
             fclose(domains_fd);
         }
 
-        if (!(domains.size < MB_64_BYTES)) {
-            errmsg("The total size of all domains must be less than 64 MB\n");
+        if (!(domains.size < (1 << OFFSET_BITS_COUNT))) {
+            errmsg("The total size of all domains must be less than %d MB\n",
+                   (1 << OFFSET_BITS_COUNT) / 1024 / 1024);
         }
 
-        if (domains.data[domains.max_size - 1] != '\n') {
-            domains.max_size += 1;
-            domains.data = realloc(domains.data, domains.max_size);
-            if (domains.data == NULL) {
-                errmsg("No free memory for domains_file %s\n", gateway_domains_paths[i]);
-            }
+        if (domains.data && domains.max_size) {
+            if (domains.data[domains.max_size - 1] != '\n') {
+                domains.max_size += 1;
+                domains.data = realloc(domains.data, domains.max_size);
+                if (domains.data == NULL) {
+                    errmsg("No free memory for domains_file %s\n", gateway_domains_paths[i]);
+                }
 
-            domains.data[domains.max_size - 1] = '\n';
-            domains.size = domains.max_size;
+                domains.data[domains.max_size - 1] = '\n';
+                domains.size = domains.max_size;
+            }
         }
 
         gateway_domains_offset[i + 1] = domains.max_size;
@@ -145,9 +150,13 @@ int32_t domains_read(void)
         errmsg("No free memory for cname_domains\n");
     }
 
-    if (!(domains.max_size < MB_64_BYTES)) {
-        errmsg("The total size of all domains and CNAME domains must be less than 64 MB\n");
+    if (!(domains.size < (1 << OFFSET_BITS_COUNT))) {
+        errmsg("The total size of all domains must be less than %d MB\n",
+               (1 << OFFSET_BITS_COUNT) / 1024 / 1024);
     }
+
+    int32_t gateway_domains_count[GATEWAY_MAX_COUNT];
+    memset(gateway_domains_count, 0, sizeof(int32_t) * GATEWAY_MAX_COUNT);
 
     if (domains.size > 0) {
         int32_t domains_map_size = 0;
@@ -179,10 +188,6 @@ int32_t domains_read(void)
         uint32_t domain_offset = 0;
         int32_t gateway_id = 0;
 
-        for (int32_t j = 0; j < gateways_count; j++) {
-            gateway_domains_count[j] = 0;
-        }
-
         for (int32_t i = 0; i < domains_map_size; i++) {
             for (int32_t j = 1; j <= gateways_count; j++) {
                 if ((gateway_domains_offset[j - 1] <= domain_offset) &&
@@ -206,9 +211,14 @@ int32_t domains_read(void)
         }
     }
 
+    int32_t status = 1;
+
     for (int32_t j = 0; j < gateways_count; j++) {
+        if ((!memcmp(gateway_domains_paths[j], "http", 4)) && (gateway_domains_count[j] == 0)) {
+            status = 0;
+        }
         printf("From %s readed %d domains\n", gateway_domains_paths[j], gateway_domains_count[j]);
     }
 
-    return 1;
+    return status;
 }

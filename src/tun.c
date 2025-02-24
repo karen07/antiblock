@@ -17,7 +17,7 @@ subnet_range_t NAT;
 
 void subnet_init(subnet_range_t *subnet)
 {
-    uint32_t netMask = (0xFFFFFFFF << (32 - (subnet->network_prefix + 1)) & 0xFFFFFFFF);
+    uint32_t netMask = (INADDR_NONE << (32 - (subnet->network_prefix + 1)) & INADDR_NONE);
     subnet->start_ip = (ntohl(subnet->network_ip) & netMask) + 2;
 
     subnet->subnet_size = 1;
@@ -77,7 +77,7 @@ int32_t tun_alloc(char *dev, int32_t flags)
 
     memset(&sin, 0, sizeof(struct sockaddr_in));
     sin.sin_family = AF_INET;
-    sin.sin_addr.s_addr = htonl(0xFFFFFFFF << (32 - tun_prefix) & 0xFFFFFFFF);
+    sin.sin_addr.s_addr = htonl(INADDR_NONE << (32 - tun_prefix) & INADDR_NONE);
     memcpy(&ifr.ifr_netmask, &sin, sizeof(struct sockaddr));
 
     if ((err = ioctl(fd_setip, SIOCSIFNETMASK, &ifr)) < 0) {
@@ -118,11 +118,7 @@ static array_hashmap_bool ip_ip_cmp(const void *elem_data, const void *hashmap_e
     const ip_ip_map_t *elem1 = elem_data;
     const ip_ip_map_t *elem2 = hashmap_elem_data;
 
-    if (elem1->ip_local == elem2->ip_local) {
-        return 1;
-    } else {
-        return 0;
-    }
+    return elem1->ip_local == elem2->ip_local;
 }
 
 static array_hashmap_hash nat_hash(const void *elem_data)
@@ -136,24 +132,11 @@ static array_hashmap_bool nat_cmp(const void *elem_data, const void *hashmap_ele
     const nat_map_t *elem1 = elem_data;
     const nat_map_t *elem2 = hashmap_elem_data;
 
-    if (memcmp(&elem1->key, &elem2->key, sizeof(elem1->key)) == 0) {
-        return 1;
-    } else {
-        return 0;
-    }
-}
-
-static void tun_catch_function(__attribute__((unused)) int32_t signo)
-{
-    errmsg("SIGSEGV catched tun\n");
+    return !memcmp(&elem1->key, &elem2->key, sizeof(elem1->key));
 }
 
 static void *tun(__attribute__((unused)) void *arg)
 {
-    if (signal(SIGSEGV, tun_catch_function) == SIG_ERR) {
-        errmsg("Can't set signal handler tun\n");
-    }
-
     //char *tap_buffer = NULL;
     char *tun_buffer = NULL;
     char *pseudogram = NULL;
@@ -165,14 +148,12 @@ static void *tun(__attribute__((unused)) void *arg)
     //int32_t tap_fd = 0;
     int32_t tun_fd = 0;
 
-    //char tap_name[IFNAMSIZ * 2];
-    //sprintf(tap_name, "%s_TAP", tun_name);
-    //tap_fd = tun_alloc(tap_name, IFF_TAP | IFF_NO_PI);
+    //tap_fd = tun_alloc("AntiBlock_NAT_TAP", IFF_TAP | IFF_NO_PI);
     //if (tap_fd < 0) {
     //    errmsg("Can't allocate TAP interface\n");
     //}
 
-    tun_fd = tun_alloc(tun_name, IFF_TUN);
+    tun_fd = tun_alloc("AntiBlock_NAT", IFF_TUN);
     if (tun_fd < 0) {
         errmsg("Can't allocate TUN interface\n");
     }
@@ -226,7 +207,7 @@ static void *tun(__attribute__((unused)) void *arg)
                 find_elem_ip_ip_flag =
                     array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
                 if (find_elem_ip_ip_flag != array_hashmap_elem_finded) {
-                    stat.nat_sended_to_dev_error++;
+                    statistics_data.nat_sended_to_dev_error++;
                     continue;
                 }
 
@@ -304,7 +285,7 @@ static void *tun(__attribute__((unused)) void *arg)
             find_elem_nat_flag =
                 array_hashmap_find_elem(nat_map_struct, &find_elem_nat, &res_elem_nat);
             if (find_elem_nat_flag != array_hashmap_elem_finded) {
-                stat.nat_sended_to_client_error++;
+                statistics_data.nat_sended_to_client_error++;
 
                 continue;
             }
@@ -316,8 +297,8 @@ static void *tun(__attribute__((unused)) void *arg)
 
             in_out_flag = 0;
 
-            stat.nat_sended_to_client++;
-            stat.nat_sended_to_client_size += nread;
+            statistics_data.nat_sended_to_client++;
+            statistics_data.nat_sended_to_client_size += nread;
         } else {
             ip_ip_map_t find_elem_ip_ip;
             find_elem_ip_ip.ip_local = iph->daddr;
@@ -328,7 +309,7 @@ static void *tun(__attribute__((unused)) void *arg)
             find_elem_ip_ip_flag =
                 array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
             if (find_elem_ip_ip_flag != array_hashmap_elem_finded) {
-                stat.nat_sended_to_dev_error++;
+                statistics_data.nat_sended_to_dev_error++;
                 continue;
             }
 
@@ -352,7 +333,7 @@ static void *tun(__attribute__((unused)) void *arg)
                     array_hashmap_add_elem(nat_map_struct, &add_elem_nat, &res_elem_nat, NULL);
                 if (add_elem_nat_flag == array_hashmap_elem_finded) {
                     correct_new_srt_port = 0;
-                    stat.nat_records++;
+                    statistics_data.nat_records++;
                 }
                 if (add_elem_nat_flag == 0) {
                     if ((add_elem_nat.value.old_src_ip == res_elem_nat.value.old_src_ip) &&
@@ -369,8 +350,8 @@ static void *tun(__attribute__((unused)) void *arg)
 
             in_out_flag = 1;
 
-            stat.nat_sended_to_dev++;
-            stat.nat_sended_to_dev_size += nread;
+            statistics_data.nat_sended_to_dev++;
+            statistics_data.nat_sended_to_dev_size += nread;
         }
 
         if (log_fd && 0) {
