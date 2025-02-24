@@ -211,6 +211,8 @@ void init_net_data_threads(void)
 
 #else
 
+#define DNS_port 53
+
 memory_t receive_msg;
 memory_t que_domain;
 memory_t ans_domain;
@@ -220,13 +222,13 @@ void callback(__attribute__((unused)) u_char *useless,
               __attribute__((unused)) const struct pcap_pkthdr *pkthdr, const u_char *packet)
 {
     char *L2_start_pointer = (char *)packet;
-    struct ethhdr *ethh = (struct ethhdr *)L2_start_pointer;
-    uint16_t proto_L3 = ntohs(ethh->h_proto);
+    struct sll_header *ethh = (struct sll_header *)L2_start_pointer;
+    uint16_t proto_L3 = ntohs(ethh->sll_protocol);
     if (proto_L3 != ETH_P_IP) {
         return;
     }
 
-    char *L3_start_pointer = L2_start_pointer + sizeof(struct ethhdr);
+    char *L3_start_pointer = L2_start_pointer + sizeof(struct sll_header);
     struct iphdr *iph = (struct iphdr *)L3_start_pointer;
     char proto_L4 = iph->protocol;
     if (proto_L4 != IPPROTO_UDP) {
@@ -235,7 +237,7 @@ void callback(__attribute__((unused)) u_char *useless,
 
     char *L4_start_pointer = L3_start_pointer + sizeof(struct iphdr);
     struct udphdr *udph = (struct udphdr *)L4_start_pointer;
-    if (ntohs(udph->source) != 53) {
+    if (ntohs(udph->source) != DNS_port) {
         return;
     }
 
@@ -248,27 +250,20 @@ void callback(__attribute__((unused)) u_char *useless,
 static void *PCAP(__attribute__((unused)) void *arg)
 {
     pcap_t *handle;
-    char dev[] = "br-lan";
+    char dev[] = "any";
     char errbuf[PCAP_ERRBUF_SIZE];
     struct bpf_program fp;
     char filter_exp[] = "udp and src port 53";
-    bpf_u_int32 mask;
-    bpf_u_int32 net;
 
-    if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) {
-        printf("Couldn't get netmask for device %s: %s\n", dev, errbuf);
-        net = 0;
-        mask = 0;
-    }
-    handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
+    handle = pcap_open_live(dev, BUFSIZ, 0, 1, errbuf);
     if (handle == NULL) {
-        printf("Couldn't open device %s: %s\n", dev, errbuf);
+        errmsg("Can't open device %s: %s\n", dev, errbuf);
     }
-    if (pcap_compile(handle, &fp, filter_exp, 0, net) == -1) {
-        printf("Couldn't parse filter %s: %s\n", filter_exp, pcap_geterr(handle));
+    if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) != 0) {
+        errmsg("Can't parse filter %s: %s\n", filter_exp, pcap_geterr(handle));
     }
-    if (pcap_setfilter(handle, &fp) == -1) {
-        printf("Couldn't install filter %s: %s\n", filter_exp, pcap_geterr(handle));
+    if (pcap_setfilter(handle, &fp) != 0) {
+        errmsg("Can't install filter %s: %s\n", filter_exp, pcap_geterr(handle));
     }
 
     receive_msg.size = 0;
