@@ -8,37 +8,29 @@
 #include "tun.h"
 #include "domains_read.h"
 
+#ifndef PCAP_MODE
+
 static id_map_t *id_map;
 static int32_t repeater_DNS_socket;
 static int32_t repeater_client_socket;
 
-static void DNS_data_catch_function(__attribute__((unused)) int32_t signo)
-{
-    errmsg("SIGSEGV catched DNS_data\n");
-}
-
 static void *DNS_data(__attribute__((unused)) void *arg)
 {
-    if (signal(SIGSEGV, DNS_data_catch_function) == SIG_ERR) {
-        errmsg("Can't set signal handler DNS_data\n");
-    }
-
     struct sockaddr_in repeater_DNS_addr, receive_DNS_addr, client_addr;
 
-    repeater_DNS_addr.sin_family = AF_INET;
-    repeater_DNS_addr.sin_port = htons(listen_port + 1);
-    repeater_DNS_addr.sin_addr.s_addr = listen_ip;
+    repeater_DNS_addr = listen_addr;
+    repeater_DNS_addr.sin_port = htons(ntohs(repeater_DNS_addr.sin_port) + 1);
 
     uint32_t receive_DNS_addr_length = sizeof(receive_DNS_addr);
 
     repeater_DNS_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (repeater_DNS_socket < 0) {
-        errmsg("Can't create socket for listen from DNS :%s\n", strerror(errno));
+        errmsg("Can't create socket for listen from DNS \"%s\"\n", strerror(errno));
     }
 
     if (bind(repeater_DNS_socket, (struct sockaddr *)&repeater_DNS_addr,
              sizeof(repeater_DNS_addr)) < 0) {
-        errmsg("Can't bind to the port for listen from DNS :%s\n", strerror(errno));
+        errmsg("Can't bind to the port for listen from DNS \"%s\"\n", strerror(errno));
     }
 
     memory_t receive_msg;
@@ -82,7 +74,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
                                     (struct sockaddr *)&receive_DNS_addr, &receive_DNS_addr_length);
 
         if (receive_msg.size < (int32_t)sizeof(dns_header_t)) {
-            stat.sended_to_client_error++;
+            statistics_data.sended_to_client_error++;
             continue;
         }
 
@@ -90,7 +82,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
         uint16_t id = ntohs(header->id);
 
         if (id_map[id].port == 0 || id_map[id].ip == 0) {
-            stat.sended_to_client_error++;
+            statistics_data.sended_to_client_error++;
             continue;
         }
 
@@ -105,10 +97,10 @@ static void *DNS_data(__attribute__((unused)) void *arg)
 
         if (sendto(repeater_client_socket, receive_msg.data, receive_msg.size, 0,
                    (struct sockaddr *)&client_addr, sizeof(client_addr)) < 0) {
-            stat.sended_to_client_error++;
-            errmsg("Can't send to client %s\n", strerror(errno));
+            statistics_data.sended_to_client_error++;
+            printf("Can't send to client \"%s\"\n", strerror(errno));
         } else {
-            stat.sended_to_client++;
+            statistics_data.sended_to_client++;
         }
     }
 
@@ -120,37 +112,19 @@ static void *DNS_data(__attribute__((unused)) void *arg)
     return NULL;
 }
 
-static void client_data_catch_function(__attribute__((unused)) int32_t signo)
-{
-    errmsg("SIGSEGV catched client_data\n");
-}
-
 static void *client_data(__attribute__((unused)) void *arg)
 {
-    if (signal(SIGSEGV, client_data_catch_function) == SIG_ERR) {
-        errmsg("Can't set signal handler client_data\n");
-    }
-
-    struct sockaddr_in repeater_client_addr, dns_addr, receive_client_addr;
-
-    repeater_client_addr.sin_family = AF_INET;
-    repeater_client_addr.sin_port = htons(listen_port);
-    repeater_client_addr.sin_addr.s_addr = listen_ip;
-
-    dns_addr.sin_family = AF_INET;
-    dns_addr.sin_port = htons(dns_port);
-    dns_addr.sin_addr.s_addr = dns_ip;
+    struct sockaddr_in receive_client_addr;
 
     uint32_t receive_client_addr_length = sizeof(receive_client_addr);
 
     repeater_client_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (repeater_client_socket < 0) {
-        errmsg("Can't create socket for listen from client :%s\n", strerror(errno));
+        errmsg("Can't create socket for listen from client \"%s\"\n", strerror(errno));
     }
 
-    if (bind(repeater_client_socket, (struct sockaddr *)&repeater_client_addr,
-             sizeof(repeater_client_addr)) < 0) {
-        errmsg("Can't bind to the port for listen from client :%s\n", strerror(errno));
+    if (bind(repeater_client_socket, (struct sockaddr *)&listen_addr, sizeof(listen_addr)) < 0) {
+        errmsg("Can't bind to the port for listen from client \"%s\"\n", strerror(errno));
     }
 
     memory_t receive_msg;
@@ -161,6 +135,14 @@ static void *client_data(__attribute__((unused)) void *arg)
         errmsg("No free memory for receive_msg from client\n");
     }
 
+    memory_t que_domain;
+    que_domain.size = 0;
+    que_domain.max_size = DOMAIN_MAX_SIZE;
+    que_domain.data = (char *)malloc(que_domain.max_size * sizeof(char));
+    if (que_domain.data == 0) {
+        errmsg("No free memory for que_domain\n");
+    }
+
     pthread_barrier_wait(&threads_barrier);
 
     while (true) {
@@ -169,8 +151,15 @@ static void *client_data(__attribute__((unused)) void *arg)
                                     &receive_client_addr_length);
 
         if (receive_msg.size < (int32_t)sizeof(dns_header_t)) {
-            stat.sended_to_dns_error++;
+            statistics_data.sended_to_dns_error++;
             continue;
+        }
+
+        int32_t dns_id;
+        dns_id = dns_ans_check(&receive_msg, &que_domain, NULL, NULL) + 1;
+
+        if (dns_id < 0) {
+            dns_id = 0;
         }
 
         dns_header_t *header = (dns_header_t *)receive_msg.data;
@@ -180,11 +169,11 @@ static void *client_data(__attribute__((unused)) void *arg)
         id_map[id].port = receive_client_addr.sin_port;
 
         if (sendto(repeater_DNS_socket, receive_msg.data, receive_msg.size, 0,
-                   (struct sockaddr *)&dns_addr, sizeof(dns_addr)) < 0) {
-            stat.sended_to_dns_error++;
-            errmsg("Can't send to DNS :%s\n", strerror(errno));
+                   (struct sockaddr *)&dns_addr[dns_id], sizeof(dns_addr[dns_id])) < 0) {
+            statistics_data.sended_to_dns_error++;
+            printf("Can't send to DNS \"%s\"\n", strerror(errno));
         } else {
-            stat.sended_to_dns++;
+            statistics_data.sended_to_dns++;
         }
     }
 
@@ -219,3 +208,109 @@ void init_net_data_threads(void)
         errmsg("Can't detach DNS_data_thread\n");
     }
 }
+
+#else
+
+#define DNS_port 53
+
+memory_t receive_msg;
+memory_t que_domain;
+memory_t ans_domain;
+memory_t cname_domain;
+
+void callback(__attribute__((unused)) u_char *useless,
+              __attribute__((unused)) const struct pcap_pkthdr *pkthdr, const u_char *packet)
+{
+    char *L2_start_pointer = (char *)packet;
+    struct sll_header *ethh = (struct sll_header *)L2_start_pointer;
+    uint16_t proto_L3 = ntohs(ethh->sll_protocol);
+    if (proto_L3 != ETH_P_IP) {
+        return;
+    }
+
+    char *L3_start_pointer = L2_start_pointer + sizeof(struct sll_header);
+    struct iphdr *iph = (struct iphdr *)L3_start_pointer;
+    char proto_L4 = iph->protocol;
+    if (proto_L4 != IPPROTO_UDP) {
+        return;
+    }
+
+    char *L4_start_pointer = L3_start_pointer + sizeof(struct iphdr);
+    struct udphdr *udph = (struct udphdr *)L4_start_pointer;
+    if (ntohs(udph->source) != DNS_port) {
+        return;
+    }
+
+    receive_msg.size = ntohs(udph->len);
+    receive_msg.data = L4_start_pointer + sizeof(struct udphdr);
+
+    dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain);
+}
+
+static void *PCAP(__attribute__((unused)) void *arg)
+{
+    pcap_t *handle;
+    char dev[] = "any";
+    char errbuf[PCAP_ERRBUF_SIZE];
+    struct bpf_program fp;
+    char filter_exp[] = "udp and src port 53";
+
+    handle = pcap_open_live(dev, BUFSIZ, 0, 1, errbuf);
+    if (handle == NULL) {
+        errmsg("Can't open device %s: %s\n", dev, errbuf);
+    }
+    if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) != 0) {
+        errmsg("Can't parse filter %s: %s\n", filter_exp, pcap_geterr(handle));
+    }
+    if (pcap_setfilter(handle, &fp) != 0) {
+        errmsg("Can't install filter %s: %s\n", filter_exp, pcap_geterr(handle));
+    }
+
+    receive_msg.size = 0;
+    receive_msg.max_size = PACKET_MAX_SIZE;
+    receive_msg.data = (char *)malloc(receive_msg.max_size * sizeof(char));
+    if (receive_msg.data == 0) {
+        errmsg("No free memory for receive_msg from DNS\n");
+    }
+
+    que_domain.size = 0;
+    que_domain.max_size = DOMAIN_MAX_SIZE;
+    que_domain.data = (char *)malloc(que_domain.max_size * sizeof(char));
+    if (que_domain.data == 0) {
+        errmsg("No free memory for que_domain\n");
+    }
+
+    ans_domain.size = 0;
+    ans_domain.max_size = DOMAIN_MAX_SIZE;
+    ans_domain.data = (char *)malloc(ans_domain.max_size * sizeof(char));
+    if (ans_domain.data == 0) {
+        errmsg("No free memory for ans_domain\n");
+    }
+
+    cname_domain.size = 0;
+    cname_domain.max_size = DOMAIN_MAX_SIZE;
+    cname_domain.data = (char *)malloc(cname_domain.max_size * sizeof(char));
+    if (cname_domain.data == 0) {
+        errmsg("No free memory for cname_domain\n");
+    }
+
+    dns_ans_check_test();
+
+    pcap_loop(handle, 0, callback, NULL);
+
+    return NULL;
+}
+
+void init_net_data_threads(void)
+{
+    pthread_t PCAP_thread;
+    if (pthread_create(&PCAP_thread, NULL, PCAP, NULL)) {
+        errmsg("Can't create client_data_thread\n");
+    }
+
+    if (pthread_detach(PCAP_thread)) {
+        errmsg("Can't detach client_data_thread\n");
+    }
+}
+
+#endif

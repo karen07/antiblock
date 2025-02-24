@@ -24,6 +24,6 @@ typedef struct statistics {
     time_t stat_start;
 } statistics_t;
 
-extern statistics_t stat;
+extern statistics_t statistics_data;
 
-void stat_print(void);
+void stat_print(FILE *stat_fd);

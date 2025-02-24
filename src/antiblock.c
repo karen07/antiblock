@@ -8,56 +8,59 @@
 #include "tun.h"
 #include "domains_read.h"
 
-pthread_barrier_t threads_barrier;
-
-int32_t is_log_print;
-int32_t is_stat_print;
-
-char log_or_stat_folder[PATH_MAX - 100];
-
-#ifdef TUN_MODE
-char tun_name[IFNAMSIZ];
-
-uint32_t tun_ip = 0xFFFFFFFF;
-uint32_t tun_prefix;
-#endif
-
-uint32_t dns_ip = 0xFFFFFFFF;
-uint16_t dns_port;
-
-uint32_t listen_ip = 0xFFFFFFFF;
-uint16_t listen_port;
-
 FILE *log_fd;
 FILE *stat_fd;
 
 int32_t gateways_count;
-
-char gateway_name[GATEWAY_MAX_COUNT][IFNAMSIZ];
 char *gateway_domains_paths[GATEWAY_MAX_COUNT];
 
-uint32_t gateway_domains_offset[GATEWAY_MAX_COUNT];
-int32_t gateway_domains_count[GATEWAY_MAX_COUNT];
+static char gateway_name[GATEWAY_MAX_COUNT][IFNAMSIZ];
+
+#ifndef PCAP_MODE
+pthread_barrier_t threads_barrier;
+struct sockaddr_in listen_addr;
+struct sockaddr_in dns_addr[DNS_MAX_COUNT];
+#endif
+
+#ifdef TUN_MODE
+uint32_t tun_ip = INADDR_NONE;
+uint32_t tun_prefix;
+#endif
 
 #ifndef TUN_MODE
-int32_t route_socket;
+static int32_t route_socket;
+static void clean_route_table(void);
 #endif
 
 void errmsg(const char *format, ...)
 {
     va_list args;
 
-    printf("\nError: ");
+    printf("Error: ");
 
     va_start(args, format);
     vprintf(format, args);
     va_end(args);
 
+#ifndef TUN_MODE
+    clean_route_table();
+#endif
+
+    if (stat_fd) {
+        stat_print(stat_fd);
+    }
+
+    if (log_fd) {
+        fflush(log_fd);
+    }
+
+    fflush(stdout);
+
     exit(EXIT_FAILURE);
 }
 
 #ifndef TUN_MODE
-void set_route(struct rtentry *route, int32_t gateway_index, uint32_t dst)
+static void set_route(struct rtentry *route, int32_t gateway_index, uint32_t dst)
 {
     memset(route, 0, sizeof(*route));
 
@@ -69,7 +72,7 @@ void set_route(struct rtentry *route, int32_t gateway_index, uint32_t dst)
 
     route_addr = (struct sockaddr_in *)(&(route->rt_genmask));
     route_addr->sin_family = AF_INET;
-    route_addr->sin_addr.s_addr = 0xFFFFFFFF;
+    route_addr->sin_addr.s_addr = INADDR_NONE;
 
     route->rt_dev = gateway_name[gateway_index];
     route->rt_flags = RTF_UP;
@@ -85,12 +88,13 @@ void add_route(int32_t gateway_index, uint32_t dst)
         if (strcmp(strerror(errno), "File exists")) {
             struct in_addr rec_ip;
             rec_ip.s_addr = dst;
-            printf("Ioctl can't add %s from route table :%s\n", inet_ntoa(rec_ip), strerror(errno));
+            printf("Ioctl can't add %s for routing via %s \"%s\"\n", inet_ntoa(rec_ip),
+                   gateway_name[gateway_index], strerror(errno));
         }
     }
 }
 
-void del_route(int32_t gateway_index, uint32_t dst)
+static void del_route(int32_t gateway_index, uint32_t dst)
 {
     struct rtentry route;
 
@@ -100,8 +104,8 @@ void del_route(int32_t gateway_index, uint32_t dst)
         if (strcmp(strerror(errno), "No such process")) {
             struct in_addr rec_ip;
             rec_ip.s_addr = dst;
-            printf("Ioctl can't delete %s from route table :%s\n", inet_ntoa(rec_ip),
-                   strerror(errno));
+            printf("Ioctl can't delete %s for routing via %s \"%s\"\n", inet_ntoa(rec_ip),
+                   gateway_name[gateway_index], strerror(errno));
         }
     }
 }
@@ -130,7 +134,7 @@ static void clean_route_table(void)
     while (fscanf(route_fd, "%s %x %x %x %x %x %x %x %x %x %x", iface, &dest_ip, &gate_ip, &flags,
                   &refcnt, &use, &metric, &mask, &mtu, &window, &irtt) != EOF) {
         for (int32_t i = 0; i < gateways_count; i++) {
-            if ((!strcmp(iface, gateway_name[i])) && (mask == 0xFFFFFFFF)) {
+            if ((!strcmp(iface, gateway_name[i])) && (mask == INADDR_NONE)) {
                 del_route(gate_ip, dest_ip);
             }
         }
@@ -142,54 +146,44 @@ static void clean_route_table(void)
 
 static void print_help(void)
 {
-    printf(
-        "\nCommands:\n"
-        "  At least one parameters needs to be filled:\n"
-        "    -domains  \"test1 https://test1.com\"  Route domains from path/url through gateway\n"
-        "    -domains  \"test2 /test1.txt\"         Route domains from path/url through gateway\n"
-        "    -domains  \"test3 /test2.txt\"         Route domains from path/url through gateway\n"
-        "    -domains  \"test4 https://test2.com\"  Route domains from path/url through gateway\n"
-        "    ........\n"
-        "  Required parameters:\n"
-        "    -listen    x.x.x.x:xx                Listen address\n"
-        "    -DNS       x.x.x.x:xx                DNS address\n"
-#ifdef TUN_MODE
-        "    -TUN_net   x.x.x.x/xx                TUN net\n"
-        "    -TUN_name  example                   TUN name\n"
+    printf("Commands:\n"
+           "  At least one parameters needs to be filled:\n"
+           "    -r  \"gateway1 https://test1.com\"  Route domains from path/url through gateway\n"
+           "    -r  \"gateway2 /test1.txt\"         Route domains from path/url through gateway\n"
+           "    -r  \"gateway2 /test2.txt\"         Route domains from path/url through gateway\n"
+           "    -r  \"gateway1 https://test2.com\"  Route domains from path/url through gateway\n"
+           "    ................................\n"
+           "  Required parameters:\n"
+#ifndef PCAP_MODE
+           "    -l  \"x.x.x.x:xx\"                  Listen address\n"
+           "    -d  \"x.x.x.x:xx\"                  DNS address\n"
 #endif
-        "  Optional parameters:\n"
-        "    -output    /test/                    Log or statistics output folder\n"
-        "    -log                                 Show operations log\n"
-        "    -stat                                Show statistics data\n");
+#ifdef TUN_MODE
+           "    -n  \"x.x.x.x/xx\"                  TUN net\n"
+#endif
+           "  Optional parameters:\n"
+           "    -o  \"/test/\"                      Log or statistics output folder\n"
+           "    --log                             Show operations log\n"
+           "    --stat                            Show statistics data\n");
 }
 
 static void main_catch_function(int32_t signo)
 {
     if (signo == SIGINT) {
-        printf("SIGINT catched main\n");
+        errmsg("SIGINT catched main\n");
     } else if (signo == SIGSEGV) {
-        printf("SIGSEGV catched main\n");
+        errmsg("SIGSEGV catched main\n");
     } else if (signo == SIGTERM) {
-        printf("SIGTERM catched main\n");
+        errmsg("SIGTERM catched main\n");
     }
-#ifndef TUN_MODE
-    clean_route_table();
-#endif
-    fflush(stdout);
-    if (stat_fd) {
-        fflush(stat_fd);
-    }
-    if (log_fd) {
-        fflush(log_fd);
-    }
-    exit(EXIT_SUCCESS);
 }
 
 int32_t main(int32_t argc, char *argv[])
 {
-    printf("\nAntiBlock started " ANTIBLOCK_VERSION "\n\n");
-    printf("AntiBlock program proxies DNS requests. The IP addresses of the specified domains\n"
-           "are added to the routing table for routing through the specified interfaces.\n\n");
+    printf(
+        "AntiBlock " ANTIBLOCK_VERSION
+        ". The program proxies DNS requests. The IP addresses of the specified \n"
+        "domains are added to the routing table for routing through the specified interfaces.\n");
 
     if (signal(SIGINT, main_catch_function) == SIG_ERR) {
         errmsg("Can't set SIGINT signal handler main\n");
@@ -203,57 +197,102 @@ int32_t main(int32_t argc, char *argv[])
         errmsg("Can't set SIGTERM signal handler main\n");
     }
 
+    int32_t is_log_print = 0;
+    int32_t is_stat_print = 0;
+    char log_or_stat_folder[PATH_MAX - 100];
+    memset(log_or_stat_folder, 0, PATH_MAX - 100);
+
+#ifndef PCAP_MODE
+    listen_addr.sin_addr.s_addr = INADDR_NONE;
+    for (int32_t i = 0; i < DNS_MAX_COUNT; i++) {
+        dns_addr[i].sin_addr.s_addr = INADDR_NONE;
+    }
+#endif
+
     printf("Launch parameters:\n");
 
     for (int32_t i = 1; i < argc; i++) {
-        if (!strcmp(argv[i], "-log")) {
+        if (!strcmp(argv[i], "--log")) {
             is_log_print = 1;
-            printf("  Log enabled\n");
+            printf("  Log     enabled\n");
             continue;
         }
-        if (!strcmp(argv[i], "-stat")) {
+        if (!strcmp(argv[i], "--stat")) {
             is_stat_print = 1;
-            printf("  Stat enabled\n");
+            printf("  Stat    enabled\n");
             continue;
         }
-        if (!strcmp(argv[i], "-domains")) {
+        if (!strcmp(argv[i], "-r")) {
             if (i != argc - 1) {
-                printf("  Domains %s\n", argv[i + 1]);
-                char *space_ptr = strchr(argv[i + 1], ' ');
-                if (space_ptr) {
-                    *space_ptr = 0;
+                printf("  Routes  \"%s\"\n", argv[i + 1]);
+                char *first_space_ptr = strchr(argv[i + 1], ' ');
+                if (first_space_ptr) {
+                    *first_space_ptr = 0;
+#ifdef MULTIPLE_DNS
+                    char *colon_ptr = strchr(argv[i + 1], ':');
+                    if (colon_ptr) {
+                        uint16_t tmp_port = 0;
+                        sscanf(colon_ptr + 1, "%hu", &tmp_port);
+                        *colon_ptr = 0;
+                        if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
+                            dns_addr[DNS_COUNT].sin_family = AF_INET;
+                            dns_addr[DNS_COUNT].sin_port = htons(tmp_port);
+                            dns_addr[DNS_COUNT].sin_addr.s_addr = inet_addr(argv[i + 1]);
+                        }
+                        *colon_ptr = ':';
+                    }
+                    *first_space_ptr = ' ';
+                    char *second_space_ptr = strchr(first_space_ptr + 1, ' ');
+                    if (second_space_ptr) {
+                        *second_space_ptr = 0;
+                        if (gateways_count < GATEWAY_MAX_COUNT) {
+                            if (strlen(first_space_ptr + 1) < IFNAMSIZ) {
+                                strcpy(gateway_name[gateways_count], first_space_ptr + 1);
+                            }
+                            gateway_domains_paths[gateways_count] = second_space_ptr + 1;
+                        }
+                        *second_space_ptr = ' ';
+                        gateways_count++;
+                    }
+#else
+                    *first_space_ptr = 0;
                     if (gateways_count < GATEWAY_MAX_COUNT) {
                         if (strlen(argv[i + 1]) < IFNAMSIZ) {
                             strcpy(gateway_name[gateways_count], argv[i + 1]);
                         }
-                        gateway_domains_paths[gateways_count] = space_ptr + 1;
+                        gateway_domains_paths[gateways_count] = first_space_ptr + 1;
                     }
-                    *space_ptr = ' ';
+                    *first_space_ptr = ' ';
                     gateways_count++;
+#endif
                 }
                 i++;
             }
             continue;
         }
-        if (!strcmp(argv[i], "-output")) {
+        if (!strcmp(argv[i], "-o")) {
             if (i != argc - 1) {
                 if (strlen(argv[i + 1]) < PATH_MAX - 100) {
                     strcpy(log_or_stat_folder, argv[i + 1]);
-                    printf("  Output log or stat to %s\n", log_or_stat_folder);
+                    printf("  Output  \"%s\"\n", log_or_stat_folder);
                 }
                 i++;
             }
             continue;
         }
-        if (!strcmp(argv[i], "-DNS")) {
+#ifndef PCAP_MODE
+        if (!strcmp(argv[i], "-d")) {
             if (i != argc - 1) {
-                printf("  DNS %s\n", argv[i + 1]);
+                printf("  DNS     \"%s\"\n", argv[i + 1]);
                 char *colon_ptr = strchr(argv[i + 1], ':');
                 if (colon_ptr) {
-                    sscanf(colon_ptr + 1, "%hu", &dns_port);
+                    uint16_t tmp_port = 0;
+                    sscanf(colon_ptr + 1, "%hu", &tmp_port);
                     *colon_ptr = 0;
                     if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
-                        dns_ip = inet_addr(argv[i + 1]);
+                        dns_addr[0].sin_family = AF_INET;
+                        dns_addr[0].sin_port = htons(tmp_port);
+                        dns_addr[0].sin_addr.s_addr = inet_addr(argv[i + 1]);
                     }
                     *colon_ptr = ':';
                 }
@@ -261,15 +300,18 @@ int32_t main(int32_t argc, char *argv[])
             }
             continue;
         }
-        if (!strcmp(argv[i], "-listen")) {
+        if (!strcmp(argv[i], "-l")) {
             if (i != argc - 1) {
-                printf("  Listen %s\n", argv[i + 1]);
+                printf("  Listen  \"%s\"\n", argv[i + 1]);
                 char *colon_ptr = strchr(argv[i + 1], ':');
                 if (colon_ptr) {
-                    sscanf(colon_ptr + 1, "%hu", &listen_port);
+                    uint16_t tmp_port = 0;
+                    sscanf(colon_ptr + 1, "%hu", &tmp_port);
                     *colon_ptr = 0;
                     if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
-                        listen_ip = inet_addr(argv[i + 1]);
+                        listen_addr.sin_family = AF_INET;
+                        listen_addr.sin_port = htons(tmp_port);
+                        listen_addr.sin_addr.s_addr = inet_addr(argv[i + 1]);
                     }
                     *colon_ptr = ':';
                 }
@@ -277,10 +319,11 @@ int32_t main(int32_t argc, char *argv[])
             }
             continue;
         }
+#endif
 #ifdef TUN_MODE
-        if (!strcmp(argv[i], "-TUN_net")) {
+        if (!strcmp(argv[i], "-n")) {
             if (i != argc - 1) {
-                printf("  TUN net %s\n", argv[i + 1]);
+                printf("  TUN     \"%s\"\n", argv[i + 1]);
                 char *slash_ptr = strchr(argv[i + 1], '/');
                 if (slash_ptr) {
                     sscanf(slash_ptr + 1, "%u", &tun_prefix);
@@ -294,28 +337,13 @@ int32_t main(int32_t argc, char *argv[])
             }
             continue;
         }
-        if (!strcmp(argv[i], "-TUN_name")) {
-            if (i != argc - 1) {
-                if (strlen(argv[i + 1]) < IFNAMSIZ) {
-                    strcpy(tun_name, argv[i + 1]);
-                    printf("  TUN name %s\n", tun_name);
-                }
-                i++;
-            }
-            continue;
-        }
 #endif
         print_help();
         errmsg("Unknown command: %s\n", argv[i]);
     }
 
 #ifdef TUN_MODE
-    if (tun_name[0] == 0) {
-        print_help();
-        errmsg("The program need TUN_name\n");
-    }
-
-    if (tun_ip == 0xFFFFFFFF) {
+    if (tun_ip == INADDR_NONE) {
         print_help();
         errmsg("The program need correct TUN IP\n");
     }
@@ -336,38 +364,48 @@ int32_t main(int32_t argc, char *argv[])
         errmsg("The program needs at least one correct pair of \"gateway domains\"\n");
     }
 
-    if (!(gateways_count < GATEWAY_MAX_COUNT)) {
+    if (gateways_count > GATEWAY_MAX_COUNT) {
+        gateways_count = GATEWAY_MAX_COUNT;
         print_help();
         errmsg("The program needs a maximum of %d pair of \"gateway domains\"\n",
-               GATEWAY_MAX_COUNT - 1);
+               GATEWAY_MAX_COUNT);
     }
 
     for (int32_t i = 0; i < gateways_count; i++) {
         if ((gateway_name[i][0] == 0) || (gateway_domains_paths[i][0] == 0)) {
             print_help();
-            errmsg("The program needs at least one correct pair of \"gateway domains\"\n");
+            errmsg("The program needs correct pairs of \"gateway domains\"\n");
         }
     }
 
-    if (dns_ip == 0xFFFFFFFF) {
-        print_help();
-        errmsg("The program need correct DNS IP\n");
+#ifndef PCAP_MODE
+#ifndef MULTIPLE_DNS
+    for (int32_t i = 1; i < DNS_COUNT; i++) {
+        dns_addr[i] = dns_addr[0];
+    }
+#endif
+
+    for (int32_t i = 0; i < DNS_COUNT; i++) {
+        if (dns_addr[i].sin_addr.s_addr == INADDR_NONE) {
+            print_help();
+            errmsg("The program need correct DNS IP\n");
+        }
+        if (dns_addr[i].sin_port == 0) {
+            print_help();
+            errmsg("The program need correct DNS port\n");
+        }
     }
 
-    if (dns_port == 0) {
-        print_help();
-        errmsg("The program need correct DNS port\n");
-    }
-
-    if (listen_ip == 0xFFFFFFFF) {
+    if (listen_addr.sin_addr.s_addr == INADDR_NONE) {
         print_help();
         errmsg("The program need correct listen IP\n");
     }
 
-    if (listen_port == 0) {
+    if (listen_addr.sin_port == 0) {
         print_help();
         errmsg("The program need correct listen port\n");
     }
+#endif
 
     if (is_log_print || is_stat_print) {
         if (log_or_stat_folder[0] == 0) {
@@ -394,8 +432,7 @@ int32_t main(int32_t argc, char *argv[])
         }
     }
 
-    printf("\n");
-
+#ifndef PCAP_MODE
     int32_t threads_barrier_count = 3;
 #ifdef TUN_MODE
     threads_barrier_count += 1;
@@ -403,33 +440,37 @@ int32_t main(int32_t argc, char *argv[])
     if (pthread_barrier_init(&threads_barrier, NULL, threads_barrier_count)) {
         errmsg("Can't create threads_barrier\n");
     }
+#endif
 
 #ifdef TUN_MODE
     init_tun_thread();
 #else
     route_socket = socket(AF_INET, SOCK_DGRAM, 0);
     if (route_socket < 0) {
-        errmsg("Can't create route_socket :%s\n", strerror(errno));
+        errmsg("Can't create route_socket \"%s\"\n", strerror(errno));
     }
 #endif
 
     init_net_data_threads();
 
+#ifndef PCAP_MODE
     pthread_barrier_wait(&threads_barrier);
+#endif
 
     int32_t circles = 0;
     int32_t sleep_circles = 0;
 
     while (true) {
         if (circles++ == 0) {
-            memset(&stat, 0, sizeof(stat));
-            stat.stat_start = time(NULL);
+            memset(&statistics_data, 0, sizeof(statistics_data));
+            statistics_data.stat_start = time(NULL);
 
 #ifndef TUN_MODE
             clean_route_table();
 #endif
 
-            int32_t domains_read_status = domains_read();
+            int32_t domains_read_status = 0;
+            domains_read_status = domains_read();
 
             if (domains_read_status) {
                 sleep_circles = DOMAINS_UPDATE_TIME;
@@ -442,11 +483,11 @@ int32_t main(int32_t argc, char *argv[])
 
         circles %= sleep_circles;
 
-        if (is_stat_print) {
-            stat_print();
+        if (stat_fd) {
+            stat_print(stat_fd);
         }
 
-        if (is_log_print) {
+        if (log_fd) {
             fflush(log_fd);
         }
 
