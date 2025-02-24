@@ -140,7 +140,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
 
     // DNS HEADER
     if (cur_pos_ptr + sizeof(dns_header_t) > receive_msg_end) {
-        stat.request_parsing_error++;
+        statistics_data.request_parsing_error++;
         return DNS_ANS_CHECK_HEADER_SIZE_ERROR;
     }
 
@@ -149,7 +149,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
     //uint16_t first_bit_mark = FIRST_BIT_UINT16;
     //uint16_t flags = ntohs(header->flags);
     //if ((flags & first_bit_mark) == 0) {
-    //    stat.request_parsing_error++;
+    //    statistics_data.request_parsing_error++;
     //    return DNS_ANS_CHECK_RES_TYPE_ERROR;
     //}
 
@@ -170,7 +170,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
     char *que_domain_start = cur_pos_ptr;
     char *que_domain_end = NULL;
     if (get_domain_from_packet(receive_msg, que_domain_start, &que_domain_end, que_domain) != 0) {
-        stat.request_parsing_error++;
+        statistics_data.request_parsing_error++;
         return DNS_ANS_CHECK_QUE_URL_GET_ERROR;
     }
     cur_pos_ptr = que_domain_end;
@@ -180,7 +180,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
 
     // QUE DATA
     if (cur_pos_ptr + sizeof(dns_que_t) > receive_msg_end) {
-        stat.request_parsing_error++;
+        statistics_data.request_parsing_error++;
         return DNS_ANS_CHECK_QUE_DATA_GET_ERROR;
     }
 
@@ -206,7 +206,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
         char *ans_domain_end = NULL;
         if (get_domain_from_packet(receive_msg, ans_domain_start, &ans_domain_end, ans_domain) !=
             0) {
-            stat.request_parsing_error++;
+            statistics_data.request_parsing_error++;
             return DNS_ANS_CHECK_ANS_URL_GET_ERROR;
         }
         cur_pos_ptr = ans_domain_end;
@@ -217,7 +217,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
 
         // ANS DATA
         if (cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t) > receive_msg_end) {
-            stat.request_parsing_error++;
+            statistics_data.request_parsing_error++;
             return DNS_ANS_CHECK_ANS_DATA_GET_ERROR;
         }
 
@@ -228,7 +228,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
         uint16_t ans_len = ntohs(ans->len);
 
         if (cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t) + ans_len > receive_msg_end) {
-            stat.request_parsing_error++;
+            statistics_data.request_parsing_error++;
             return DNS_ANS_CHECK_ANS_LEN_ERROR;
         }
 
@@ -301,7 +301,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
             char *cname_domain_end = NULL;
             if (get_domain_from_packet(receive_msg, cname_domain_start, &cname_domain_end,
                                        cname_domain) != 0) {
-                stat.request_parsing_error++;
+                statistics_data.request_parsing_error++;
                 return DNS_ANS_CHECK_CNAME_URL_GET_ERROR;
             }
 
@@ -353,7 +353,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
 
     if ((header->auth == 0) && (header->add == 0)) {
         if (cur_pos_ptr != receive_msg_end) {
-            stat.request_parsing_error++;
+            statistics_data.request_parsing_error++;
             return DNS_ANS_CHECK_NOT_END_ERROR;
         }
     }
