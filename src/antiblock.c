@@ -36,7 +36,7 @@ void errmsg(const char *format, ...)
 {
     va_list args;
 
-    printf("\nError: ");
+    printf("Error: ");
 
     va_start(args, format);
     vprintf(format, args);
@@ -146,7 +146,7 @@ static void clean_route_table(void)
 
 static void print_help(void)
 {
-    printf("\nCommands:\n"
+    printf("Commands:\n"
            "  At least one parameters needs to be filled:\n"
            "    -r  \"gateway1 https://test1.com\"  Route domains from path/url through gateway\n"
            "    -r  \"gateway2 /test1.txt\"         Route domains from path/url through gateway\n"
@@ -180,9 +180,10 @@ static void main_catch_function(int32_t signo)
 
 int32_t main(int32_t argc, char *argv[])
 {
-    printf("\nAntiBlock started " ANTIBLOCK_VERSION "\n\n");
-    printf("AntiBlock program proxies DNS requests. The IP addresses of the specified domains\n"
-           "are added to the routing table for routing through the specified interfaces.\n\n");
+    printf(
+        "AntiBlock " ANTIBLOCK_VERSION
+        ". The program proxies DNS requests. The IP addresses of the specified \n"
+        "domains are added to the routing table for routing through the specified interfaces.\n");
 
     if (signal(SIGINT, main_catch_function) == SIG_ERR) {
         errmsg("Can't set SIGINT signal handler main\n");
@@ -430,8 +431,6 @@ int32_t main(int32_t argc, char *argv[])
             errmsg("Can't open stat file\n");
         }
     }
-
-    printf("\n");
 
 #ifndef PCAP_MODE
     int32_t threads_barrier_count = 3;
