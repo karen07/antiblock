@@ -52,8 +52,8 @@ typedef struct memory {
 #ifndef _DOMAINS_TYPE
 #define _DOMAINS_TYPE
 typedef struct domains_gateway {
-    unsigned int offset : OFFSET_BITS_COUNT;
     unsigned int gateway : GATEWAY_BITS_COUNT;
+    unsigned int offset : OFFSET_BITS_COUNT;
 } domains_gateway_t;
 #endif
 
