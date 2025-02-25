@@ -148,23 +148,32 @@ static void print_help(void)
 {
     printf("Commands:\n"
            "  At least one parameters needs to be filled:\n"
-           "    -r  \"gateway1 https://test1.com\"  Route domains from path/url through gateway\n"
-           "    -r  \"gateway2 /test1.txt\"         Route domains from path/url through gateway\n"
-           "    -r  \"gateway2 /test2.txt\"         Route domains from path/url through gateway\n"
-           "    -r  \"gateway1 https://test2.com\"  Route domains from path/url through gateway\n"
-           "    ................................\n"
-           "  Required parameters:\n"
-#ifndef PCAP_MODE
-           "    -l  \"x.x.x.x:xx\"                  Listen address\n"
-           "    -d  \"x.x.x.x:xx\"                  DNS address\n"
+           "    Route domains from path/url through gateway,\n"
+#ifdef MULTIPLE_DNS
+           "    resolve domains from path/url via DNS:\n"
+           "      -r  \"DNS2 gateway1 https://test1.com\"\n"
+           "      -r  \"DNS2 gateway2 /test1.txt\"\n"
+           "      -r  \"DNS1 gateway2 /test2.txt\"\n"
+           "      -r  \"DNS1 gateway1 https://test2.com\"\n"
+#else
+           "      -r  \"gateway1 https://test1.com\"\n"
+           "      -r  \"gateway2 /test1.txt\"\n"
+           "      -r  \"gateway2 /test2.txt\"\n"
+           "      -r  \"gateway1 https://test2.com\"\n"
 #endif
+           "      .....................................\n"
+#ifndef PCAP_MODE
+           "  Required parameters:\n"
+           "    -l  \"x.x.x.x:xx\"  Listen address\n"
+           "    -d  \"x.x.x.x:xx\"  DNS address\n"
 #ifdef TUN_MODE
-           "    -n  \"x.x.x.x/xx\"                  TUN net\n"
+           "    -n  \"x.x.x.x/xx\"  TUN net\n"
+#endif
 #endif
            "  Optional parameters:\n"
-           "    -o  \"/test/\"                      Log or statistics output folder\n"
-           "    --log                             Show operations log\n"
-           "    --stat                            Show statistics data\n");
+           "    -o  \"/test/\"      Log or stat output folder\n"
+           "    --log             Show operations log\n"
+           "    --stat            Show statistics data\n");
 }
 
 static void main_catch_function(int32_t signo)
@@ -180,10 +189,17 @@ static void main_catch_function(int32_t signo)
 
 int32_t main(int32_t argc, char *argv[])
 {
-    printf(
-        "AntiBlock " ANTIBLOCK_VERSION
-        ". The program proxies DNS requests. The IP addresses of the specified \n"
-        "domains are added to the routing table for routing through the specified interfaces.\n");
+#ifdef PCAP_MODE
+    printf("AntiBlock " ANTIBLOCK_VERSION " sniffer DNS requests.\n"
+           "The IP addresses of the specified domains\n"
+           "are added to the routing table for routing\n"
+           "through the specified interfaces.\n");
+#else
+    printf("AntiBlock " ANTIBLOCK_VERSION " proxies DNS requests.\n"
+           "The IP addresses of the specified domains\n"
+           "are added to the routing table for routing\n"
+           "through the specified interfaces.\n");
+#endif
 
     if (signal(SIGINT, main_catch_function) == SIG_ERR) {
         errmsg("Can't set SIGINT signal handler main\n");
