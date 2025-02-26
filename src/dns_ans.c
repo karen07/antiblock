@@ -132,6 +132,31 @@ static int32_t check_domain(memory_t *domain)
     return CHECK_DOMAIN_NOT_BLOCKED;
 }
 
+int32_t in_subnet(uint32_t ip, char *subnet_in)
+{
+    char subnet[100];
+    strcpy(subnet, subnet_in);
+
+    uint32_t subnet_ip = 0;
+    uint32_t subnet_prefix = 0;
+
+    char *slash_ptr = strchr(subnet, '/');
+    if (slash_ptr) {
+        sscanf(slash_ptr + 1, "%u", &subnet_prefix);
+        *slash_ptr = 0;
+        if (strlen(subnet) < INET_ADDRSTRLEN) {
+            subnet_ip = inet_addr(subnet);
+        }
+        *slash_ptr = '/';
+    }
+
+    uint32_t ip_h = ntohl(ip);
+    uint32_t netip = ntohl(subnet_ip);
+    uint32_t netmask = (0xFFFFFFFF << (32 - subnet_prefix) & 0xFFFFFFFF);
+
+    return ((netip & netmask) == (ip_h & netmask));
+}
+
 int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans_domain,
                       memory_t *cname_domain)
 {
@@ -263,18 +288,18 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
                 }
 #else
 
-                int32_t correct_ip4_flag = 1;
+                int32_t correct_ip4_flag = 0;
                 if (ans->ip4 == 0) {
-                    correct_ip4_flag = 0;
+                    correct_ip4_flag = 1;
                 }
-#ifndef PCAP_MODE
-                for (int32_t j = 0; j < DNS_COUNT; j++) {
-                    if (ans->ip4 == dns_addr[j].sin_addr.s_addr) {
-                        correct_ip4_flag = 0;
-                    }
-                }
-#endif
-                if (correct_ip4_flag) {
+
+                correct_ip4_flag += in_subnet(ans->ip4, "10.0.0.0/8");
+                correct_ip4_flag += in_subnet(ans->ip4, "100.64.0.0/10");
+                correct_ip4_flag += in_subnet(ans->ip4, "172.16.0.0/12");
+                correct_ip4_flag += in_subnet(ans->ip4, "192.168.0.0/16");
+                correct_ip4_flag += in_subnet(ans->ip4, "1.1.1.1/32");
+
+                if (correct_ip4_flag == 0) {
                     add_route(block_ans_domain_flag, ans->ip4);
                 }
 
