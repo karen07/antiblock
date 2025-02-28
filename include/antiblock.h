@@ -1,8 +1,9 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <limits.h>
-#include <net/if.h>
-#include <net/route.h>
+#include <linux/if.h>
+#include <linux/limits.h>
+#include <linux/route.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
