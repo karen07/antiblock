@@ -74,6 +74,7 @@ extern FILE *stat_fd;
 extern int32_t gateways_count;
 extern char *gateway_domains_paths[GATEWAY_MAX_COUNT];
 
+extern int32_t blacklist_count;
 extern subnet_t blacklist[BLACKLIST_MAX_COUNT];
 
 #ifdef TUN_MODE
