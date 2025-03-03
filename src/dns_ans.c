@@ -132,29 +132,12 @@ static int32_t check_domain(memory_t *domain)
     return CHECK_DOMAIN_NOT_BLOCKED;
 }
 
-int32_t in_subnet(uint32_t ip, char *subnet_in)
+int32_t in_subnet(uint32_t ip, subnet_t *subnet)
 {
-    char subnet[100];
-    strcpy(subnet, subnet_in);
-
-    uint32_t subnet_ip = 0;
-    uint32_t subnet_prefix = 0;
-
-    char *slash_ptr = strchr(subnet, '/');
-    if (slash_ptr) {
-        sscanf(slash_ptr + 1, "%u", &subnet_prefix);
-        *slash_ptr = 0;
-        if (strlen(subnet) < INET_ADDRSTRLEN) {
-            subnet_ip = inet_addr(subnet);
-        }
-        *slash_ptr = '/';
-    }
-
     uint32_t ip_h = ntohl(ip);
-    uint32_t netip = ntohl(subnet_ip);
-    uint32_t netmask = (0xFFFFFFFF << (32 - subnet_prefix) & 0xFFFFFFFF);
+    uint32_t subnet_ip_h = ntohl(subnet->ip);
 
-    return ((netip & netmask) == (ip_h & netmask));
+    return ((subnet_ip_h & subnet->mask) == (ip_h & subnet->mask));
 }
 
 int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans_domain,
@@ -293,11 +276,9 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
                     correct_ip4_flag = 1;
                 }
 
-                correct_ip4_flag += in_subnet(ans->ip4, "10.0.0.0/8");
-                correct_ip4_flag += in_subnet(ans->ip4, "100.64.0.0/10");
-                correct_ip4_flag += in_subnet(ans->ip4, "172.16.0.0/12");
-                correct_ip4_flag += in_subnet(ans->ip4, "192.168.0.0/16");
-                correct_ip4_flag += in_subnet(ans->ip4, "1.1.1.1/32");
+                for (int32_t j = 0; j < blacklist_count; j++) {
+                    correct_ip4_flag += in_subnet(ans->ip4, &blacklist[j]);
+                }
 
                 if (correct_ip4_flag == 0) {
                     add_route(block_ans_domain_flag, ans->ip4);

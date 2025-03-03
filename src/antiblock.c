@@ -14,7 +14,8 @@ FILE *stat_fd;
 int32_t gateways_count;
 char *gateway_domains_paths[GATEWAY_MAX_COUNT];
 
-extern subnet_t blacklist[BLACKLIST_MAX_COUNT];
+int32_t blacklist_count;
+subnet_t blacklist[BLACKLIST_MAX_COUNT];
 
 static char gateway_name[GATEWAY_MAX_COUNT][IFNAMSIZ];
 
@@ -438,6 +439,33 @@ int32_t main(int32_t argc, char *argv[])
         errmsg("The program need TUN net prefix 1 - 24\n");
     }
 #endif
+
+    if (blacklist_file_path[0] != 0) {
+        FILE *blacklist_fd;
+        blacklist_fd = fopen(blacklist_file_path, "r");
+        if (blacklist_fd == NULL) {
+            errmsg("Can't open blacklist file\n");
+        }
+
+        char tmp_line[100];
+
+        while (fscanf(blacklist_fd, "%s", tmp_line) != EOF) {
+            printf("%s\n", tmp_line);
+            char *slash_ptr = strchr(tmp_line, '/');
+            if (slash_ptr) {
+                int32_t tmp_prefix = 0;
+                sscanf(slash_ptr + 1, "%u", &tmp_prefix);
+                *slash_ptr = 0;
+                if (strlen(tmp_line) < INET_ADDRSTRLEN) {
+                    blacklist[blacklist_count].ip = inet_addr(tmp_line);
+                    blacklist[blacklist_count].mask = (0xFFFFFFFF << (32 - tmp_prefix)) &
+                                                      0xFFFFFFFF;
+                }
+                *slash_ptr = '/';
+            }
+            blacklist_count++;
+        }
+    }
 
     if (is_log_print || is_stat_print) {
         if (log_or_stat_folder[0] == 0) {
