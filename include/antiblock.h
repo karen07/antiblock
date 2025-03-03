@@ -46,6 +46,16 @@ typedef struct memory {
 } memory_t;
 #endif
 
+#ifndef _SUBNET_TYPE
+#define _SUBNET_TYPE
+typedef struct subnet {
+    uint32_t ip;
+    uint32_t mask;
+} subnet_t;
+#endif
+
+#define BLACKLIST_MAX_COUNT 128
+
 #define GATEWAY_BITS_COUNT 5
 #define OFFSET_BITS_COUNT (32 - GATEWAY_BITS_COUNT)
 #define GATEWAY_MAX_COUNT (1 << GATEWAY_BITS_COUNT)
@@ -63,6 +73,8 @@ extern FILE *stat_fd;
 
 extern int32_t gateways_count;
 extern char *gateway_domains_paths[GATEWAY_MAX_COUNT];
+
+extern subnet_t blacklist[BLACKLIST_MAX_COUNT];
 
 #ifdef TUN_MODE
 extern uint32_t tun_ip;
