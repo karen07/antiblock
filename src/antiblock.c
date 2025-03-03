@@ -381,10 +381,11 @@ int32_t main(int32_t argc, char *argv[])
     }
 
     if (gateways_count > GATEWAY_MAX_COUNT) {
+        int32_t tmp_gateways_count = gateways_count;
         gateways_count = GATEWAY_MAX_COUNT;
         print_help();
-        errmsg("The program needs a maximum of %d pair of \"gateway domains\"\n",
-               GATEWAY_MAX_COUNT);
+        errmsg("The program needs a maximum of %d pair of \"gateway domains\", seted %d\n",
+               GATEWAY_MAX_COUNT, tmp_gateways_count);
     }
 
     for (int32_t i = 0; i < gateways_count; i++) {
@@ -450,20 +451,30 @@ int32_t main(int32_t argc, char *argv[])
         char tmp_line[100];
 
         while (fscanf(blacklist_fd, "%s", tmp_line) != EOF) {
-            printf("%s\n", tmp_line);
             char *slash_ptr = strchr(tmp_line, '/');
             if (slash_ptr) {
                 int32_t tmp_prefix = 0;
                 sscanf(slash_ptr + 1, "%u", &tmp_prefix);
                 *slash_ptr = 0;
                 if (strlen(tmp_line) < INET_ADDRSTRLEN) {
-                    blacklist[blacklist_count].ip = inet_addr(tmp_line);
-                    blacklist[blacklist_count].mask = (0xFFFFFFFF << (32 - tmp_prefix)) &
-                                                      0xFFFFFFFF;
+                    if (blacklist_count < BLACKLIST_MAX_COUNT) {
+                        blacklist[blacklist_count].ip = inet_addr(tmp_line);
+                        blacklist[blacklist_count].mask = (0xFFFFFFFF << (32 - tmp_prefix)) &
+                                                          0xFFFFFFFF;
+                    }
+                    blacklist_count++;
                 }
                 *slash_ptr = '/';
+            } else {
+                print_help();
+                errmsg("Every blacklist line \"x.x.x.x/xx\"\n");
             }
-            blacklist_count++;
+        }
+
+        if (blacklist_count > BLACKLIST_MAX_COUNT) {
+            print_help();
+            errmsg("The program needs a maximum of %d blacklist subnets, seted %d\n",
+                   BLACKLIST_MAX_COUNT, blacklist_count);
         }
     }
 

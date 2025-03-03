@@ -271,23 +271,30 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
                 }
 #else
 
-                int32_t correct_ip4_flag = 0;
+                int32_t correct_ip4_flag = 1;
                 if (ans->ip4 == 0) {
-                    correct_ip4_flag = 1;
+                    correct_ip4_flag = 0;
                 }
 
                 for (int32_t j = 0; j < blacklist_count; j++) {
-                    correct_ip4_flag += in_subnet(ans->ip4, &blacklist[j]);
+                    if (in_subnet(ans->ip4, &blacklist[j])) {
+                        correct_ip4_flag = 0;
+                        break;
+                    }
                 }
 
-                if (correct_ip4_flag == 0) {
+                if (correct_ip4_flag) {
                     add_route(block_ans_domain_flag, ans->ip4);
                 }
 
                 if (log_fd) {
                     struct in_addr rec_ip;
                     rec_ip.s_addr = ans->ip4;
-                    fprintf(log_fd, "    Blocked_IP: %s", ans_domain->data + 1);
+                    if (correct_ip4_flag) {
+                        fprintf(log_fd, "    Blocked_IP: %s", ans_domain->data + 1);
+                    } else {
+                        fprintf(log_fd, "    Blocked_IP_Blacklist: %s", ans_domain->data + 1);
+                    }
                     fprintf(log_fd, " %s\n", inet_ntoa(rec_ip));
                 }
 #endif
