@@ -453,7 +453,7 @@ int32_t main(int32_t argc, char *argv[])
         while (fscanf(blacklist_fd, "%s", tmp_line) != EOF) {
             char *slash_ptr = strchr(tmp_line, '/');
             if (slash_ptr) {
-                int32_t tmp_prefix = 0;
+                uint32_t tmp_prefix = 0;
                 sscanf(slash_ptr + 1, "%u", &tmp_prefix);
                 *slash_ptr = 0;
                 if (strlen(tmp_line) < INET_ADDRSTRLEN) {
