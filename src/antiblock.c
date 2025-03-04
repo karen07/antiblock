@@ -365,7 +365,7 @@ int32_t main(int32_t argc, char *argv[])
             if (i != argc - 1) {
                 if (strlen(argv[i + 1]) < PATH_MAX) {
                     strcpy(blacklist_file_path, argv[i + 1]);
-                    printf("  Blacklist  \"%s\"\n", blacklist_file_path);
+                    printf("  BList   \"%s\"\n", blacklist_file_path);
                 }
                 i++;
             }
