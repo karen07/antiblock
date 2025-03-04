@@ -260,7 +260,6 @@ static void *PCAP(__attribute__((unused)) void *arg)
 
     sprintf(filter_exp, "udp and src %s and src port %hu", inet_ntoa(listen_ip),
             htons(listen_addr.sin_port));
-    printf("%s\n", filter_exp);
 
     handle = pcap_open_live(dev, BUFSIZ, 0, 1, errbuf);
     if (handle == NULL) {
