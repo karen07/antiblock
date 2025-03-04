@@ -161,16 +161,19 @@ static void clean_route_table(void)
 }
 #endif
 
-void add_blacklist(char *subnet_str)
+void add_blacklist(const char *subnet_str)
 {
-    char *slash_ptr = strchr(subnet_str, '/');
+    char tmp_subnet[100];
+    strcpy(tmp_subnet, subnet_str);
+
+    char *slash_ptr = strchr(tmp_subnet, '/');
     if (slash_ptr) {
         uint32_t tmp_prefix = 0;
         sscanf(slash_ptr + 1, "%u", &tmp_prefix);
         *slash_ptr = 0;
-        if (strlen(subnet_str) < INET_ADDRSTRLEN) {
+        if (strlen(tmp_subnet) < INET_ADDRSTRLEN) {
             if (blacklist_count < BLACKLIST_MAX_COUNT) {
-                blacklist[blacklist_count].ip = inet_addr(subnet_str);
+                blacklist[blacklist_count].ip = inet_addr(tmp_subnet);
                 blacklist[blacklist_count].mask = (0xFFFFFFFF << (32 - tmp_prefix)) & 0xFFFFFFFF;
             }
             blacklist_count++;
