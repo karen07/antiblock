@@ -253,7 +253,13 @@ static void *PCAP(__attribute__((unused)) void *arg)
     char dev[] = "any";
     char errbuf[PCAP_ERRBUF_SIZE];
     struct bpf_program fp;
-    char filter_exp[] = "udp and src port 53";
+    char filter_exp[1000];
+
+    struct in_addr listen_ip;
+    listen_ip.s_addr = listen_addr.sin_addr.s_addr;
+
+    sprintf(filter_exp, "udp and host %s and port %hu", inet_ntoa(listen_ip),
+            htons(listen_addr.sin_port));
 
     handle = pcap_open_live(dev, BUFSIZ, 0, 1, errbuf);
     if (handle == NULL) {
