@@ -77,6 +77,8 @@ extern char *gateway_domains_paths[GATEWAY_MAX_COUNT];
 extern int32_t blacklist_count;
 extern subnet_t blacklist[BLACKLIST_MAX_COUNT];
 
+extern struct sockaddr_in listen_addr;
+
 #ifdef TUN_MODE
 extern uint32_t tun_ip;
 extern uint32_t tun_prefix;
@@ -87,7 +89,6 @@ extern uint32_t tun_prefix;
 #define DNS_MAX_COUNT (GATEWAY_MAX_COUNT + 1)
 
 extern pthread_barrier_t threads_barrier;
-extern struct sockaddr_in listen_addr;
 extern struct sockaddr_in dns_addr[DNS_MAX_COUNT];
 #endif
 

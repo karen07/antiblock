@@ -17,11 +17,12 @@ char *gateway_domains_paths[GATEWAY_MAX_COUNT];
 int32_t blacklist_count;
 subnet_t blacklist[BLACKLIST_MAX_COUNT];
 
+struct sockaddr_in listen_addr;
+
 static char gateway_name[GATEWAY_MAX_COUNT][IFNAMSIZ];
 
 #ifndef PCAP_MODE
 pthread_barrier_t threads_barrier;
-struct sockaddr_in listen_addr;
 struct sockaddr_in dns_addr[DNS_MAX_COUNT];
 #endif
 
@@ -31,6 +32,7 @@ uint32_t tun_prefix;
 #endif
 
 #ifndef TUN_MODE
+static int32_t test_mode;
 static int32_t route_socket;
 static void clean_route_table(void);
 #endif
@@ -87,13 +89,19 @@ void add_route(int32_t gateway_index, uint32_t dst)
 
     set_route(&route, gateway_index, dst);
 
-    if (ioctl(route_socket, SIOCADDRT, &route) < 0) {
-        if (strcmp(strerror(errno), "File exists")) {
-            struct in_addr rec_ip;
-            rec_ip.s_addr = dst;
-            printf("Ioctl can't add %s for routing via %s \"%s\"\n", inet_ntoa(rec_ip),
-                   gateway_name[gateway_index], strerror(errno));
-        }
+    if (test_mode) {
+        return;
+    }
+
+    if (ioctl(route_socket, SIOCADDRT, &route) >= 0) {
+        return;
+    }
+
+    if (strcmp(strerror(errno), "File exists")) {
+        struct in_addr rec_ip;
+        rec_ip.s_addr = dst;
+        printf("Ioctl can't add %s for routing via %s \"%s\"\n", inet_ntoa(rec_ip),
+               gateway_name[gateway_index], strerror(errno));
     }
 }
 
@@ -103,13 +111,19 @@ static void del_route(int32_t gateway_index, uint32_t dst)
 
     set_route(&route, gateway_index, dst);
 
-    if (ioctl(route_socket, SIOCDELRT, &route) < 0) {
-        if (strcmp(strerror(errno), "No such process")) {
-            struct in_addr rec_ip;
-            rec_ip.s_addr = dst;
-            printf("Ioctl can't delete %s for routing via %s \"%s\"\n", inet_ntoa(rec_ip),
-                   gateway_name[gateway_index], strerror(errno));
-        }
+    if (test_mode) {
+        return;
+    }
+
+    if (ioctl(route_socket, SIOCDELRT, &route) >= 0) {
+        return;
+    }
+
+    if (strcmp(strerror(errno), "No such process")) {
+        struct in_addr rec_ip;
+        rec_ip.s_addr = dst;
+        printf("Ioctl can't delete %s for routing via %s \"%s\"\n", inet_ntoa(rec_ip),
+               gateway_name[gateway_index], strerror(errno));
     }
 }
 
@@ -166,19 +180,22 @@ static void print_help(void)
            "      -r  \"gateway1 https://test2.com\"\n"
 #endif
            "      .....................................\n"
-#ifndef PCAP_MODE
            "  Required parameters:\n"
+#ifndef PCAP_MODE
            "    -l  \"x.x.x.x:xx\"  Listen address\n"
            "    -d  \"x.x.x.x:xx\"  DNS address\n"
+#else
+           "    -l  \"x.x.x.x:xx\"  Sniffer address\n"
+#endif
 #ifdef TUN_MODE
            "    -n  \"x.x.x.x/xx\"  TUN net\n"
-#endif
 #endif
            "  Optional parameters:\n"
            "    -b  \"/test.txt\"   Subnets not add to the routing table\n"
            "    -o  \"/test/\"      Log or stat output folder\n"
            "    --log             Show operations log\n"
-           "    --stat            Show statistics data\n");
+           "    --stat            Show statistics data\n"
+           "    --test            Test mode\n");
 }
 
 static void main_catch_function(int32_t signo)
@@ -220,13 +237,16 @@ int32_t main(int32_t argc, char *argv[])
 
     int32_t is_log_print = 0;
     int32_t is_stat_print = 0;
+
     char log_or_stat_folder[PATH_MAX - 100];
     memset(log_or_stat_folder, 0, PATH_MAX - 100);
 
     char blacklist_file_path[PATH_MAX];
+    memset(blacklist_file_path, 0, PATH_MAX);
+
+    listen_addr.sin_addr.s_addr = INADDR_NONE;
 
 #ifndef PCAP_MODE
-    listen_addr.sin_addr.s_addr = INADDR_NONE;
     for (int32_t i = 0; i < DNS_MAX_COUNT; i++) {
         dns_addr[i].sin_addr.s_addr = INADDR_NONE;
     }
@@ -283,7 +303,6 @@ int32_t main(int32_t argc, char *argv[])
             }
             continue;
         }
-#ifndef PCAP_MODE
         if (!strcmp(argv[i], "-l")) {
             if (i != argc - 1) {
                 printf("  Listen  \"%s\"\n", argv[i + 1]);
@@ -303,6 +322,7 @@ int32_t main(int32_t argc, char *argv[])
             }
             continue;
         }
+#ifndef PCAP_MODE
         if (!strcmp(argv[i], "-d")) {
             if (i != argc - 1) {
                 printf("  DNS     \"%s\"\n", argv[i + 1]);
@@ -371,6 +391,11 @@ int32_t main(int32_t argc, char *argv[])
             printf("  Stat    enabled\n");
             continue;
         }
+        if (!strcmp(argv[i], "--test")) {
+            test_mode = 1;
+            printf("  Test    enabled\n");
+            continue;
+        }
         print_help();
         errmsg("Unknown command: %s\n", argv[i]);
     }
@@ -395,7 +420,6 @@ int32_t main(int32_t argc, char *argv[])
         }
     }
 
-#ifndef PCAP_MODE
     if (listen_addr.sin_addr.s_addr == INADDR_NONE) {
         print_help();
         errmsg("The program need correct listen IP\n");
@@ -406,6 +430,7 @@ int32_t main(int32_t argc, char *argv[])
         errmsg("The program need correct listen port\n");
     }
 
+#ifndef PCAP_MODE
 #ifndef MULTIPLE_DNS
     for (int32_t i = 1; i < DNS_COUNT; i++) {
         dns_addr[i] = dns_addr[0];
