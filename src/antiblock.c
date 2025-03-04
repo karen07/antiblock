@@ -507,7 +507,7 @@ int32_t main(int32_t argc, char *argv[])
         FILE *blacklist_fd;
         blacklist_fd = fopen(blacklist_file_path, "r");
         if (blacklist_fd == NULL) {
-            errmsg("Can't open blacklist file\n");
+            errmsg("Can't open blacklist file %s\n", blacklist_file_path);
         }
 
         char tmp_line[100];
