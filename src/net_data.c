@@ -258,8 +258,9 @@ static void *PCAP(__attribute__((unused)) void *arg)
     struct in_addr listen_ip;
     listen_ip.s_addr = listen_addr.sin_addr.s_addr;
 
-    sprintf(filter_exp, "udp and host %s and port %hu", inet_ntoa(listen_ip),
+    sprintf(filter_exp, "udp and src %s and src port %hu", inet_ntoa(listen_ip),
             htons(listen_addr.sin_port));
+    printf("%s\n", filter_exp);
 
     handle = pcap_open_live(dev, BUFSIZ, 0, 1, errbuf);
     if (handle == NULL) {
