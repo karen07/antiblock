@@ -415,7 +415,9 @@ int32_t main(int32_t argc, char *argv[])
             continue;
         }
         if (!strcmp(argv[i], "--test")) {
+#ifndef TUN_MODE
             test_mode = 1;
+#endif
             printf("  Test    enabled\n");
             continue;
         }
