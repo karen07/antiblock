@@ -1,5 +1,5 @@
 # AntiBlock
-AntiBlock program proxies DNS requests. The IP addresses of the specified domains are added to the routing table for routing through the specified interfaces.
+AntiBlock sniffer DNS requests. The IP addresses of the specified domains are added to the routing table for routing through the specified interfaces.
 ## Usage
 ```sh
 Commands:
