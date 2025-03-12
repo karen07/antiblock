@@ -4,18 +4,20 @@ AntiBlock program proxies DNS requests. The IP addresses of the specified domain
 ```sh
 Commands:
   At least one parameters needs to be filled:
-    -domains  "test1 https://test1.com"  Route domains from path/url through gateway
-    -domains  "test2 /test1.txt"         Route domains from path/url through gateway
-    -domains  "test3 /test2.txt"         Route domains from path/url through gateway
-    -domains  "test4 https://test2.com"  Route domains from path/url through gateway
-    ........
+    Route domains from path/url through gateway:
+      -r  "gateway1 https://test1.com"
+      -r  "gateway2 /test1.txt"
+      -r  "gateway2 /test2.txt"
+      -r  "gateway1 https://test2.com"
+      .....................................
   Required parameters:
-    -listen    x.x.x.x:xx                Listen address
-    -DNS       x.x.x.x:xx                DNS address
+    -l  "x.x.x.x:xx"  Sniffer address
   Optional parameters:
-    -output    /test/                    Log or statistics output folder
-    -log                                 Show operations log
-    -stat                                Show statistics data
+    -b  "/test.txt"   Subnets not add to the routing table
+    -o  "/test/"      Log or stat output folder
+    --log             Show operations log
+    --stat            Show statistics data
+    --test            Test mode
 ```
 ## Article
 You can read about the method in the [article](https://habr.com/ru/articles/847412/).
