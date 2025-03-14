@@ -179,6 +179,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
 
     uint16_t quest_count = ntohs(header->quest);
     if (quest_count != 1) {
+        statistics_data.request_parsing_error++;
         dump_dns_data(DNS_ANS_CHECK_QUE_COUNT_ERROR, receive_msg);
         return DNS_ANS_CHECK_QUE_COUNT_ERROR;
     }
