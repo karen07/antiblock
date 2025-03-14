@@ -65,8 +65,6 @@ static void *DNS_data(__attribute__((unused)) void *arg)
         errmsg("No free memory for cname_domain\n");
     }
 
-    dns_ans_check_test();
-
     pthread_barrier_wait(&threads_barrier);
 
     while (true) {
@@ -299,8 +297,6 @@ static void *PCAP(__attribute__((unused)) void *arg)
     if (cname_domain.data == 0) {
         errmsg("No free memory for cname_domain\n");
     }
-
-    dns_ans_check_test();
 
     pcap_loop(handle, 0, callback, NULL);
 

@@ -567,6 +567,8 @@ int32_t main(int32_t argc, char *argv[])
     pthread_barrier_wait(&threads_barrier);
 #endif
 
+    dns_ans_check_test();
+
     int32_t circles = 0;
     int32_t sleep_circles = 0;
 
