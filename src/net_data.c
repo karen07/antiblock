@@ -241,7 +241,7 @@ void callback(__attribute__((unused)) u_char *useless,
         return;
     }
 
-    receive_msg.size = ntohs(udph->len);
+    receive_msg.size = ntohs(udph->len) - sizeof(struct udphdr);
     receive_msg.data = L4_start_pointer + sizeof(struct udphdr);
 
     dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain);
