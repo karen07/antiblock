@@ -140,6 +140,20 @@ int32_t in_subnet(uint32_t ip, subnet_t *subnet)
     return ((subnet_ip_h & subnet->mask) == (ip_h & subnet->mask));
 }
 
+void dump_dns_data(int32_t error, memory_t *receive_msg)
+{
+    if (log_fd) {
+        fprintf(log_fd, "Error %d\n", error);
+        for (int32_t i = 0; i < (int32_t)receive_msg->size; i++) {
+            if ((i % 16 == 0) && (i != 0)) {
+                fprintf(log_fd, "\n");
+            }
+            fprintf(log_fd, "%02hhx ", receive_msg->data[i]);
+        }
+        fprintf(log_fd, "\n");
+    }
+}
+
 int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans_domain,
                       memory_t *cname_domain)
 {
@@ -149,6 +163,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
     // DNS HEADER
     if (cur_pos_ptr + sizeof(dns_header_t) > receive_msg_end) {
         statistics_data.request_parsing_error++;
+        dump_dns_data(DNS_ANS_CHECK_HEADER_SIZE_ERROR, receive_msg);
         return DNS_ANS_CHECK_HEADER_SIZE_ERROR;
     }
 
@@ -158,16 +173,19 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
     //uint16_t flags = ntohs(header->flags);
     //if ((flags & first_bit_mark) == 0) {
     //    statistics_data.request_parsing_error++;
+    //    dump_dns_data(DNS_ANS_CHECK_RES_TYPE_ERROR, receive_msg);
     //    return DNS_ANS_CHECK_RES_TYPE_ERROR;
     //}
 
     uint16_t quest_count = ntohs(header->quest);
     if (quest_count != 1) {
+        dump_dns_data(DNS_ANS_CHECK_QUE_COUNT_ERROR, receive_msg);
         return DNS_ANS_CHECK_QUE_COUNT_ERROR;
     }
 
     uint16_t ans_count = ntohs(header->ans);
     //if (ans_count == 0) {
+    //    dump_dns_data(DNS_ANS_CHECK_ANS_COUNT_ERROR, receive_msg);
     //    return DNS_ANS_CHECK_ANS_COUNT_ERROR;
     //}
 
@@ -179,6 +197,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
     char *que_domain_end = NULL;
     if (get_domain_from_packet(receive_msg, que_domain_start, &que_domain_end, que_domain) != 0) {
         statistics_data.request_parsing_error++;
+        dump_dns_data(DNS_ANS_CHECK_QUE_URL_GET_ERROR, receive_msg);
         return DNS_ANS_CHECK_QUE_URL_GET_ERROR;
     }
     cur_pos_ptr = que_domain_end;
@@ -189,6 +208,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
     // QUE DATA
     if (cur_pos_ptr + sizeof(dns_que_t) > receive_msg_end) {
         statistics_data.request_parsing_error++;
+        dump_dns_data(DNS_ANS_CHECK_QUE_DATA_GET_ERROR, receive_msg);
         return DNS_ANS_CHECK_QUE_DATA_GET_ERROR;
     }
 
@@ -215,6 +235,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
         if (get_domain_from_packet(receive_msg, ans_domain_start, &ans_domain_end, ans_domain) !=
             0) {
             statistics_data.request_parsing_error++;
+            dump_dns_data(DNS_ANS_CHECK_ANS_URL_GET_ERROR, receive_msg);
             return DNS_ANS_CHECK_ANS_URL_GET_ERROR;
         }
         cur_pos_ptr = ans_domain_end;
@@ -226,6 +247,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
         // ANS DATA
         if (cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t) > receive_msg_end) {
             statistics_data.request_parsing_error++;
+            dump_dns_data(DNS_ANS_CHECK_ANS_DATA_GET_ERROR, receive_msg);
             return DNS_ANS_CHECK_ANS_DATA_GET_ERROR;
         }
 
@@ -237,6 +259,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
 
         if (cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t) + ans_len > receive_msg_end) {
             statistics_data.request_parsing_error++;
+            dump_dns_data(DNS_ANS_CHECK_ANS_LEN_ERROR, receive_msg);
             return DNS_ANS_CHECK_ANS_LEN_ERROR;
         }
 
@@ -315,6 +338,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
             if (get_domain_from_packet(receive_msg, cname_domain_start, &cname_domain_end,
                                        cname_domain) != 0) {
                 statistics_data.request_parsing_error++;
+                dump_dns_data(DNS_ANS_CHECK_CNAME_URL_GET_ERROR, receive_msg);
                 return DNS_ANS_CHECK_CNAME_URL_GET_ERROR;
             }
 
@@ -367,6 +391,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
     if ((header->auth == 0) && (header->add == 0)) {
         if (cur_pos_ptr != receive_msg_end) {
             statistics_data.request_parsing_error++;
+            dump_dns_data(DNS_ANS_CHECK_NOT_END_ERROR, receive_msg);
             return DNS_ANS_CHECK_NOT_END_ERROR;
         }
     }
