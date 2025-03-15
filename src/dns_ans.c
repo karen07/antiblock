@@ -225,7 +225,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
     if (log_fd) {
         time_t now = time(NULL);
         struct tm *tm_struct = localtime(&now);
-        fprintf(log_fd, "%02d.%02d.%04d %02d:%02d:%02d\n", tm_struct->tm_mday,
+        fprintf(log_fd, "\n%02d.%02d.%04d %02d:%02d:%02d\n", tm_struct->tm_mday,
                 tm_struct->tm_mon + 1, tm_struct->tm_year + 1900, tm_struct->tm_hour,
                 tm_struct->tm_min, tm_struct->tm_sec);
         fprintf(log_fd, "Que_domain %d: %s\n", que_type, que_domain->data + 1);
@@ -385,10 +385,6 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
 
         cur_pos_ptr += sizeof(dns_ans_t) - sizeof(uint32_t) + ans_len;
         // ANS DATA
-    }
-
-    if (log_fd) {
-        fprintf(log_fd, "\n");
     }
 
     if ((header->auth == 0) && (header->add == 0)) {
