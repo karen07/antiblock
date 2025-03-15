@@ -216,31 +216,60 @@ memory_t que_domain;
 memory_t ans_domain;
 memory_t cname_domain;
 
-void callback(__attribute__((unused)) u_char *useless,
-              __attribute__((unused)) const struct pcap_pkthdr *pkthdr, const u_char *packet)
+static void callback_sll(__attribute__((unused)) u_char *useless, const struct pcap_pkthdr *pkthdr,
+                         const u_char *packet)
 {
-    char *L2_start_pointer = (char *)packet;
-    struct sll_header *ethh = (struct sll_header *)L2_start_pointer;
-    uint16_t proto_L3 = ntohs(ethh->sll_protocol);
-    if (proto_L3 != ETH_P_IP) {
+    if (pkthdr->len <
+        (int32_t)(sizeof(struct sll_header) + sizeof(struct iphdr) + sizeof(struct udphdr))) {
         return;
     }
 
-    char *L3_start_pointer = L2_start_pointer + sizeof(struct sll_header);
-    struct iphdr *iph = (struct iphdr *)L3_start_pointer;
-    char proto_L4 = iph->protocol;
-    if (proto_L4 != IPPROTO_UDP) {
+    struct sll_header *eth_h = (struct sll_header *)packet;
+    if (eth_h->sll_protocol != htons(ETH_P_IP)) {
         return;
     }
 
-    char *L4_start_pointer = L3_start_pointer + sizeof(struct iphdr);
-    struct udphdr *udph = (struct udphdr *)L4_start_pointer;
-    if (ntohs(udph->source) != DNS_port) {
+    struct iphdr *iph = (struct iphdr *)((char *)eth_h + sizeof(*eth_h));
+    if (iph->protocol != IPPROTO_UDP) {
         return;
     }
 
-    receive_msg.size = ntohs(udph->len) - sizeof(struct udphdr);
-    receive_msg.data = L4_start_pointer + sizeof(struct udphdr);
+    struct udphdr *udph = (struct udphdr *)((char *)iph + sizeof(*iph));
+    if (udph->source != htons(DNS_port)) {
+        return;
+    }
+
+    receive_msg.size = ntohs(udph->len) - sizeof(*udph);
+    receive_msg.data = (char *)udph + sizeof(*udph);
+
+    dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain);
+}
+
+static void callback_eth(__attribute__((unused)) u_char *useless, const struct pcap_pkthdr *pkthdr,
+                         const u_char *packet)
+{
+    if (pkthdr->len <
+        (int32_t)(sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr))) {
+        return;
+    }
+
+    struct ethhdr *eth_h = (struct ethhdr *)packet;
+    if (eth_h->h_proto != htons(ETH_P_IP)) {
+        return;
+    }
+
+    struct iphdr *iph = (struct iphdr *)((char *)eth_h + sizeof(*eth_h));
+    if (iph->protocol != IPPROTO_UDP) {
+        return;
+    }
+
+    struct udphdr *udph = (struct udphdr *)((char *)iph + sizeof(*iph));
+    if (udph->source != htons(DNS_port)) {
+        return;
+    }
+
+    receive_msg.size = ntohs(udph->len) - sizeof(*udph);
+    receive_msg.data = (char *)udph + sizeof(*udph);
 
     dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain);
 }
@@ -248,7 +277,6 @@ void callback(__attribute__((unused)) u_char *useless,
 static void *PCAP(__attribute__((unused)) void *arg)
 {
     pcap_t *handle;
-    char dev[] = "any";
     char errbuf[PCAP_ERRBUF_SIZE];
     struct bpf_program fp;
     char filter_exp[1000];
@@ -259,9 +287,9 @@ static void *PCAP(__attribute__((unused)) void *arg)
     sprintf(filter_exp, "udp and src %s and src port %hu", inet_ntoa(listen_ip),
             htons(listen_addr.sin_port));
 
-    handle = pcap_open_live(dev, BUFSIZ, 0, 1, errbuf);
+    handle = pcap_open_live(sniffer_interface, BUFSIZ, 0, 1, errbuf);
     if (handle == NULL) {
-        errmsg("Can't open device %s: %s\n", dev, errbuf);
+        errmsg("Can't open device %s: %s\n", sniffer_interface, errbuf);
     }
     if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) != 0) {
         errmsg("Can't parse filter %s: %s\n", filter_exp, pcap_geterr(handle));
@@ -298,7 +326,11 @@ static void *PCAP(__attribute__((unused)) void *arg)
         errmsg("No free memory for cname_domain\n");
     }
 
-    pcap_loop(handle, 0, callback, NULL);
+    if (!strcmp(sniffer_interface, "any")) {
+        pcap_loop(handle, 0, callback_sll, NULL);
+    } else {
+        pcap_loop(handle, 0, callback_eth, NULL);
+    }
 
     return NULL;
 }
