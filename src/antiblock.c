@@ -21,6 +21,10 @@ struct sockaddr_in listen_addr;
 
 static char gateway_name[GATEWAY_MAX_COUNT][IFNAMSIZ];
 
+#ifdef PCAP_MODE
+char sniffer_interface[IFNAMSIZ];
+#endif
+
 #ifndef PCAP_MODE
 pthread_barrier_t threads_barrier;
 struct sockaddr_in dns_addr[DNS_MAX_COUNT];
@@ -209,6 +213,7 @@ static void print_help(void)
            "    -d  \"x.x.x.x:xx\"  DNS address\n"
 #else
            "    -l  \"x.x.x.x:xx\"  Sniffer address\n"
+           "    -i  \"/test/\"      Sniffer interface\n"
 #endif
 #ifdef TUN_MODE
            "    -n  \"x.x.x.x/xx\"  TUN net\n"
@@ -345,6 +350,18 @@ int32_t main(int32_t argc, char *argv[])
             }
             continue;
         }
+#ifdef PCAP_MODE
+        if (!strcmp(argv[i], "-i")) {
+            if (i != argc - 1) {
+                printf("  Interface  \"%s\"\n", argv[i + 1]);
+                if (strlen(argv[i + 1]) < IFNAMSIZ) {
+                    strcpy(sniffer_interface, argv[i + 1]);
+                }
+                i++;
+            }
+            continue;
+        }
+#endif
 #ifndef PCAP_MODE
         if (!strcmp(argv[i], "-d")) {
             if (i != argc - 1) {
@@ -454,6 +471,13 @@ int32_t main(int32_t argc, char *argv[])
         print_help();
         errmsg("The program need correct listen port\n");
     }
+
+#ifdef PCAP_MODE
+    if (sniffer_interface[0] == 0) {
+        print_help();
+        errmsg("The program need sniffer interface name\n");
+    }
+#endif
 
 #ifndef PCAP_MODE
 #ifndef MULTIPLE_DNS
