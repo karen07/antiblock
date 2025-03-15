@@ -285,7 +285,7 @@ int32_t main(int32_t argc, char *argv[])
     for (int32_t i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-r")) {
             if (i != argc - 1) {
-                printf("  Routes  \"%s\"\n", argv[i + 1]);
+                printf("  Routes     \"%s\"\n", argv[i + 1]);
                 char *first_space_ptr = strchr(argv[i + 1], ' ');
                 if (first_space_ptr) {
                     *first_space_ptr = 0;
@@ -333,7 +333,7 @@ int32_t main(int32_t argc, char *argv[])
         }
         if (!strcmp(argv[i], "-l")) {
             if (i != argc - 1) {
-                printf("  Listen  \"%s\"\n", argv[i + 1]);
+                printf("  Listen     \"%s\"\n", argv[i + 1]);
                 char *colon_ptr = strchr(argv[i + 1], ':');
                 if (colon_ptr) {
                     uint16_t tmp_port = 0;
@@ -405,7 +405,7 @@ int32_t main(int32_t argc, char *argv[])
             if (i != argc - 1) {
                 if (strlen(argv[i + 1]) < PATH_MAX) {
                     strcpy(blacklist_file_path, argv[i + 1]);
-                    printf("  BList   \"%s\"\n", blacklist_file_path);
+                    printf("  BlackList  \"%s\"\n", blacklist_file_path);
                 }
                 i++;
             }
@@ -415,7 +415,7 @@ int32_t main(int32_t argc, char *argv[])
             if (i != argc - 1) {
                 if (strlen(argv[i + 1]) < PATH_MAX - 100) {
                     strcpy(log_or_stat_folder, argv[i + 1]);
-                    printf("  Output  \"%s\"\n", log_or_stat_folder);
+                    printf("  Output     \"%s\"\n", log_or_stat_folder);
                 }
                 i++;
             }
@@ -423,19 +423,19 @@ int32_t main(int32_t argc, char *argv[])
         }
         if (!strcmp(argv[i], "--log")) {
             is_log_print = 1;
-            printf("  Log     enabled\n");
+            printf("  Log        enabled\n");
             continue;
         }
         if (!strcmp(argv[i], "--stat")) {
             is_stat_print = 1;
-            printf("  Stat    enabled\n");
+            printf("  Stat       enabled\n");
             continue;
         }
         if (!strcmp(argv[i], "--test")) {
 #ifndef TUN_MODE
             test_mode = 1;
 #endif
-            printf("  Test    enabled\n");
+            printf("  Test       enabled\n");
             continue;
         }
         print_help();
