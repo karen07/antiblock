@@ -157,6 +157,8 @@ void dump_dns_data(int32_t error, memory_t *receive_msg)
 int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans_domain,
                       memory_t *cname_domain)
 {
+    statistics_data.processed_count++;
+
     char *cur_pos_ptr = receive_msg->data;
     char *receive_msg_end = receive_msg->data + receive_msg->size;
 
