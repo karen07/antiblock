@@ -1,12 +1,7 @@
 #include "antiblock.h"
 
 typedef struct statistics {
-    int32_t sended_to_client;
-    int32_t sended_to_dns;
-
-    int32_t sended_to_client_error;
-    int32_t sended_to_dns_error;
-
+    int32_t processed_count;
     int32_t request_parsing_error;
 
 #ifdef TUN_MODE

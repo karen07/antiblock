@@ -30,17 +30,8 @@ void stat_print(FILE *stat_fd)
 
     fprintf(stat_fd, "\n");
 
-    fprintf(stat_fd, "DNS sended to DNS             : %d\n", statistics_data.sended_to_dns);
-    fprintf(stat_fd, "DNS sended to client          : %d\n", statistics_data.sended_to_client);
-
-    fprintf(stat_fd, "\n");
-
-    fprintf(stat_fd, "DNS sended to DNS errors      : %d\n", statistics_data.sended_to_dns_error);
-    fprintf(stat_fd, "DNS sended to client errors   : %d\n",
-            statistics_data.sended_to_client_error);
+    fprintf(stat_fd, "DNS packets processed         : %d\n", statistics_data.processed_count);
     fprintf(stat_fd, "DNS parsing errors            : %d\n", statistics_data.request_parsing_error);
-
-    fprintf(stat_fd, "\n");
 
 #ifdef TUN_MODE
     double nat_sended_to_dev_size_gb = statistics_data.nat_sended_to_dev_size / 1024 / 1024 / 1024;
