@@ -20,8 +20,8 @@
 #define ONE_DNS
 //#define MULTIPLE_DNS
 
-#define PROXY_MODE
-//#define PCAP_MODE
+//#define PROXY_MODE
+#define PCAP_MODE
 
 #define ROUTE_TABLE_MODE
 //#define TUN_MODE
