@@ -15,8 +15,7 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-//Initial setup
-
+/* Initial setup */
 //#define ONE_DNS
 //#define MULTIPLE_DNS
 
@@ -25,8 +24,7 @@
 
 #define ROUTE_TABLE_MODE
 //#define TUN_MODE
-
-//Initial setup
+/* Initial setup */
 
 //Defines check
 #ifdef PCAP_MODE
@@ -43,7 +41,6 @@
 #error "You can't use PCAP_MODE and TUN_MODE"
 #endif
 #endif
-
 //Defines check
 
 #ifdef PCAP_MODE
