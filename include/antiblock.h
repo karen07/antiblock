@@ -17,7 +17,7 @@
 
 //Initial setup
 
-#define ONE_DNS
+//#define ONE_DNS
 //#define MULTIPLE_DNS
 
 //#define PROXY_MODE
@@ -30,11 +30,14 @@
 
 //Defines check
 #ifdef PCAP_MODE
-#ifdef PROXY_MODE
-#error "You can't use PCAP_MODE and PROXY_MODE"
+#ifdef ONE_DNS
+#error "You can't use PCAP_MODE and ONE_DNS"
 #endif
 #ifdef MULTIPLE_DNS
 #error "You can't use PCAP_MODE and MULTIPLE_DNS"
+#endif
+#ifdef PROXY_MODE
+#error "You can't use PCAP_MODE and PROXY_MODE"
 #endif
 #ifdef TUN_MODE
 #error "You can't use PCAP_MODE and TUN_MODE"
