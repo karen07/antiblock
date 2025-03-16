@@ -108,10 +108,6 @@ extern uint32_t tun_ip;
 extern uint32_t tun_prefix;
 #endif
 
-#ifdef PCAP_MODE
-extern char sniffer_interface[IFNAMSIZ];
-#endif
-
 #ifdef PROXY_MODE
 #define DNS_COUNT (gateways_count + 1)
 #define DNS_MAX_COUNT (GATEWAY_MAX_COUNT + 1)
