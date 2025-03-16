@@ -15,9 +15,33 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
+//Initial setup
+
+#define ONE_DNS
 //#define MULTIPLE_DNS
-#define PCAP_MODE
+
+#define PROXY_MODE
+//#define PCAP_MODE
+
+#define ROUTE_TABLE_MODE
 //#define TUN_MODE
+
+//Initial setup
+
+//Defines check
+#ifdef PCAP_MODE
+#ifdef PROXY_MODE
+#error "You can't use PCAP_MODE and PROXY_MODE"
+#endif
+#ifdef MULTIPLE_DNS
+#error "You can't use PCAP_MODE and MULTIPLE_DNS"
+#endif
+#ifdef TUN_MODE
+#error "You can't use PCAP_MODE and TUN_MODE"
+#endif
+#endif
+
+//Defines check
 
 #ifdef PCAP_MODE
 #include <linux/if_ether.h>
@@ -88,7 +112,7 @@ extern uint32_t tun_prefix;
 extern char sniffer_interface[IFNAMSIZ];
 #endif
 
-#ifndef PCAP_MODE
+#ifdef PROXY_MODE
 #define DNS_COUNT (gateways_count + 1)
 #define DNS_MAX_COUNT (GATEWAY_MAX_COUNT + 1)
 
@@ -98,15 +122,6 @@ extern struct sockaddr_in dns_addr[DNS_MAX_COUNT];
 
 void errmsg(const char *format, ...);
 
-#ifndef TUN_MODE
+#ifdef ROUTE_TABLE_MODE
 void add_route(int32_t gateway_index, uint32_t dst);
-#endif
-
-#ifdef PCAP_MODE
-#ifdef MULTIPLE_DNS
-#error "You can't use PCAP_MODE and MULTIPLE_DNS"
-#endif
-#ifdef TUN_MODE
-#error "You can't use PCAP_MODE and TUN_MODE"
-#endif
 #endif

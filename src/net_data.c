@@ -8,7 +8,7 @@
 #include "tun.h"
 #include "domains_read.h"
 
-#ifndef PCAP_MODE
+#ifdef PROXY_MODE
 
 static id_map_t *id_map;
 static int32_t repeater_DNS_socket;
@@ -147,12 +147,13 @@ static void *client_data(__attribute__((unused)) void *arg)
             continue;
         }
 
-        int32_t dns_id;
+        int32_t dns_id = 0;
+#ifdef MULTIPLE_DNS
         dns_id = dns_ans_check(&receive_msg, &que_domain, NULL, NULL) + 1;
-
         if (dns_id < 0) {
             dns_id = 0;
         }
+#endif
 
         dns_header_t *header = (dns_header_t *)receive_msg.data;
         uint16_t id = ntohs(header->id);
@@ -210,6 +211,10 @@ memory_t cname_domain;
 static void callback_sll(__attribute__((unused)) u_char *useless, const struct pcap_pkthdr *pkthdr,
                          const u_char *packet)
 {
+    if (pkthdr->len != pkthdr->caplen) {
+        return;
+    }
+
     if (pkthdr->len <
         (int32_t)(sizeof(struct sll_header) + sizeof(struct iphdr) + sizeof(struct udphdr))) {
         return;
