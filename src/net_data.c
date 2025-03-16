@@ -203,10 +203,10 @@ void init_net_data_threads(void)
 
 #define DNS_port 53
 
-memory_t receive_msg;
-memory_t que_domain;
-memory_t ans_domain;
-memory_t cname_domain;
+static memory_t receive_msg;
+static memory_t que_domain;
+static memory_t ans_domain;
+static memory_t cname_domain;
 
 static void callback_sll(__attribute__((unused)) u_char *useless, const struct pcap_pkthdr *pkthdr,
                          const u_char *packet)
@@ -241,35 +241,6 @@ static void callback_sll(__attribute__((unused)) u_char *useless, const struct p
     dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain);
 }
 
-static void callback_eth(__attribute__((unused)) u_char *useless, const struct pcap_pkthdr *pkthdr,
-                         const u_char *packet)
-{
-    if (pkthdr->len <
-        (int32_t)(sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr))) {
-        return;
-    }
-
-    struct ethhdr *eth_h = (struct ethhdr *)packet;
-    if (eth_h->h_proto != htons(ETH_P_IP)) {
-        return;
-    }
-
-    struct iphdr *iph = (struct iphdr *)((char *)eth_h + sizeof(*eth_h));
-    if (iph->protocol != IPPROTO_UDP) {
-        return;
-    }
-
-    struct udphdr *udph = (struct udphdr *)((char *)iph + sizeof(*iph));
-    if (udph->source != htons(DNS_port)) {
-        return;
-    }
-
-    receive_msg.size = ntohs(udph->len) - sizeof(*udph);
-    receive_msg.data = (char *)udph + sizeof(*udph);
-
-    dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain);
-}
-
 static void *PCAP(__attribute__((unused)) void *arg)
 {
     pcap_t *handle;
@@ -283,9 +254,14 @@ static void *PCAP(__attribute__((unused)) void *arg)
     sprintf(filter_exp, "udp and src %s and src port %hu", inet_ntoa(listen_ip),
             htons(listen_addr.sin_port));
 
-    handle = pcap_open_live(sniffer_interface, BUFSIZ, 0, 1, errbuf);
+    char *device_name = "any";
+
+    handle = pcap_open_live(device_name, BUFSIZ, 0, 1, errbuf);
     if (handle == NULL) {
-        errmsg("Can't open device %s: %s\n", sniffer_interface, errbuf);
+        errmsg("Can't open device %s: %s\n", device_name, errbuf);
+    }
+    if (pcap_datalink(handle) != DLT_LINUX_SLL) {
+        errmsg("This program handles only SLL captures\n");
     }
     if (pcap_compile(handle, &fp, filter_exp, 0, PCAP_NETMASK_UNKNOWN) != 0) {
         errmsg("Can't parse filter %s: %s\n", filter_exp, pcap_geterr(handle));
@@ -322,11 +298,7 @@ static void *PCAP(__attribute__((unused)) void *arg)
         errmsg("No free memory for cname_domain\n");
     }
 
-    if (!strcmp(sniffer_interface, "any")) {
-        pcap_loop(handle, 0, callback_sll, NULL);
-    } else {
-        pcap_loop(handle, 0, callback_eth, NULL);
-    }
+    pcap_loop(handle, 0, callback_sll, NULL);
 
     return NULL;
 }

@@ -37,8 +37,8 @@
 #define DNS_ANS_CHECK_CNAME_URL_GET_ERROR -12
 #define DNS_ANS_CHECK_NOT_END_ERROR -13
 
-int32_t get_domain_from_packet(memory_t *receive_msg, char *cur_pos_ptr, char **new_cur_pos_ptr,
-                               memory_t *domain)
+static int32_t get_domain_from_packet(memory_t *receive_msg, char *cur_pos_ptr,
+                                      char **new_cur_pos_ptr, memory_t *domain)
 {
     uint8_t two_bit_mark = FIRST_TWO_BITS_UINT8;
     int32_t part_len = 0;
@@ -133,7 +133,7 @@ static int32_t check_domain(memory_t *domain)
     return CHECK_DOMAIN_NOT_BLOCKED;
 }
 
-int32_t in_subnet(uint32_t ip, subnet_t *subnet)
+static int32_t in_subnet(uint32_t ip, subnet_t *subnet)
 {
     uint32_t ip_h = ntohl(ip);
     uint32_t subnet_ip_h = ntohl(subnet->ip);
@@ -141,7 +141,7 @@ int32_t in_subnet(uint32_t ip, subnet_t *subnet)
     return ((subnet_ip_h & subnet->mask) == (ip_h & subnet->mask));
 }
 
-void dump_dns_data(int32_t error, memory_t *receive_msg)
+static void dump_dns_data(int32_t error, memory_t *receive_msg)
 {
     if (log_fd) {
         fprintf(log_fd, "Error %d\n", error);
@@ -155,7 +155,7 @@ void dump_dns_data(int32_t error, memory_t *receive_msg)
     }
 }
 
-uint16_t last_processed_id;
+static uint16_t last_processed_id;
 
 int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans_domain,
                       memory_t *cname_domain)
