@@ -25,16 +25,17 @@
 #define CHECK_DOMAIN_NOT_BLOCKED -1
 
 #define DNS_ANS_CHECK_HEADER_SIZE_ERROR -2
-#define DNS_ANS_CHECK_RES_TYPE_ERROR -3
-#define DNS_ANS_CHECK_QUE_COUNT_ERROR -4
-#define DNS_ANS_CHECK_ANS_COUNT_ERROR -5
-#define DNS_ANS_CHECK_QUE_URL_GET_ERROR -6
-#define DNS_ANS_CHECK_QUE_DATA_GET_ERROR -7
-#define DNS_ANS_CHECK_ANS_URL_GET_ERROR -8
-#define DNS_ANS_CHECK_ANS_DATA_GET_ERROR -9
-#define DNS_ANS_CHECK_ANS_LEN_ERROR -10
-#define DNS_ANS_CHECK_CNAME_URL_GET_ERROR -11
-#define DNS_ANS_CHECK_NOT_END_ERROR -12
+#define DNS_ANS_CHECK_ID_DUBLICATION -3
+#define DNS_ANS_CHECK_RES_TYPE_ERROR -4
+#define DNS_ANS_CHECK_QUE_COUNT_ERROR -5
+#define DNS_ANS_CHECK_ANS_COUNT_ERROR -6
+#define DNS_ANS_CHECK_QUE_URL_GET_ERROR -7
+#define DNS_ANS_CHECK_QUE_DATA_GET_ERROR -8
+#define DNS_ANS_CHECK_ANS_URL_GET_ERROR -9
+#define DNS_ANS_CHECK_ANS_DATA_GET_ERROR -10
+#define DNS_ANS_CHECK_ANS_LEN_ERROR -11
+#define DNS_ANS_CHECK_CNAME_URL_GET_ERROR -12
+#define DNS_ANS_CHECK_NOT_END_ERROR -13
 
 int32_t get_domain_from_packet(memory_t *receive_msg, char *cur_pos_ptr, char **new_cur_pos_ptr,
                                memory_t *domain)
@@ -154,11 +155,11 @@ void dump_dns_data(int32_t error, memory_t *receive_msg)
     }
 }
 
+uint16_t last_processed_id;
+
 int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans_domain,
                       memory_t *cname_domain)
 {
-    statistics_data.processed_count++;
-
     char *cur_pos_ptr = receive_msg->data;
     char *receive_msg_end = receive_msg->data + receive_msg->size;
 
@@ -171,13 +172,15 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
 
     dns_header_t *header = (dns_header_t *)cur_pos_ptr;
 
-    //uint16_t first_bit_mark = FIRST_BIT_UINT16;
-    //uint16_t flags = ntohs(header->flags);
-    //if ((flags & first_bit_mark) == 0) {
-    //    statistics_data.request_parsing_error++;
-    //    dump_dns_data(DNS_ANS_CHECK_RES_TYPE_ERROR, receive_msg);
-    //    return DNS_ANS_CHECK_RES_TYPE_ERROR;
-    //}
+#ifdef ONE_DNS
+    uint16_t first_bit_mark = FIRST_BIT_UINT16;
+    uint16_t flags = ntohs(header->flags);
+    if ((flags & first_bit_mark) == 0) {
+        statistics_data.request_parsing_error++;
+        dump_dns_data(DNS_ANS_CHECK_RES_TYPE_ERROR, receive_msg);
+        return DNS_ANS_CHECK_RES_TYPE_ERROR;
+    }
+#endif
 
     uint16_t quest_count = ntohs(header->quest);
     if (quest_count != 1) {
@@ -187,13 +190,14 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
     }
 
     uint16_t ans_count = ntohs(header->ans);
-    //if (ans_count == 0) {
-    //    dump_dns_data(DNS_ANS_CHECK_ANS_COUNT_ERROR, receive_msg);
-    //    return DNS_ANS_CHECK_ANS_COUNT_ERROR;
-    //}
 
     cur_pos_ptr += sizeof(dns_header_t);
     // DNS HEADER
+
+    if (last_processed_id == header->id) {
+        return DNS_ANS_CHECK_ID_DUBLICATION;
+    }
+    last_processed_id = header->id;
 
     // QUE DOMAIN
     char *que_domain_start = cur_pos_ptr;
@@ -395,6 +399,8 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
         }
     }
 
+    statistics_data.processed_count++;
+
     return block_que_domain_flag;
 }
 
@@ -444,6 +450,7 @@ void dns_ans_check_test(void)
                                0x16, 0xc0, 0x2b, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x01, 0x09,
                                0x00, 0x04, 0x40, 0xe9, 0xa1, 0xc6 };
 
+    last_processed_id = 0;
     receive_msg.size = sizeof(correct_test);
     memcpy(receive_msg.data, correct_test, receive_msg.size);
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
@@ -451,6 +458,7 @@ void dns_ans_check_test(void)
         errmsg("Test DNS correct fail\n");
     }
 
+    last_processed_id = 0;
     receive_msg.size = 11;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_HEADER_SIZE_ERROR) {
@@ -458,12 +466,17 @@ void dns_ans_check_test(void)
     }
     receive_msg.size = sizeof(correct_test);
 
-    //receive_msg.data[2] = 1;
-    //if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != DNS_ANS_CHECK_RES_TYPE_ERROR) {
-    //    errmsg("Test DNS flag fail\n");
-    //}
-    //receive_msg.data[2] = correct_test[2];
+#ifdef ONE_DNS
+    last_processed_id = 0;
+    receive_msg.data[2] = 1;
+    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
+        DNS_ANS_CHECK_RES_TYPE_ERROR) {
+        errmsg("Test DNS flag fail\n");
+    }
+    receive_msg.data[2] = correct_test[2];
+#endif
 
+    last_processed_id = 0;
     receive_msg.data[5] = 2;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_QUE_COUNT_ERROR) {
@@ -471,12 +484,7 @@ void dns_ans_check_test(void)
     }
     receive_msg.data[5] = correct_test[5];
 
-    //receive_msg.data[7] = 0;
-    //if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) != DNS_ANS_CHECK_ANS_COUNT_ERROR) {
-    //    errmsg("Test DNS ans count fail\n");
-    //}
-    //receive_msg.data[7] = correct_test[7];
-
+    last_processed_id = 0;
     receive_msg.size = 26;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_QUE_URL_GET_ERROR) {
@@ -484,6 +492,7 @@ void dns_ans_check_test(void)
     }
     receive_msg.size = sizeof(correct_test);
 
+    last_processed_id = 0;
     receive_msg.size = 30;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_QUE_DATA_GET_ERROR) {
@@ -491,6 +500,7 @@ void dns_ans_check_test(void)
     }
     receive_msg.size = sizeof(correct_test);
 
+    last_processed_id = 0;
     receive_msg.size = 32;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_ANS_URL_GET_ERROR) {
@@ -498,6 +508,7 @@ void dns_ans_check_test(void)
     }
     receive_msg.size = sizeof(correct_test);
 
+    last_processed_id = 0;
     receive_msg.size = 42;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_ANS_DATA_GET_ERROR) {
@@ -505,6 +516,7 @@ void dns_ans_check_test(void)
     }
     receive_msg.size = sizeof(correct_test);
 
+    last_processed_id = 0;
     receive_msg.size = 66;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_ANS_LEN_ERROR) {
@@ -512,6 +524,7 @@ void dns_ans_check_test(void)
     }
     receive_msg.size = sizeof(correct_test);
 
+    last_processed_id = 0;
     receive_msg.data[58] = 0x3F;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_CNAME_URL_GET_ERROR) {
@@ -519,6 +532,7 @@ void dns_ans_check_test(void)
     }
     receive_msg.data[58] = correct_test[58];
 
+    last_processed_id = 0;
     receive_msg.size = sizeof(correct_test) + 1;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_NOT_END_ERROR) {

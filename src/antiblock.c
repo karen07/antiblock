@@ -25,7 +25,7 @@ static char gateway_name[GATEWAY_MAX_COUNT][IFNAMSIZ];
 char sniffer_interface[IFNAMSIZ];
 #endif
 
-#ifndef PCAP_MODE
+#ifdef PROXY_MODE
 pthread_barrier_t threads_barrier;
 struct sockaddr_in dns_addr[DNS_MAX_COUNT];
 #endif
@@ -35,7 +35,7 @@ uint32_t tun_ip = INADDR_NONE;
 uint32_t tun_prefix;
 #endif
 
-#ifndef TUN_MODE
+#ifdef ROUTE_TABLE_MODE
 static int32_t test_mode;
 static int32_t route_socket;
 static void clean_route_table(void);
@@ -51,7 +51,7 @@ void errmsg(const char *format, ...)
     vprintf(format, args);
     va_end(args);
 
-#ifndef TUN_MODE
+#ifdef ROUTE_TABLE_MODE
     clean_route_table();
 #endif
 
@@ -68,7 +68,7 @@ void errmsg(const char *format, ...)
     exit(EXIT_FAILURE);
 }
 
-#ifndef TUN_MODE
+#ifdef ROUTE_TABLE_MODE
 static void set_route(struct rtentry *route, int32_t gateway_index, uint32_t dst)
 {
     memset(route, 0, sizeof(*route));
@@ -208,7 +208,7 @@ static void print_help(void)
 #endif
            "      .....................................\n"
            "  Required parameters:\n"
-#ifndef PCAP_MODE
+#ifdef PROXY_MODE
            "    -l  \"x.x.x.x:xx\"  Listen address\n"
            "    -d  \"x.x.x.x:xx\"  DNS address\n"
 #else
@@ -274,7 +274,7 @@ int32_t main(int32_t argc, char *argv[])
 
     listen_addr.sin_addr.s_addr = INADDR_NONE;
 
-#ifndef PCAP_MODE
+#ifdef PROXY_MODE
     for (int32_t i = 0; i < DNS_MAX_COUNT; i++) {
         dns_addr[i].sin_addr.s_addr = INADDR_NONE;
     }
@@ -362,7 +362,7 @@ int32_t main(int32_t argc, char *argv[])
             continue;
         }
 #endif
-#ifndef PCAP_MODE
+#ifdef PROXY_MODE
         if (!strcmp(argv[i], "-d")) {
             if (i != argc - 1) {
                 printf("  DNS     \"%s\"\n", argv[i + 1]);
@@ -432,7 +432,7 @@ int32_t main(int32_t argc, char *argv[])
             continue;
         }
         if (!strcmp(argv[i], "--test")) {
-#ifndef TUN_MODE
+#ifdef ROUTE_TABLE_MODE
             test_mode = 1;
 #endif
             printf("  Test       enabled\n");
@@ -479,8 +479,8 @@ int32_t main(int32_t argc, char *argv[])
     }
 #endif
 
-#ifndef PCAP_MODE
-#ifndef MULTIPLE_DNS
+#ifdef PROXY_MODE
+#ifdef ONE_DNS
     for (int32_t i = 1; i < DNS_COUNT; i++) {
         dns_addr[i] = dns_addr[0];
     }
@@ -566,7 +566,7 @@ int32_t main(int32_t argc, char *argv[])
         }
     }
 
-#ifndef PCAP_MODE
+#ifdef PROXY_MODE
     int32_t threads_barrier_count = 3;
 #ifdef TUN_MODE
     threads_barrier_count += 1;
@@ -587,7 +587,7 @@ int32_t main(int32_t argc, char *argv[])
 
     init_net_data_threads();
 
-#ifndef PCAP_MODE
+#ifdef PROXY_MODE
     pthread_barrier_wait(&threads_barrier);
 #endif
 
@@ -601,7 +601,7 @@ int32_t main(int32_t argc, char *argv[])
             memset(&statistics_data, 0, sizeof(statistics_data));
             statistics_data.stat_start = time(NULL);
 
-#ifndef TUN_MODE
+#ifdef ROUTE_TABLE_MODE
             clean_route_table();
 #endif
 
