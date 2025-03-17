@@ -298,6 +298,8 @@ static void *PCAP(__attribute__((unused)) void *arg)
         errmsg("No free memory for cname_domain\n");
     }
 
+    pthread_barrier_wait(&threads_barrier);
+
     pcap_loop(handle, 0, callback_sll, NULL);
 
     return NULL;
