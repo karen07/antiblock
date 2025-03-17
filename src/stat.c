@@ -32,6 +32,7 @@ void stat_print(FILE *stat_fd)
 
     fprintf(stat_fd, "DNS packets processed         : %d\n", statistics_data.processed_count);
     fprintf(stat_fd, "DNS parsing errors            : %d\n", statistics_data.request_parsing_error);
+    fprintf(stat_fd, "Additions to route table      : %d\n", statistics_data.add_to_route_table);
 
 #ifdef TUN_MODE
     double nat_sended_to_dev_size_gb = statistics_data.nat_sended_to_dev_size / 1024 / 1024 / 1024;
