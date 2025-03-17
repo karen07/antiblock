@@ -172,7 +172,7 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
 
     dns_header_t *header = (dns_header_t *)cur_pos_ptr;
 
-#ifdef ONE_DNS
+#ifndef MULTIPLE_DNS
     uint16_t first_bit_mark = FIRST_BIT_UINT16;
     uint16_t flags = ntohs(header->flags);
     if ((flags & first_bit_mark) == 0) {
@@ -466,7 +466,7 @@ void dns_ans_check_test(void)
     }
     receive_msg.size = sizeof(correct_test);
 
-#ifdef ONE_DNS
+#ifndef MULTIPLE_DNS
     last_processed_id = 0;
     receive_msg.data[2] = 1;
     if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=

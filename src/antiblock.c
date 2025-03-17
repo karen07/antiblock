@@ -18,11 +18,11 @@ int32_t blacklist_count;
 subnet_t blacklist[BLACKLIST_MAX_COUNT];
 
 struct sockaddr_in listen_addr;
+pthread_barrier_t threads_barrier;
 
 static char gateway_name[GATEWAY_MAX_COUNT][IFNAMSIZ];
 
 #ifdef PROXY_MODE
-pthread_barrier_t threads_barrier;
 struct sockaddr_in dns_addr[DNS_MAX_COUNT];
 #endif
 
@@ -210,7 +210,6 @@ static void print_help(void)
            "    -d  \"x.x.x.x:xx\"  DNS address\n"
 #else
            "    -l  \"x.x.x.x:xx\"  Sniffer address\n"
-           "    -i  \"/test/\"      Sniffer interface\n"
 #endif
 #ifdef TUN_MODE
            "    -n  \"x.x.x.x/xx\"  TUN net\n"
@@ -458,12 +457,6 @@ int32_t main(int32_t argc, char *argv[])
     }
 
 #ifdef PROXY_MODE
-#ifdef ONE_DNS
-    for (int32_t i = 1; i < DNS_COUNT; i++) {
-        dns_addr[i] = dns_addr[0];
-    }
-#endif
-
     for (int32_t i = 0; i < DNS_COUNT; i++) {
         if (dns_addr[i].sin_addr.s_addr == INADDR_NONE) {
             print_help();
@@ -544,15 +537,19 @@ int32_t main(int32_t argc, char *argv[])
         }
     }
 
-#ifdef PROXY_MODE
     int32_t threads_barrier_count = 3;
+
 #ifdef TUN_MODE
     threads_barrier_count += 1;
 #endif
+
+#ifdef PCAP_MODE
+    threads_barrier_count -= 1;
+#endif
+
     if (pthread_barrier_init(&threads_barrier, NULL, threads_barrier_count)) {
         errmsg("Can't create threads_barrier\n");
     }
-#endif
 
 #ifdef TUN_MODE
     init_tun_thread();
@@ -565,11 +562,9 @@ int32_t main(int32_t argc, char *argv[])
 
     init_net_data_threads();
 
-#ifdef PROXY_MODE
-    pthread_barrier_wait(&threads_barrier);
-#endif
-
     dns_ans_check_test();
+
+    pthread_barrier_wait(&threads_barrier);
 
     int32_t circles = 0;
     int32_t sleep_circles = 0;

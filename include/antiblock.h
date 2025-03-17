@@ -16,7 +16,6 @@
 #include <unistd.h>
 
 /* Initial setup */
-//#define ONE_DNS
 //#define MULTIPLE_DNS
 
 //#define PROXY_MODE
@@ -28,9 +27,6 @@
 
 //Defines check
 #ifdef PCAP_MODE
-#ifdef ONE_DNS
-#error "You can't use PCAP_MODE and ONE_DNS"
-#endif
 #ifdef MULTIPLE_DNS
 #error "You can't use PCAP_MODE and MULTIPLE_DNS"
 #endif
@@ -102,6 +98,7 @@ extern int32_t blacklist_count;
 extern subnet_t blacklist[BLACKLIST_MAX_COUNT];
 
 extern struct sockaddr_in listen_addr;
+extern pthread_barrier_t threads_barrier;
 
 #ifdef TUN_MODE
 extern uint32_t tun_ip;
@@ -109,10 +106,14 @@ extern uint32_t tun_prefix;
 #endif
 
 #ifdef PROXY_MODE
+#ifdef MULTIPLE_DNS
 #define DNS_COUNT (gateways_count + 1)
 #define DNS_MAX_COUNT (GATEWAY_MAX_COUNT + 1)
+#else
+#define DNS_COUNT (1)
+#define DNS_MAX_COUNT (1)
+#endif
 
-extern pthread_barrier_t threads_barrier;
 extern struct sockaddr_in dns_addr[DNS_MAX_COUNT];
 #endif
 
