@@ -82,7 +82,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
             continue;
         }
 
-        dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain);
+        dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain);
 
         client_addr.sin_family = AF_INET;
         client_addr.sin_port = id_map[id].port;
@@ -149,7 +149,7 @@ static void *client_data(__attribute__((unused)) void *arg)
 
         int32_t dns_id = 0;
 #ifdef MULTIPLE_DNS
-        dns_id = dns_ans_check(&receive_msg, &que_domain, NULL, NULL) + 1;
+        dns_id = dns_ans_check(DNS_QUE, &receive_msg, &que_domain, NULL, NULL) + 1;
         if (dns_id < 0) {
             dns_id = 0;
         }
@@ -238,7 +238,7 @@ static void callback_sll(__attribute__((unused)) u_char *useless, const struct p
     receive_msg.size = ntohs(udph->len) - sizeof(*udph);
     receive_msg.data = (char *)udph + sizeof(*udph);
 
-    dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain);
+    dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain);
 }
 
 static void *PCAP(__attribute__((unused)) void *arg)
