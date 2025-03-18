@@ -157,8 +157,8 @@ static void dump_dns_data(int32_t error, memory_t *receive_msg)
 
 static uint16_t last_processed_id;
 
-int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans_domain,
-                      memory_t *cname_domain)
+int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_domain,
+                      memory_t *ans_domain, memory_t *cname_domain)
 {
     char *cur_pos_ptr = receive_msg->data;
     char *receive_msg_end = receive_msg->data + receive_msg->size;
@@ -172,15 +172,13 @@ int32_t dns_ans_check(memory_t *receive_msg, memory_t *que_domain, memory_t *ans
 
     dns_header_t *header = (dns_header_t *)cur_pos_ptr;
 
-#ifndef MULTIPLE_DNS
     uint16_t first_bit_mark = FIRST_BIT_UINT16;
     uint16_t flags = ntohs(header->flags);
-    if ((flags & first_bit_mark) == 0) {
+    if ((flags & first_bit_mark) == direction) {
         statistics_data.request_parsing_error++;
         dump_dns_data(DNS_ANS_CHECK_RES_TYPE_ERROR, receive_msg);
         return DNS_ANS_CHECK_RES_TYPE_ERROR;
     }
-#endif
 
     uint16_t quest_count = ntohs(header->quest);
     if (quest_count != 1) {
@@ -453,32 +451,30 @@ void dns_ans_check_test(void)
     last_processed_id = 0;
     receive_msg.size = sizeof(correct_test);
     memcpy(receive_msg.data, correct_test, receive_msg.size);
-    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
+    if (dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         CHECK_DOMAIN_NOT_BLOCKED) {
         errmsg("Test DNS correct fail\n");
     }
 
     last_processed_id = 0;
     receive_msg.size = 11;
-    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
+    if (dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_HEADER_SIZE_ERROR) {
         errmsg("Test DNS header size fail\n");
     }
     receive_msg.size = sizeof(correct_test);
 
-#ifndef MULTIPLE_DNS
     last_processed_id = 0;
     receive_msg.data[2] = 1;
-    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
+    if (dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_RES_TYPE_ERROR) {
         errmsg("Test DNS flag fail\n");
     }
     receive_msg.data[2] = correct_test[2];
-#endif
 
     last_processed_id = 0;
     receive_msg.data[5] = 2;
-    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
+    if (dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_QUE_COUNT_ERROR) {
         errmsg("Test DNS quest count fail\n");
     }
@@ -486,7 +482,7 @@ void dns_ans_check_test(void)
 
     last_processed_id = 0;
     receive_msg.size = 26;
-    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
+    if (dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_QUE_URL_GET_ERROR) {
         errmsg("Test DNS que domain fail\n");
     }
@@ -494,7 +490,7 @@ void dns_ans_check_test(void)
 
     last_processed_id = 0;
     receive_msg.size = 30;
-    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
+    if (dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_QUE_DATA_GET_ERROR) {
         errmsg("Test DNS header que size fail\n");
     }
@@ -502,7 +498,7 @@ void dns_ans_check_test(void)
 
     last_processed_id = 0;
     receive_msg.size = 32;
-    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
+    if (dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_ANS_URL_GET_ERROR) {
         errmsg("Test DNS ans domain fail\n");
     }
@@ -510,7 +506,7 @@ void dns_ans_check_test(void)
 
     last_processed_id = 0;
     receive_msg.size = 42;
-    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
+    if (dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_ANS_DATA_GET_ERROR) {
         errmsg("Test DNS header ans size fail\n");
     }
@@ -518,7 +514,7 @@ void dns_ans_check_test(void)
 
     last_processed_id = 0;
     receive_msg.size = 66;
-    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
+    if (dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_ANS_LEN_ERROR) {
         errmsg("Test DNS header ans data size fail\n");
     }
@@ -526,7 +522,7 @@ void dns_ans_check_test(void)
 
     last_processed_id = 0;
     receive_msg.data[58] = 0x3F;
-    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
+    if (dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_CNAME_URL_GET_ERROR) {
         errmsg("Test DNS cname domain fail\n");
     }
@@ -534,7 +530,7 @@ void dns_ans_check_test(void)
 
     last_processed_id = 0;
     receive_msg.size = sizeof(correct_test) + 1;
-    if (dns_ans_check(&receive_msg, &que_domain, &ans_domain, &cname_domain) !=
+    if (dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         DNS_ANS_CHECK_NOT_END_ERROR) {
         errmsg("Test DNS end fail\n");
     }
