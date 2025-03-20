@@ -209,7 +209,7 @@ static void print_help(void)
            "    -l  \"x.x.x.x:xx\"  Listen address\n"
            "    -d  \"x.x.x.x:xx\"  DNS address\n"
 #else
-           "    -l  \"x.x.x.x:xx\"  Sniffer address\n"
+           "    -l  \"x.x.x.x:xx\"  Address for sniffing packets with this src\n"
 #endif
 #ifdef TUN_MODE
            "    -n  \"x.x.x.x/xx\"  TUN net\n"
@@ -236,15 +236,13 @@ static void main_catch_function(int32_t signo)
 int32_t main(int32_t argc, char *argv[])
 {
 #ifdef PCAP_MODE
-    printf("AntiBlock " ANTIBLOCK_VERSION " sniffer DNS requests.\n"
-           "The IP addresses of the specified domains\n"
-           "are added to the routing table for routing\n"
-           "through the specified interfaces.\n");
+    printf("AntiBlock " ANTIBLOCK_VERSION " sniffer DNS requests. The IP addresses of\n"
+           "the specified domains are added to the routing table for\n"
+           "routing through the specified interfaces.\n");
 #else
-    printf("AntiBlock " ANTIBLOCK_VERSION " proxies DNS requests.\n"
-           "The IP addresses of the specified domains\n"
-           "are added to the routing table for routing\n"
-           "through the specified interfaces.\n");
+    printf("AntiBlock " ANTIBLOCK_VERSION " proxies DNS requests. The IP addresses of\n"
+           "the specified domains are added to the routing table for\n"
+           "routing through the specified interfaces.\n");
 #endif
 
     if (signal(SIGINT, main_catch_function) == SIG_ERR) {
