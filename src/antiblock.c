@@ -188,7 +188,7 @@ static void add_blacklist(const char *subnet_str)
 static void print_help(void)
 {
     printf("Commands:\n"
-           "  At least one parameters needs to be filled:\n"
+           "  It is necessary to enter from 1 to %d values:\n"
 #ifdef MULTIPLE_DNS
            "    Route domains from path/url through gateway,\n"
            "    resolve domains from path/url via DNS:\n"
@@ -219,7 +219,8 @@ static void print_help(void)
            "    -o  \"/test/\"      Log or stat output folder\n"
            "    --log             Show operations log\n"
            "    --stat            Show statistics data\n"
-           "    --test            Test mode\n");
+           "    --test            Test mode\n",
+           GATEWAY_MAX_COUNT);
 }
 
 static void main_catch_function(int32_t signo)
