@@ -1,7 +1,7 @@
 # AntiBlock
 AntiBlock sniffer DNS requests. The IP addresses of the specified domains are added to the routing table for routing through the specified interfaces.
 ## Usage
-```sh
+```c
 Commands:
   It is necessary to enter from 1 to 32 values:
     Route domains from path/url through gateway:
