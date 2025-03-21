@@ -94,7 +94,7 @@ void add_route(int32_t gateway_index, uint32_t dst)
     }
 
     if (ioctl(route_socket, SIOCADDRT, &route) >= 0) {
-        statistics_data.add_to_route_table++;
+        statistics_data.in_route_table[gateway_index]++;
         return;
     }
 
