@@ -280,7 +280,7 @@ int32_t main(int32_t argc, char *argv[])
     for (int32_t i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-r")) {
             if (i != argc - 1) {
-                printf("  Routes     \"%s\"\n", argv[i + 1]);
+                printf("  Route      \"%s\"\n", argv[i + 1]);
                 char *first_space_ptr = strchr(argv[i + 1], ' ');
                 if (first_space_ptr) {
                     *first_space_ptr = 0;
@@ -328,7 +328,11 @@ int32_t main(int32_t argc, char *argv[])
         }
         if (!strcmp(argv[i], "-l")) {
             if (i != argc - 1) {
+#ifdef PROXY_MODE
                 printf("  Listen     \"%s\"\n", argv[i + 1]);
+#else
+                printf("  Sniffer    \"%s\"\n", argv[i + 1]);
+#endif
                 char *colon_ptr = strchr(argv[i + 1], ':');
                 if (colon_ptr) {
                     uint16_t tmp_port = 0;
