@@ -3,7 +3,7 @@ AntiBlock sniffer DNS requests. The IP addresses of the specified domains are ad
 ## Usage
 ```sh
 Commands:
-  At least one parameters needs to be filled:
+  It is necessary to enter from 1 to 32 values:
     Route domains from path/url through gateway:
       -r  "gateway1 https://test1.com"
       -r  "gateway2 /test1.txt"
@@ -11,7 +11,7 @@ Commands:
       -r  "gateway1 https://test2.com"
       .....................................
   Required parameters:
-    -l  "x.x.x.x:xx"  Sniffer address
+    -l  "x.x.x.x:xx"  Address for sniffing packets with this src
   Optional parameters:
     -b  "/test.txt"   Subnets not add to the routing table
     -o  "/test/"      Log or stat output folder
