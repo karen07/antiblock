@@ -3,7 +3,7 @@
 typedef struct statistics {
     int32_t processed_count;
     int32_t request_parsing_error;
-    int32_t add_to_route_table;
+    int32_t in_route_table[GATEWAY_MAX_COUNT];
 
 #ifdef TUN_MODE
     int32_t nat_sended_to_client_error;
