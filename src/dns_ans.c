@@ -290,7 +290,7 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
                     struct in_addr new_ip;
                     new_ip.s_addr = add_elem.ip_local;
 
-                    fprintf(log_fd, "    B(%d) %s", ans_domain_gateway + 1, inet_ntoa(new_ip));
+                    fprintf(log_fd, "    BA(%d) %s", ans_domain_gateway + 1, inet_ntoa(new_ip));
                 }
 #else
 
@@ -312,15 +312,15 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
 
                 if (log_fd) {
                     if (correct_ip4_flag) {
-                        fprintf(log_fd, "    B(%d)", ans_domain_gateway + 1);
+                        fprintf(log_fd, "    BA(%d)", ans_domain_gateway + 1);
                     } else {
-                        fprintf(log_fd, "    L(%d)", ans_domain_gateway + 1);
+                        fprintf(log_fd, "    BL");
                     }
                 }
 #endif
             } else {
                 if (log_fd) {
-                    fprintf(log_fd, "    N");
+                    fprintf(log_fd, "    NA");
                 }
             }
 
@@ -364,7 +364,7 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
 
             if (cname_domain_gateway != GET_GATEWAY_NOT_IN_ROUTES) {
                 if (log_fd) {
-                    fprintf(log_fd, "    BC");
+                    fprintf(log_fd, "    BC(%d)", cname_domain_gateway);
                 }
             } else {
                 if (log_fd) {
