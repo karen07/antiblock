@@ -364,7 +364,7 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
 
             if (cname_domain_gateway != GET_GATEWAY_NOT_IN_ROUTES) {
                 if (log_fd) {
-                    fprintf(log_fd, "    BC(%d)", cname_domain_gateway);
+                    fprintf(log_fd, "    BC(%d)", cname_domain_gateway + 1);
                 }
             } else {
                 if (log_fd) {
