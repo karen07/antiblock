@@ -22,7 +22,7 @@
 #define GET_DOMAIN_ADD_CH_DOMAIN_ERROR 7
 #define GET_DOMAIN_NULL_CH_DOMAIN_ERROR 8
 
-#define CHECK_DOMAIN_NOT_BLOCKED -1
+#define GET_GATEWAY_NOT_IN_ROUTES -1
 
 #define DNS_ANS_CHECK_HEADER_SIZE_ERROR -2
 #define DNS_ANS_CHECK_ID_DUBLICATION -3
@@ -109,7 +109,7 @@ static int32_t get_domain_from_packet(memory_t *receive_msg, char *cur_pos_ptr,
     return GET_DOMAIN_OK;
 }
 
-static int32_t check_domain(memory_t *domain)
+static int32_t get_gateway(memory_t *domain)
 {
     char *dot_pos = NULL;
     int32_t dot_count = 0;
@@ -130,7 +130,7 @@ static int32_t check_domain(memory_t *domain)
         }
     }
 
-    return CHECK_DOMAIN_NOT_BLOCKED;
+    return GET_GATEWAY_NOT_IN_ROUTES;
 }
 
 static int32_t in_subnet(uint32_t ip, subnet_t *subnet)
@@ -207,7 +207,8 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
     }
     cur_pos_ptr = que_domain_end;
 
-    int32_t block_que_domain_flag = check_domain(que_domain);
+    int32_t que_domain_gateway = GET_GATEWAY_NOT_IN_ROUTES;
+    que_domain_gateway = get_gateway(que_domain);
     // QUE DOMAIN
 
     // QUE DATA
@@ -227,10 +228,9 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
     if (log_fd) {
         time_t now = time(NULL);
         struct tm *tm_struct = localtime(&now);
-        fprintf(log_fd, "\n%02d.%02d.%04d %02d:%02d:%02d\n", tm_struct->tm_mday,
-                tm_struct->tm_mon + 1, tm_struct->tm_year + 1900, tm_struct->tm_hour,
-                tm_struct->tm_min, tm_struct->tm_sec);
-        fprintf(log_fd, "Que_domain %d: %s\n", que_type, que_domain->data + 1);
+        fprintf(log_fd, "\n%02d:%02d:%02d ", tm_struct->tm_hour, tm_struct->tm_min,
+                tm_struct->tm_sec);
+        fprintf(log_fd, "Q(%d) %s\n", que_type, que_domain->data + 1);
     }
 
     for (int32_t i = 0; i < ans_count; i++) {
@@ -245,8 +245,8 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
         }
         cur_pos_ptr = ans_domain_end;
 
-        int32_t block_ans_domain_flag = CHECK_DOMAIN_NOT_BLOCKED;
-        block_ans_domain_flag = check_domain(ans_domain);
+        int32_t ans_domain_gateway = GET_GATEWAY_NOT_IN_ROUTES;
+        ans_domain_gateway = get_gateway(ans_domain);
         // ANS DOMAIN
 
         // ANS DATA
@@ -269,7 +269,7 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
         }
 
         if (ans_type == DNS_TypeA) {
-            if (block_ans_domain_flag != CHECK_DOMAIN_NOT_BLOCKED) {
+            if (ans_domain_gateway != GET_GATEWAY_NOT_IN_ROUTES) {
 #ifdef TUN_MODE
                 uint32_t NAT_subnet_start_n = htonl(NAT.start_ip++);
 
@@ -290,12 +290,7 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
                     struct in_addr new_ip;
                     new_ip.s_addr = add_elem.ip_local;
 
-                    struct in_addr old_ip;
-                    old_ip.s_addr = add_elem.ip_global;
-
-                    fprintf(log_fd, "    Blocked_IP: %s", ans_domain->data + 1);
-                    fprintf(log_fd, " %s", inet_ntoa(old_ip));
-                    fprintf(log_fd, " %s\n", inet_ntoa(new_ip));
+                    fprintf(log_fd, "    B(%d) %s", ans_domain_gateway + 1, inet_ntoa(new_ip));
                 }
 #else
 
@@ -312,28 +307,27 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
                 }
 
                 if (correct_ip4_flag) {
-                    add_route(block_ans_domain_flag, ans->ip4);
+                    add_route(ans_domain_gateway, ans->ip4);
                 }
 
                 if (log_fd) {
-                    struct in_addr rec_ip;
-                    rec_ip.s_addr = ans->ip4;
                     if (correct_ip4_flag) {
-                        fprintf(log_fd, "    Blocked_IP: %s", ans_domain->data + 1);
+                        fprintf(log_fd, "    B(%d)", ans_domain_gateway + 1);
                     } else {
-                        fprintf(log_fd, "    Blocked_IP_Blacklist: %s", ans_domain->data + 1);
+                        fprintf(log_fd, "    L(%d)", ans_domain_gateway + 1);
                     }
-                    fprintf(log_fd, " %s\n", inet_ntoa(rec_ip));
                 }
 #endif
             } else {
                 if (log_fd) {
-                    struct in_addr new_ip;
-                    new_ip.s_addr = ans->ip4;
-
-                    fprintf(log_fd, "    Not_Blocked_IP: %s", ans_domain->data + 1);
-                    fprintf(log_fd, " %s\n", inet_ntoa(new_ip));
+                    fprintf(log_fd, "    N");
                 }
+            }
+
+            if (log_fd) {
+                struct in_addr new_ip;
+                new_ip.s_addr = ans->ip4;
+                fprintf(log_fd, " %s %s\n", ans_domain->data + 1, inet_ntoa(new_ip));
             }
         }
 
@@ -347,19 +341,19 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
                 return DNS_ANS_CHECK_CNAME_URL_GET_ERROR;
             }
 
-            int32_t block_cname_domain_flag = CHECK_DOMAIN_NOT_BLOCKED;
-            block_cname_domain_flag = check_domain(cname_domain);
+            int32_t cname_domain_gateway = GET_GATEWAY_NOT_IN_ROUTES;
+            cname_domain_gateway = get_gateway(cname_domain);
 
-            if (block_ans_domain_flag != CHECK_DOMAIN_NOT_BLOCKED &&
-                block_cname_domain_flag == CHECK_DOMAIN_NOT_BLOCKED) {
-                block_cname_domain_flag = block_ans_domain_flag;
+            if (ans_domain_gateway != GET_GATEWAY_NOT_IN_ROUTES &&
+                cname_domain_gateway == GET_GATEWAY_NOT_IN_ROUTES) {
+                cname_domain_gateway = ans_domain_gateway;
                 if (domains_map_struct) {
                     if (domains.size + cname_domain->size < domains.max_size) {
                         strcpy(&(domains.data[domains.size]), cname_domain->data + 1);
 
                         domains_gateway_t add_elem;
                         add_elem.offset = domains.size;
-                        add_elem.gateway = block_cname_domain_flag;
+                        add_elem.gateway = cname_domain_gateway;
 
                         domains.size += cname_domain->size;
 
@@ -368,20 +362,24 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
                 }
             }
 
-            if (block_cname_domain_flag != CHECK_DOMAIN_NOT_BLOCKED) {
+            if (cname_domain_gateway != GET_GATEWAY_NOT_IN_ROUTES) {
                 if (log_fd) {
-                    fprintf(log_fd, "    Blocked_Cname: %s\n", cname_domain->data + 1);
+                    fprintf(log_fd, "    BC");
                 }
             } else {
                 if (log_fd) {
-                    fprintf(log_fd, "    Not_Blocked_Cname: %s\n", cname_domain->data + 1);
+                    fprintf(log_fd, "    NC");
                 }
+            }
+
+            if (log_fd) {
+                fprintf(log_fd, " %s %s\n", ans_domain->data + 1, cname_domain->data + 1);
             }
         }
 
         if (ans_type != DNS_TypeA && ans_type != DNS_TypeCNAME) {
             if (log_fd) {
-                fprintf(log_fd, "    Ans_domain %d: %s\n", ans_type, ans_domain->data + 1);
+                fprintf(log_fd, "    A(%d) %s\n", ans_type, ans_domain->data + 1);
             }
         }
 
@@ -399,7 +397,7 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
 
     statistics_data.processed_count++;
 
-    return block_que_domain_flag;
+    return que_domain_gateway;
 }
 
 void dns_ans_check_test(void)
@@ -436,9 +434,6 @@ void dns_ans_check_test(void)
         errmsg("No free memory for cname_domain\n");
     }
 
-    FILE *log_fd_tmp = log_fd;
-    log_fd = NULL;
-
     uint8_t correct_test[] = { 0x0f, 0x32, 0x81, 0x80, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00,
                                0x00, 0x03, 0x79, 0x74, 0x33, 0x05, 0x67, 0x67, 0x70, 0x68, 0x74,
                                0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01, 0x00, 0x01, 0xc0, 0x0c,
@@ -452,7 +447,7 @@ void dns_ans_check_test(void)
     receive_msg.size = sizeof(correct_test);
     memcpy(receive_msg.data, correct_test, receive_msg.size);
     if (dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain) !=
-        CHECK_DOMAIN_NOT_BLOCKED) {
+        GET_GATEWAY_NOT_IN_ROUTES) {
         errmsg("Test DNS correct fail\n");
     }
 
@@ -599,8 +594,6 @@ void dns_ans_check_test(void)
         errmsg("Test get domain data domain last byte fail\n");
     }
     que_domain.max_size = DOMAIN_MAX_SIZE;
-
-    log_fd = log_fd_tmp;
 
     free(receive_msg.data);
     free(que_domain.data);

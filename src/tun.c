@@ -181,9 +181,6 @@ static void *tun(__attribute__((unused)) void *arg)
 
         char proto_L4 = iph->protocol;
         if ((proto_L4 != IPPROTO_TCP) && (proto_L4 != IPPROTO_UDP) && (proto_L4 != IPPROTO_ICMP)) {
-            if (log_fd) {
-                fprintf(log_fd, "NAT_proto_L4 %d\n", proto_L4);
-            }
             continue;
         }
 
@@ -352,37 +349,6 @@ static void *tun(__attribute__((unused)) void *arg)
 
             statistics_data.nat_sended_to_dev++;
             statistics_data.nat_sended_to_dev_size += nread;
-        }
-
-        if (log_fd && 0) {
-            struct in_addr s_ip_new;
-            s_ip_new.s_addr = iph->saddr;
-
-            struct in_addr d_ip_new;
-            d_ip_new.s_addr = iph->daddr;
-
-            char log_out_str[1000];
-
-            if (in_out_flag) {
-                sprintf(log_out_str, "NAT_sended_to_dev: %s ", inet_ntoa(src_ip_old));
-            } else {
-                sprintf(log_out_str, "NAT_sended_to_client: %s ", inet_ntoa(src_ip_old));
-            }
-
-            sprintf(log_out_str + strlen(log_out_str), "%s ", inet_ntoa(dst_ip_old));
-            sprintf(log_out_str + strlen(log_out_str), "%u ", ntohs(src_port_old));
-            sprintf(log_out_str + strlen(log_out_str), "%u", ntohs(dst_port_old));
-
-            sprintf(log_out_str + strlen(log_out_str), " - ");
-
-            sprintf(log_out_str + strlen(log_out_str), "%s ", inet_ntoa(s_ip_new));
-            sprintf(log_out_str + strlen(log_out_str), "%s ", inet_ntoa(d_ip_new));
-            sprintf(log_out_str + strlen(log_out_str), "%u ", ntohs(src_port));
-            sprintf(log_out_str + strlen(log_out_str), "%u ", ntohs(dst_port));
-
-            sprintf(log_out_str + strlen(log_out_str), "%d\n", nread);
-
-            fprintf(log_fd, "%s", log_out_str);
         }
 
         if (proto_L4 == IPPROTO_TCP) {
