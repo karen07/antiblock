@@ -580,10 +580,10 @@ int32_t main(int32_t argc, char *argv[])
                 fprintf(log_fd, "Reductions:\n");
                 fprintf(log_fd, "    Q(x)-DNS question type\n");
                 fprintf(log_fd, "    A(x)-DNS answer type\n");
-                fprintf(log_fd, "    B(x)-domain in x route\n");
-                fprintf(log_fd, "    L(x)-IP in blacklist\n");
-                fprintf(log_fd, "    N-domain not in routes\n");
-                fprintf(log_fd, "    BC-CNAME in routes\n");
+                fprintf(log_fd, "    BA(x)-A in x route\n");
+                fprintf(log_fd, "    BC(x)-CNAME in x route\n");
+                fprintf(log_fd, "    BL-IP in blacklist\n");
+                fprintf(log_fd, "    NA-A not in routes\n");
                 fprintf(log_fd, "    NC-CNAME not in routes\n");
             }
 
