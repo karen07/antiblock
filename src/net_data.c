@@ -201,8 +201,6 @@ void init_net_data_threads(void)
 
 #else
 
-#define DNS_port 53
-
 static memory_t receive_msg;
 static memory_t que_domain;
 static memory_t ans_domain;
@@ -231,7 +229,7 @@ static void callback_sll(__attribute__((unused)) u_char *useless, const struct p
     }
 
     struct udphdr *udph = (struct udphdr *)((char *)iph + sizeof(*iph));
-    if (udph->source != htons(DNS_port)) {
+    if (udph->source != listen_addr.sin_port) {
         return;
     }
 
@@ -252,7 +250,7 @@ static void *PCAP(__attribute__((unused)) void *arg)
     listen_ip.s_addr = listen_addr.sin_addr.s_addr;
 
     sprintf(filter_exp, "udp and src %s and src port %hu", inet_ntoa(listen_ip),
-            htons(listen_addr.sin_port));
+            ntohs(listen_addr.sin_port));
 
     char *device_name = "any";
 
