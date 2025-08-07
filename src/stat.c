@@ -12,7 +12,10 @@ statistics_t statistics_data;
 
 void stat_print(FILE *stat_fd)
 {
-    ftruncate(fileno(stat_fd), 0);
+    if (ftruncate(fileno(stat_fd), 0) != 0) {
+        return;
+    }
+
     fseek(stat_fd, 0, SEEK_SET);
 
     fprintf(stat_fd, "Statistics ");

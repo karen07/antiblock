@@ -575,16 +575,17 @@ int32_t main(int32_t argc, char *argv[])
     while (true) {
         if (circles++ == 0) {
             if (log_fd) {
-                ftruncate(fileno(log_fd), 0);
-                fseek(log_fd, 0, SEEK_SET);
-                fprintf(log_fd, "Reductions:\n");
-                fprintf(log_fd, "    Q(x)-DNS question x type\n");
-                fprintf(log_fd, "    A(x)-DNS answer x type\n");
-                fprintf(log_fd, "    BA(x)-A in x route\n");
-                fprintf(log_fd, "    BC(x)-CNAME in x route\n");
-                fprintf(log_fd, "    BL-IP in blacklist\n");
-                fprintf(log_fd, "    NA-A not in routes\n");
-                fprintf(log_fd, "    NC-CNAME not in routes\n");
+                if (ftruncate(fileno(log_fd), 0) == 0) {
+                    fseek(log_fd, 0, SEEK_SET);
+                    fprintf(log_fd, "Reductions:\n");
+                    fprintf(log_fd, "    Q(x)-DNS question x type\n");
+                    fprintf(log_fd, "    A(x)-DNS answer x type\n");
+                    fprintf(log_fd, "    BA(x)-A in x route\n");
+                    fprintf(log_fd, "    BC(x)-CNAME in x route\n");
+                    fprintf(log_fd, "    BL-IP in blacklist\n");
+                    fprintf(log_fd, "    NA-A not in routes\n");
+                    fprintf(log_fd, "    NC-CNAME not in routes\n");
+                }
             }
 
             memset(&statistics_data, 0, sizeof(statistics_data));
