@@ -80,8 +80,8 @@ typedef struct subnet {
 #ifndef _DOMAIN_GATEWAY_TYPE
 #define _DOMAIN_GATEWAY_TYPE
 typedef struct domain_gateway {
-    unsigned char hash[3];
-    unsigned char gateway;
+    uint32_t hash;
+    uint8_t gateway;
 } domain_gateway_t;
 #endif
 
@@ -93,7 +93,7 @@ typedef struct domains {
     domain_gateway_t *domains;
     int32_t used;
     int32_t allocated;
-    unsigned char current_gateway;
+    uint8_t current_gateway;
     char unprocessed_domain[MAX_UNPROCESSED_DOMAIN];
     int32_t unprocessed_domain_len;
 } domains_t;
