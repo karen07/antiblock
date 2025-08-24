@@ -18,7 +18,7 @@
 static uint32_t g_seed32 = 0;
 static domains_t global_domains;
 
-static inline uint32_t rotl32(uint32_t x, int32_t r)
+static uint32_t rotl32(uint32_t x, int32_t r)
 {
     return (x << r) | (x >> (32 - r));
 }
@@ -118,6 +118,47 @@ static bool insert_sorted_unique(domains_t *d, uint32_t h, int32_t gateway)
     return true;
 }
 
+static int cmp_hash_qsort(const void *a, const void *b)
+{
+    const domain_gateway_t *x = (const domain_gateway_t *)a;
+    const domain_gateway_t *y = (const domain_gateway_t *)b;
+    if (x->hash < y->hash) {
+        return -1;
+    }
+    if (x->hash > y->hash) {
+        return 1;
+    }
+    return 0;
+}
+
+static void finalize_sort_and_unique(domains_t *d)
+{
+    if (d->count <= 1) {
+        d->collision_count = 0;
+        return;
+    }
+    qsort(d->entries, (size_t)d->count, sizeof(domain_gateway_t), cmp_hash_qsort);
+    int32_t w = 1;
+    for (int32_t r = 1; r < d->count; ++r) {
+        if (d->entries[r].hash != d->entries[w - 1].hash) {
+            d->entries[w++] = d->entries[r];
+        }
+    }
+    int32_t old = d->count;
+    d->count = w;
+    d->collision_count = old - w;
+}
+
+static void append_entry(domains_t *d, uint32_t h, int32_t gateway)
+{
+    if (d->capacity - d->count < 1) {
+        realloc_domains(d);
+    }
+    d->entries[d->count].hash = h;
+    d->entries[d->count].gateway = (unsigned char)gateway;
+    d->count++;
+}
+
 static void domain_append_part(domains_t *domains, int32_t start_pos, int32_t now_pos, char *str)
 {
     char *str_end = &domains->unprocessed_domain[domains->unprocessed_domain_len];
@@ -153,24 +194,7 @@ static size_t cb(void *data, size_t size, size_t nmemb, void *clientp)
 
             domains->lines_count++;
 
-            int32_t status = insert_sorted_unique(domains, h, domains->current_gateway);
-            if (!status) {
-                domains->collision_count++;
-            }
-
-#ifdef DEBUG
-            printf("%u ", h);
-            for (int32_t i = start_pos; i < now_pos; i++) {
-                printf("%c", str[i]);
-            }
-            if (!status) {
-                printf(" collision");
-            } else {
-                printf(" uniq");
-            }
-            printf("\n");
-#endif
-
+            append_entry(domains, h, domains->current_gateway);
             start_pos = now_pos + 1;
         }
     }
@@ -192,22 +216,7 @@ static void flush_tail(domains_t *domains)
 
     domains->lines_count++;
 
-    int32_t status = insert_sorted_unique(domains, h, domains->current_gateway);
-    if (!status) {
-        domains->collision_count++;
-    }
-
-#ifdef DEBUG
-    printf("%u ", h);
-    for (int32_t i = 0; i < domains->unprocessed_domain_len; i++) {
-        printf("%c", domains->unprocessed_domain[i]);
-    }
-    if (!status) {
-        printf(" collision");
-    }
-    printf("\n");
-#endif
-
+    append_entry(domains, h, domains->current_gateway);
     domains->unprocessed_domain_len = 0;
 }
 
@@ -307,6 +316,7 @@ int32_t domains_read(void)
         printf("From %s readed %d domains\n", gateway_domains_paths[i], local_domains.lines_count);
     }
 
+    finalize_sort_and_unique(&local_domains);
     printf("Unique %d / Collision %d\n", local_domains.count, local_domains.collision_count);
 
     domain_gateway_t *entries = global_domains.entries;
