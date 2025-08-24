@@ -55,8 +55,6 @@
 #include <linux/udp.h>
 #endif
 
-#include "array_hashmap.h"
-
 #ifndef _MEMORY_TYPE
 #define _MEMORY_TYPE
 typedef struct memory {
@@ -76,16 +74,29 @@ typedef struct subnet {
 
 #define BLACKLIST_MAX_COUNT 128
 
-#define GATEWAY_BITS_COUNT 5
-#define OFFSET_BITS_COUNT (32 - GATEWAY_BITS_COUNT)
+#define GATEWAY_BITS_COUNT 8
 #define GATEWAY_MAX_COUNT (1 << GATEWAY_BITS_COUNT)
+
+#ifndef _DOMAIN_GATEWAY_TYPE
+#define _DOMAIN_GATEWAY_TYPE
+typedef struct domain_gateway {
+    unsigned char hash[3];
+    unsigned char gateway[1];
+} domain_gateway_t;
+#endif
+
+#define MAX_UNPROCESSED_DOMAIN 1024
 
 #ifndef _DOMAINS_TYPE
 #define _DOMAINS_TYPE
-typedef struct domains_gateway {
-    unsigned int gateway : GATEWAY_BITS_COUNT;
-    unsigned int offset : OFFSET_BITS_COUNT;
-} domains_gateway_t;
+typedef struct domains {
+    domain_gateway_t *domains;
+    int32_t used;
+    int32_t allocated;
+    unsigned char current_gateway;
+    char unprocessed_domain[MAX_UNPROCESSED_DOMAIN];
+    int32_t unprocessed_domain_len;
+} domains_t;
 #endif
 
 extern FILE *log_fd;

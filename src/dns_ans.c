@@ -111,7 +111,8 @@ static int32_t get_domain_from_packet(memory_t *receive_msg, char *cur_pos_ptr,
 
 static int32_t get_gateway(memory_t *domain)
 {
-    char *dot_pos = NULL;
+    (void)domain;
+    /*char *dot_pos = NULL;
     int32_t dot_count = 0;
     for (int32_t i = domain->size; i >= 0; i--) {
         if (domain->data[i] == '.') {
@@ -128,7 +129,7 @@ static int32_t get_gateway(memory_t *domain)
                 return res_elem.gateway;
             }
         }
-    }
+    }*/
 
     return GET_GATEWAY_NOT_IN_ROUTES;
 }
@@ -344,7 +345,7 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
             int32_t cname_domain_gateway = GET_GATEWAY_NOT_IN_ROUTES;
             cname_domain_gateway = get_gateway(cname_domain);
 
-            if (ans_domain_gateway != GET_GATEWAY_NOT_IN_ROUTES &&
+            /*if (ans_domain_gateway != GET_GATEWAY_NOT_IN_ROUTES &&
                 cname_domain_gateway == GET_GATEWAY_NOT_IN_ROUTES) {
                 cname_domain_gateway = ans_domain_gateway;
                 if (domains_map_struct) {
@@ -360,7 +361,7 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
                         array_hashmap_add_elem(domains_map_struct, &add_elem, NULL, NULL);
                     }
                 }
-            }
+            }*/
 
             if (cname_domain_gateway != GET_GATEWAY_NOT_IN_ROUTES) {
                 if (log_fd) {

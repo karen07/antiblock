@@ -10,78 +10,113 @@
 #include <curl/curl.h>
 
 #define HTTP_OK 200
+#define DOMAINS_ALLOCATION_STEP 1024
 
-memory_t domains;
-array_hashmap_t domains_map_struct;
+static uint32_t g_seed32 = 0;
 
-static array_hashmap_hash domain_add_hash(const void *add_elem_data)
+static inline uint32_t crc24_openpgp_seeded(const void *key, size_t len, uint32_t seed)
 {
-    const domains_gateway_t *elem = add_elem_data;
-    return djb33_hash_len(&domains.data[elem->offset], -1);
+    const uint8_t *data = (const uint8_t *)key;
+    uint32_t crc = 0xB704CEu ^ (seed & 0x00FFFFFFu);
+    for (size_t i = 0; i < len; ++i) {
+        crc ^= (uint32_t)data[i] << 16;
+        for (int j = 0; j < 8; ++j) {
+            crc <<= 1;
+            if (crc & 0x01000000u) {
+                crc ^= 0x01864CFBu;
+            }
+        }
+    }
+    return crc & 0x00FFFFFFu;
 }
 
-static array_hashmap_bool domain_add_cmp(const void *add_elem_data, const void *hashmap_elem_data)
+static inline uint32_t tag32(const char *s, size_t len)
 {
-    const domains_gateway_t *elem1 = add_elem_data;
-    const domains_gateway_t *elem2 = hashmap_elem_data;
-
-    return !strcmp(&domains.data[elem1->offset], &domains.data[elem2->offset]);
+    return crc24_openpgp_seeded(s, len, g_seed32);
 }
 
-static array_hashmap_hash domain_find_hash(const void *find_elem_data)
+static inline void put24be(uint8_t out[3], uint32_t v)
 {
-    const char *elem = find_elem_data;
-    return djb33_hash_len(elem, -1);
+    out[0] = (uint8_t)(v >> 16);
+    out[1] = (uint8_t)(v >> 8);
+    out[2] = (uint8_t)v;
 }
 
-static array_hashmap_bool domain_find_cmp(const void *find_elem_data, const void *hashmap_elem_data)
+inline uint32_t get24be(const uint8_t in[3])
 {
-    const char *elem1 = find_elem_data;
-    const domains_gateway_t *elem2 = hashmap_elem_data;
+    return ((uint32_t)in[0] << 16) | ((uint32_t)in[1] << 8) | in[2];
+}
 
-    return !strcmp(elem1, &domains.data[elem2->offset]);
+void realloc_domains(domains_t *domains)
+{
+    int32_t new_size = (domains->allocated + DOMAINS_ALLOCATION_STEP) * sizeof(domain_gateway_t);
+    domain_gateway_t *tmp_domains = realloc(domains->domains, new_size);
+    if (!tmp_domains) {
+        errmsg("Can't realloc domains\n");
+    }
+    domains->domains = tmp_domains;
+    domains->allocated += DOMAINS_ALLOCATION_STEP;
 }
 
 static size_t cb(void *data, size_t size, size_t nmemb, void *clientp)
 {
+    char *str = (char *)data;
+    domains_t *domains = (domains_t *)clientp;
     size_t realsize = size * nmemb;
-    memory_t *mem = (memory_t *)clientp;
 
-    mem->max_size += realsize;
-    char *ptr = realloc(mem->data, mem->max_size);
-    if (ptr == NULL)
-        return 0;
-    mem->data = ptr;
+    printf("Start\n");
 
-    memcpy(&(mem->data[mem->size]), data, realsize);
-    mem->size = mem->max_size;
+    int32_t start_pos = 0;
+    for (int32_t i = 0; i < (int32_t)realsize; i++) {
+        if (str[i] == '\n') {
+            if (domains->allocated - domains->used < 1) {
+                realloc_domains(domains);
+            }
+
+            if (domains->unprocessed_domain_len) {
+                char *str_end = &domains->unprocessed_domain[domains->unprocessed_domain_len];
+                int32_t unprocessed_domain_len = i - start_pos;
+                memcpy(str_end, &str[start_pos], unprocessed_domain_len);
+                domains
+                    ->unprocessed_domain[domains->unprocessed_domain_len + unprocessed_domain_len] =
+                    0;
+                printf("%s\n", domains->unprocessed_domain);
+                domains->unprocessed_domain_len = 0;
+            } else {
+                uint32_t h = tag32(&str[start_pos], i - start_pos);
+                put24be(domains->domains[domains->used].hash, h);
+            }
+            domains->used++;
+            start_pos = i + 1;
+        }
+    }
+
+    if (start_pos < (int32_t)realsize) {
+        int32_t unprocessed_domain_len = (int32_t)realsize - start_pos;
+        memcpy(domains->unprocessed_domain, &str[start_pos], unprocessed_domain_len);
+        domains->unprocessed_domain_len = unprocessed_domain_len;
+    }
 
     return realsize;
 }
 
 int32_t domains_read(void)
 {
-    array_hashmap_del(&domains_map_struct);
-
-    if (domains.data) {
-        free(domains.data);
-    }
-
-    memset(&domains, 0, sizeof(domains));
-
-    uint32_t gateway_domains_offset[GATEWAY_MAX_COUNT + 1];
-    gateway_domains_offset[0] = 0;
+    domains_t tmp_domains;
+    memset(&tmp_domains, 0, sizeof(tmp_domains));
 
     for (int32_t i = 0; i < gateways_count; i++) {
         if (!memcmp(gateway_domains_paths[i], "http", 4)) {
             curl_global_init(CURL_GLOBAL_DEFAULT);
             CURL *curl = curl_easy_init();
             if (curl) {
+                tmp_domains.current_gateway = i;
+
                 curl_easy_setopt(curl, CURLOPT_URL, gateway_domains_paths[i]);
                 curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
                 curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
                 curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
-                curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&domains);
+                curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&tmp_domains);
 
                 CURLcode response;
                 response = curl_easy_perform(curl);
@@ -104,121 +139,21 @@ int32_t domains_read(void)
                 errmsg("Can't open domains file %s\n", gateway_domains_paths[i]);
             }
 
-            fseek(domains_fd, 0, SEEK_END);
-            int64_t domains_file_size_add = ftell(domains_fd);
-            fseek(domains_fd, 0, SEEK_SET);
-
-            domains.max_size += domains_file_size_add;
-            domains.data = realloc(domains.data, domains.max_size);
-            if (domains.data == NULL) {
-                errmsg("No free memory for domains_file %s\n", gateway_domains_paths[i]);
-            }
-
-            if (fread(&(domains.data[domains.size]), 1, domains_file_size_add, domains_fd) !=
-                (size_t)domains_file_size_add) {
-                errmsg("Can't read domains file %s\n", gateway_domains_paths[i]);
-            }
-            domains.size = domains.max_size;
-
             fclose(domains_fd);
-        }
-
-        if (!(domains.size < (1 << OFFSET_BITS_COUNT))) {
-            errmsg("The total size of all domains must be less than %d MB\n",
-                   (1 << OFFSET_BITS_COUNT) / 1024 / 1024);
-        }
-
-        if (domains.data && domains.max_size) {
-            if (domains.data[domains.max_size - 1] != '\n') {
-                domains.max_size += 1;
-                domains.data = realloc(domains.data, domains.max_size);
-                if (domains.data == NULL) {
-                    errmsg("No free memory for domains_file %s\n", gateway_domains_paths[i]);
-                }
-
-                domains.data[domains.max_size - 1] = '\n';
-                domains.size = domains.max_size;
-            }
-        }
-
-        gateway_domains_offset[i + 1] = domains.max_size;
-    }
-
-    domains.max_size += CNAME_DOMAINS_MAP_MAX_SIZE * DOMAIN_MAX_SIZE;
-    domains.data = realloc(domains.data, domains.max_size);
-    if (domains.data == NULL) {
-        errmsg("No free memory for cname_domains\n");
-    }
-
-    if (!(domains.size < (1 << OFFSET_BITS_COUNT))) {
-        errmsg("The total size of all domains must be less than %d MB\n",
-               (1 << OFFSET_BITS_COUNT) / 1024 / 1024);
-    }
-
-    int32_t gateway_domains_count[GATEWAY_MAX_COUNT];
-    memset(gateway_domains_count, 0, sizeof(int32_t) * GATEWAY_MAX_COUNT);
-
-    if (domains.size > 0) {
-        int32_t domains_map_size = 0;
-        for (int32_t i = 0; i < (int32_t)domains.size; i++) {
-            if (domains.data[i] == '\n') {
-                domains.data[i] = 0;
-
-                domains_map_size++;
-            }
-        }
-
-        int32_t domains_map_size_cname = domains_map_size + CNAME_DOMAINS_MAP_MAX_SIZE;
-        domains_map_struct =
-            array_hashmap_init(domains_map_size_cname, 1.0, sizeof(domains_gateway_t));
-        if (domains_map_struct == NULL) {
-            errmsg("No free memory for domains_map\n");
-        }
-
-        int32_t is_thread_safety = 0;
-        is_thread_safety = array_hashmap_is_thread_safety(domains_map_struct);
-        if (is_thread_safety == 0) {
-            errmsg("No thread safety hashmap\n");
-        }
-
-        array_hashmap_set_func(domains_map_struct, domain_add_hash, domain_add_cmp,
-                               domain_find_hash, domain_find_cmp, domain_find_hash,
-                               domain_find_cmp);
-
-        uint32_t domain_offset = 0;
-        int32_t gateway_id = 0;
-
-        for (int32_t i = 0; i < domains_map_size; i++) {
-            for (int32_t j = 1; j <= gateways_count; j++) {
-                if ((gateway_domains_offset[j - 1] <= domain_offset) &&
-                    (domain_offset < gateway_domains_offset[j])) {
-                    gateway_id = j - 1;
-                    gateway_domains_count[gateway_id]++;
-                }
-            }
-
-            if (!memcmp(&domains.data[domain_offset], "www.", 4)) {
-                domain_offset += 4;
-            }
-
-            domains_gateway_t add_elem;
-            add_elem.offset = domain_offset;
-            add_elem.gateway = gateway_id;
-
-            array_hashmap_add_elem(domains_map_struct, &add_elem, NULL, NULL);
-
-            domain_offset = strchr(&domains.data[domain_offset + 1], 0) - domains.data + 1;
         }
     }
 
     int32_t status = 1;
 
     for (int32_t j = 0; j < gateways_count; j++) {
-        if ((!memcmp(gateway_domains_paths[j], "http", 4)) && (gateway_domains_count[j] == 0)) {
-            status = 0;
-        }
-        printf("From %s readed %d domains\n", gateway_domains_paths[j], gateway_domains_count[j]);
+        //if ((!memcmp(gateway_domains_paths[j], "http", 4)) && (gateway_domains_count[j] == 0)) {
+        //    status = 0;
+        //}
+        //printf("From %s readed %d domains\n", gateway_domains_paths[j], gateway_domains_count[j]);
     }
+
+    printf("FULL End\n");
+    fflush(stdout);
 
     return status;
 }
