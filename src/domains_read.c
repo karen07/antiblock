@@ -11,6 +11,7 @@
 
 #define HTTP_OK 200
 #define DOMAINS_ALLOCATION_STEP 1024
+#define READ_BUF_SIZE 1024
 
 static uint32_t g_seed32 = 0;
 
@@ -69,22 +70,22 @@ static uint32_t tag32(const char *s, size_t len)
 
 void realloc_domains(domains_t *domains)
 {
-    int32_t new_count = domains->allocated + DOMAINS_ALLOCATION_STEP;
+    int32_t new_count = domains->capacity + DOMAINS_ALLOCATION_STEP;
     int32_t new_size = new_count * (int32_t)sizeof(domain_gateway_t);
-    domain_gateway_t *tmp_domains = realloc(domains->domains, (size_t)new_size);
+    domain_gateway_t *tmp_domains = realloc(domains->entries, (size_t)new_size);
     if (!tmp_domains) {
         errmsg("Can't realloc domains\n");
     }
-    domains->domains = tmp_domains;
-    domains->allocated += DOMAINS_ALLOCATION_STEP;
+    domains->entries = tmp_domains;
+    domains->capacity += DOMAINS_ALLOCATION_STEP;
 }
 
 static int32_t lower_bound_hash32(const domains_t *d, uint32_t h)
 {
-    int32_t lo = 0, hi = d->used;
+    int32_t lo = 0, hi = d->count;
     while (lo < hi) {
         int32_t mid = lo + ((hi - lo) >> 1);
-        uint32_t mh = d->domains[mid].hash;
+        uint32_t mh = d->entries[mid].hash;
         if (mh < h) {
             lo = mid + 1;
         } else {
@@ -97,17 +98,17 @@ static int32_t lower_bound_hash32(const domains_t *d, uint32_t h)
 static bool insert_sorted_unique(domains_t *d, uint32_t h, int32_t gateway)
 {
     int32_t pos = lower_bound_hash32(d, h);
-    if (pos < d->used && d->domains[pos].hash == h) {
+    if (pos < d->count && d->entries[pos].hash == h) {
         return false;
     }
-    if (d->allocated - d->used < 1) {
+    if (d->capacity - d->count < 1) {
         realloc_domains(d);
     }
-    memmove(&d->domains[pos + 1], &d->domains[pos],
-            (size_t)(d->used - pos) * sizeof(domain_gateway_t));
-    d->domains[pos].hash = h;
-    d->domains[pos].gateway = (unsigned char)gateway;
-    d->used++;
+    memmove(&d->entries[pos + 1], &d->entries[pos],
+            (size_t)(d->count - pos) * sizeof(domain_gateway_t));
+    d->entries[pos].hash = h;
+    d->entries[pos].gateway = (unsigned char)gateway;
+    d->count++;
     return true;
 }
 
@@ -144,15 +145,25 @@ static size_t cb(void *data, size_t size, size_t nmemb, void *clientp)
                 h = tag32(&str[start_pos], now_pos - start_pos);
             }
 
+            domains->lines_count++;
+
+            int32_t status = insert_sorted_unique(domains, h, domains->current_gateway);
+            if (!status) {
+                domains->collision_count++;
+            }
+
+#ifdef DEBUG
             printf("%u ", h);
             for (int32_t i = start_pos; i < now_pos; i++) {
                 printf("%c", str[i]);
             }
-
-            if (!insert_sorted_unique(domains, h, domains->current_gateway)) {
+            if (!status) {
                 printf(" collision");
+            } else {
+                printf(" uniq");
             }
             printf("\n");
+#endif
 
             start_pos = now_pos + 1;
         }
@@ -165,13 +176,43 @@ static size_t cb(void *data, size_t size, size_t nmemb, void *clientp)
     return realsize;
 }
 
+static void flush_tail(domains_t *domains)
+{
+    if (!domains->unprocessed_domain_len) {
+        return;
+    }
+
+    uint32_t h = tag32(domains->unprocessed_domain, domains->unprocessed_domain_len);
+
+    domains->lines_count++;
+
+    int32_t status = insert_sorted_unique(domains, h, domains->current_gateway);
+    if (!status) {
+        domains->collision_count++;
+    }
+
+#ifdef DEBUG
+    printf("%u ", h);
+    for (int32_t i = 0; i < domains->unprocessed_domain_len; i++) {
+        printf("%c", domains->unprocessed_domain[i]);
+    }
+    if (!status) {
+        printf(" collision");
+    }
+    printf("\n");
+#endif
+
+    domains->unprocessed_domain_len = 0;
+}
+
 static uint32_t simple_seed32(void)
 {
     uint32_t s = 0;
     FILE *f = fopen("/dev/urandom", "rb");
     if (f) {
-        if (fread(&s, 1, 4, f) != 4)
+        if (fread(&s, 1, 4, f) != 4) {
             s = 0;
+        }
         fclose(f);
     }
     if (!s) {
@@ -187,18 +228,20 @@ int32_t domains_read(void)
 
     if (!g_seed32) {
         g_seed32 = simple_seed32();
-        printf("g_seed32 %u\n", g_seed32);
     }
 
+    int32_t status = 1;
+
     for (int32_t i = 0; i < gateways_count; i++) {
+        tmp_domains.current_gateway = i;
+        tmp_domains.lines_count = 0;
+
         if (!memcmp(gateway_domains_paths[i], "http", 4)) {
             curl_global_init(CURL_GLOBAL_DEFAULT);
             CURL *curl = curl_easy_init();
             if (curl) {
-                tmp_domains.current_gateway = i;
                 curl_easy_setopt(curl, CURLOPT_URL, gateway_domains_paths[i]);
-                curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-                curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+                curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
                 curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
                 curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&tmp_domains);
                 CURLcode response;
@@ -212,22 +255,33 @@ int32_t domains_read(void)
                     printf("Wrong status code %s\n", gateway_domains_paths[i]);
                 }
                 curl_easy_cleanup(curl);
+                flush_tail(&tmp_domains);
             }
             curl_global_cleanup();
         } else {
-            FILE *domains_fd = fopen(gateway_domains_paths[i], "r");
-            if (domains_fd == NULL) {
+            FILE *domains_fd = fopen(gateway_domains_paths[i], "rb");
+            if (!domains_fd) {
                 errmsg("Can't open domains file %s\n", gateway_domains_paths[i]);
             }
+
+            char buf[READ_BUF_SIZE];
+            size_t n;
+            while ((n = fread(buf, 1, sizeof buf, domains_fd)) > 0) {
+                cb(buf, 1, n, &tmp_domains);
+            }
+
+            if (ferror(domains_fd)) {
+                errmsg("Read error on %s\n", gateway_domains_paths[i]);
+            }
+
             fclose(domains_fd);
+            flush_tail(&tmp_domains);
         }
-        printf("%d\n", tmp_domains.used);
+
+        printf("From %s readed %d domains\n", gateway_domains_paths[i], tmp_domains.lines_count);
     }
 
-    int32_t status = 1;
-
-    for (int32_t j = 0; j < gateways_count; j++) {
-    }
+    printf("unique %d / collision %d\n", tmp_domains.count, tmp_domains.collision_count);
 
     return status;
 }

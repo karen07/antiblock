@@ -90,12 +90,14 @@ typedef struct domain_gateway {
 #ifndef _DOMAINS_TYPE
 #define _DOMAINS_TYPE
 typedef struct domains {
-    domain_gateway_t *domains;
-    int32_t used;
-    int32_t allocated;
+    domain_gateway_t *entries;
+    int32_t count;
+    int32_t capacity;
     uint8_t current_gateway;
     char unprocessed_domain[MAX_UNPROCESSED_DOMAIN];
     int32_t unprocessed_domain_len;
+    int32_t lines_count;
+    int32_t collision_count;
 } domains_t;
 #endif
 
