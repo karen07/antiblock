@@ -64,8 +64,6 @@ static size_t cb(void *data, size_t size, size_t nmemb, void *clientp)
     domains_t *domains = (domains_t *)clientp;
     size_t realsize = size * nmemb;
 
-    printf("Start\n");
-
     int32_t start_pos = 0;
     for (int32_t i = 0; i < (int32_t)realsize; i++) {
         if (str[i] == '\n') {
@@ -73,19 +71,21 @@ static size_t cb(void *data, size_t size, size_t nmemb, void *clientp)
                 realloc_domains(domains);
             }
 
+            uint32_t h = 0;
             if (domains->unprocessed_domain_len) {
                 char *str_end = &domains->unprocessed_domain[domains->unprocessed_domain_len];
                 int32_t unprocessed_domain_len = i - start_pos;
                 memcpy(str_end, &str[start_pos], unprocessed_domain_len);
-                domains
-                    ->unprocessed_domain[domains->unprocessed_domain_len + unprocessed_domain_len] =
-                    0;
-                printf("%s\n", domains->unprocessed_domain);
+                domains->unprocessed_domain_len += unprocessed_domain_len;
+                h = tag32(domains->unprocessed_domain, domains->unprocessed_domain_len);
                 domains->unprocessed_domain_len = 0;
             } else {
-                uint32_t h = tag32(&str[start_pos], i - start_pos);
-                put24be(domains->domains[domains->used].hash, h);
+                h = tag32(&str[start_pos], i - start_pos);
             }
+
+            put24be(domains->domains[domains->used].hash, h);
+            domains->domains[domains->used].gateway = domains->current_gateway;
+
             domains->used++;
             start_pos = i + 1;
         }
@@ -151,9 +151,6 @@ int32_t domains_read(void)
         //}
         //printf("From %s readed %d domains\n", gateway_domains_paths[j], gateway_domains_count[j]);
     }
-
-    printf("FULL End\n");
-    fflush(stdout);
 
     return status;
 }

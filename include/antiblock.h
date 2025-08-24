@@ -81,7 +81,7 @@ typedef struct subnet {
 #define _DOMAIN_GATEWAY_TYPE
 typedef struct domain_gateway {
     unsigned char hash[3];
-    unsigned char gateway[1];
+    unsigned char gateway;
 } domain_gateway_t;
 #endif
 
