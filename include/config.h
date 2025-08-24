@@ -1,7 +1,6 @@
 #define PACKET_MAX_SIZE 1600
 #define DOMAIN_MAX_SIZE 300
 
-#define CNAME_DOMAINS_MAP_MAX_SIZE 500
 #ifdef TUN_MODE
 #define NAT_MAP_MAX_SIZE 50000
 #endif

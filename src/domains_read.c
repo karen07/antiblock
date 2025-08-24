@@ -13,9 +13,12 @@
 #define DOMAINS_ALLOCATION_STEP 1024
 #define READ_BUF_SIZE 1024
 
-static uint32_t g_seed32 = 0;
+#define GET_GATEWAY_NOT_IN_ROUTES -1
 
-static inline uint32_t rotl32(uint32_t x, int r)
+static uint32_t g_seed32 = 0;
+static domains_t global_domains;
+
+static inline uint32_t rotl32(uint32_t x, int32_t r)
 {
     return (x << r) | (x >> (32 - r));
 }
@@ -23,13 +26,13 @@ static inline uint32_t rotl32(uint32_t x, int r)
 static uint32_t murmur3_32(const void *key, size_t len, uint32_t seed)
 {
     const uint8_t *data = (const uint8_t *)key;
-    int nblocks = (int)(len / 4);
+    int32_t nblocks = (int32_t)(len / 4);
     uint32_t h = seed;
     const uint32_t c1 = 0xcc9e2d51u;
     const uint32_t c2 = 0x1b873593u;
 
     const uint32_t *blocks = (const uint32_t *)(const void *)(data + ((size_t)nblocks * 4));
-    for (int i = -nblocks; i; i++) {
+    for (int32_t i = -nblocks; i; i++) {
         uint32_t k = blocks[i];
         k *= c1;
         k = rotl32(k, 15);
@@ -68,7 +71,7 @@ static uint32_t tag32(const char *s, size_t len)
     return murmur3_32(s, len, g_seed32);
 }
 
-void realloc_domains(domains_t *domains)
+static void realloc_domains(domains_t *domains)
 {
     int32_t new_count = domains->capacity + DOMAINS_ALLOCATION_STEP;
     int32_t new_size = new_count * (int32_t)sizeof(domain_gateway_t);
@@ -221,10 +224,30 @@ static uint32_t simple_seed32(void)
     return s;
 }
 
+int32_t domains_gateway_get(const char *s)
+{
+    uint32_t h = tag32(s, strlen(s));
+    if (global_domains.count <= 0) {
+        return GET_GATEWAY_NOT_IN_ROUTES;
+    }
+    int32_t pos = lower_bound_hash32(&global_domains, h);
+    if (pos < global_domains.count && global_domains.entries[pos].hash == h) {
+        return (int32_t)global_domains.entries[pos].gateway;
+    }
+
+    return GET_GATEWAY_NOT_IN_ROUTES;
+}
+
+void domains_gateway_add(const char *s, int32_t gateway)
+{
+    uint32_t h = tag32(s, strlen(s));
+    insert_sorted_unique(&global_domains, h, gateway);
+}
+
 int32_t domains_read(void)
 {
-    domains_t tmp_domains;
-    memset(&tmp_domains, 0, sizeof(tmp_domains));
+    domains_t local_domains;
+    memset(&local_domains, 0, sizeof(local_domains));
 
     if (!g_seed32) {
         g_seed32 = simple_seed32();
@@ -233,8 +256,8 @@ int32_t domains_read(void)
     int32_t status = 1;
 
     for (int32_t i = 0; i < gateways_count; i++) {
-        tmp_domains.current_gateway = i;
-        tmp_domains.lines_count = 0;
+        local_domains.current_gateway = i;
+        local_domains.lines_count = 0;
 
         if (!memcmp(gateway_domains_paths[i], "http", 4)) {
             curl_global_init(CURL_GLOBAL_DEFAULT);
@@ -243,7 +266,7 @@ int32_t domains_read(void)
                 curl_easy_setopt(curl, CURLOPT_URL, gateway_domains_paths[i]);
                 curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
                 curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
-                curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&tmp_domains);
+                curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&local_domains);
                 CURLcode response;
                 response = curl_easy_perform(curl);
                 if (response == CURLE_COULDNT_RESOLVE_HOST) {
@@ -255,7 +278,7 @@ int32_t domains_read(void)
                     printf("Wrong status code %s\n", gateway_domains_paths[i]);
                 }
                 curl_easy_cleanup(curl);
-                flush_tail(&tmp_domains);
+                flush_tail(&local_domains);
             }
             curl_global_cleanup();
         } else {
@@ -267,7 +290,7 @@ int32_t domains_read(void)
             char buf[READ_BUF_SIZE];
             size_t n;
             while ((n = fread(buf, 1, sizeof buf, domains_fd)) > 0) {
-                cb(buf, 1, n, &tmp_domains);
+                cb(buf, 1, n, &local_domains);
             }
 
             if (ferror(domains_fd)) {
@@ -275,13 +298,18 @@ int32_t domains_read(void)
             }
 
             fclose(domains_fd);
-            flush_tail(&tmp_domains);
+            flush_tail(&local_domains);
         }
 
-        printf("From %s readed %d domains\n", gateway_domains_paths[i], tmp_domains.lines_count);
+        printf("From %s readed %d domains\n", gateway_domains_paths[i], local_domains.lines_count);
     }
 
-    printf("unique %d / collision %d\n", tmp_domains.count, tmp_domains.collision_count);
+    printf("Unique %d / Collision %d\n", local_domains.count, local_domains.collision_count);
+
+    domain_gateway_t *entries = global_domains.entries;
+    global_domains = local_domains;
+
+    free(entries);
 
     return status;
 }

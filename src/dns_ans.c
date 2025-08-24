@@ -112,7 +112,7 @@ static int32_t get_domain_from_packet(memory_t *receive_msg, char *cur_pos_ptr,
 static int32_t get_gateway(memory_t *domain)
 {
     (void)domain;
-    /*char *dot_pos = NULL;
+    char *dot_pos = NULL;
     int32_t dot_count = 0;
     for (int32_t i = domain->size; i >= 0; i--) {
         if (domain->data[i] == '.') {
@@ -122,14 +122,12 @@ static int32_t get_gateway(memory_t *domain)
 
             dot_pos = &domain->data[i + 1];
 
-            domains_gateway_t res_elem;
-
-            int32_t find_res = array_hashmap_find_elem(domains_map_struct, dot_pos, &res_elem);
-            if (find_res == array_hashmap_elem_finded) {
-                return res_elem.gateway;
+            int32_t gateway = domains_gateway_get(dot_pos);
+            if (gateway != GET_GATEWAY_NOT_IN_ROUTES) {
+                return gateway;
             }
         }
-    }*/
+    }
 
     return GET_GATEWAY_NOT_IN_ROUTES;
 }
@@ -345,23 +343,12 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
             int32_t cname_domain_gateway = GET_GATEWAY_NOT_IN_ROUTES;
             cname_domain_gateway = get_gateway(cname_domain);
 
-            /*if (ans_domain_gateway != GET_GATEWAY_NOT_IN_ROUTES &&
+            if (ans_domain_gateway != GET_GATEWAY_NOT_IN_ROUTES &&
                 cname_domain_gateway == GET_GATEWAY_NOT_IN_ROUTES) {
                 cname_domain_gateway = ans_domain_gateway;
-                if (domains_map_struct) {
-                    if (domains.size + cname_domain->size < domains.max_size) {
-                        strcpy(&(domains.data[domains.size]), cname_domain->data + 1);
 
-                        domains_gateway_t add_elem;
-                        add_elem.offset = domains.size;
-                        add_elem.gateway = cname_domain_gateway;
-
-                        domains.size += cname_domain->size;
-
-                        array_hashmap_add_elem(domains_map_struct, &add_elem, NULL, NULL);
-                    }
-                }
-            }*/
+                domains_gateway_add(cname_domain->data + 1, cname_domain_gateway);
+            }
 
             if (cname_domain_gateway != GET_GATEWAY_NOT_IN_ROUTES) {
                 if (log_fd) {
