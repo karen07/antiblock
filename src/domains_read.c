@@ -176,13 +176,19 @@ static void domain_append_part(domains_t *domains, int32_t start_pos, int32_t no
 {
     char *str_end = &domains->unprocessed_domain[domains->unprocessed_domain_len];
     int32_t unprocessed_domain_len = now_pos - start_pos;
-    memcpy(str_end, &str[start_pos], unprocessed_domain_len);
     domains->unprocessed_domain_len += unprocessed_domain_len;
+    if (unprocessed_domain_len >= MAX_UNPROCESSED_DOMAIN) {
+        errmsg("Domain line more that %d\n", MAX_UNPROCESSED_DOMAIN);
+    }
+    memcpy(str_end, &str[start_pos], unprocessed_domain_len);
 }
 
 static void domain_save_part(domains_t *domains, int32_t start_pos, int32_t now_pos, char *str)
 {
     int32_t unprocessed_domain_len = now_pos - start_pos;
+    if (unprocessed_domain_len >= MAX_UNPROCESSED_DOMAIN) {
+        errmsg("Domain line more that %d\n", MAX_UNPROCESSED_DOMAIN);
+    }
     memcpy(domains->unprocessed_domain, &str[start_pos], unprocessed_domain_len);
     domains->unprocessed_domain_len = unprocessed_domain_len;
 }
