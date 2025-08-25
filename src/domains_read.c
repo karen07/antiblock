@@ -2,7 +2,6 @@
 #include "config.h"
 #include "const.h"
 #include "dns_ans.h"
-#include "hash.h"
 #include "net_data.h"
 #include "stat.h"
 #include "tun.h"
@@ -83,7 +82,19 @@ static void realloc_domains(domains_t *domains)
         errmsg("Can't realloc domains\n");
     }
     domains->entries = tmp_domains;
-    domains->capacity += DOMAINS_ALLOCATION_STEP;
+    domains->capacity = new_count;
+}
+
+static void reserve_domains(domains_t *domains)
+{
+    int32_t new_count = (domains->count / DOMAINS_ALLOCATION_STEP + 1) * DOMAINS_ALLOCATION_STEP;
+    int32_t new_size = new_count * (int32_t)sizeof(domain_gateway_t);
+    domain_gateway_t *tmp_domains = realloc(domains->entries, (size_t)new_size);
+    if (!tmp_domains) {
+        errmsg("Can't realloc domains\n");
+    }
+    domains->entries = tmp_domains;
+    domains->capacity = new_count;
 }
 
 static int32_t lower_bound_hash32(const domains_t *d, uint32_t h)
@@ -147,6 +158,8 @@ static void finalize_sort_and_unique(domains_t *d)
     int32_t old = d->count;
     d->count = w;
     d->collision_count = old - w;
+
+    reserve_domains(d);
 }
 
 static void append_entry(domains_t *d, uint32_t h, int32_t gateway)
@@ -317,7 +330,6 @@ int32_t domains_read(void)
     }
 
     finalize_sort_and_unique(&local_domains);
-    printf("Unique %d / Collision %d\n", local_domains.count, local_domains.collision_count);
 
     domain_gateway_t *entries = global_domains.entries;
     global_domains = local_domains;

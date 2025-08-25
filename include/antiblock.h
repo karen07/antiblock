@@ -82,7 +82,7 @@ typedef struct subnet {
 typedef struct domain_gateway {
     uint32_t hash;
     uint8_t gateway;
-} domain_gateway_t;
+} __attribute__((packed)) domain_gateway_t;
 #endif
 
 #define MAX_UNPROCESSED_DOMAIN 1024

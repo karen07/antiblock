@@ -2,7 +2,6 @@
 #include "config.h"
 #include "const.h"
 #include "dns_ans.h"
-#include "hash.h"
 #include "net_data.h"
 #include "stat.h"
 #include "tun.h"
