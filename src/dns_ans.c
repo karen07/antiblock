@@ -112,13 +112,8 @@ static int32_t get_domain_from_packet(memory_t *receive_msg, char *cur_pos_ptr,
 static int32_t get_gateway(memory_t *domain)
 {
     char *dot_pos = NULL;
-    int32_t dot_count = 0;
-    for (int32_t i = domain->size; i >= 0; i--) {
+    for (int32_t i = 0; i < (int32_t)domain->size; i++) {
         if (domain->data[i] == '.') {
-            if (dot_count++ == 0) {
-                continue;
-            }
-
             dot_pos = &domain->data[i + 1];
 
             domains_gateway_t res_elem;
