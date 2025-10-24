@@ -20,7 +20,12 @@ subnet_t blacklist[BLACKLIST_MAX_COUNT];
 struct sockaddr_in listen_addr;
 pthread_barrier_t threads_barrier;
 
-static char gateway_name[GATEWAY_MAX_COUNT][IFNAMSIZ];
+typedef struct gateway_data {
+    char name[IFNAMSIZ];
+    uint32_t nexthop_ip;
+} gateway_data_t;
+
+static gateway_data_t gateways[GATEWAY_MAX_COUNT];
 
 #ifdef PROXY_MODE
 struct sockaddr_in dns_addr[DNS_MAX_COUNT];
@@ -79,8 +84,16 @@ static void set_route(struct rtentry *route, int32_t gateway_index, uint32_t dst
     route_addr->sin_family = AF_INET;
     route_addr->sin_addr.s_addr = INADDR_NONE;
 
-    route->rt_dev = gateway_name[gateway_index];
+    route->rt_dev = gateways[gateway_index].name;
     route->rt_flags = RTF_UP;
+
+    if (gateways[gateway_index].nexthop_ip) {
+        route_addr = (struct sockaddr_in *)(&route->rt_gateway);
+        route_addr->sin_family = AF_INET;
+        route_addr->sin_addr.s_addr = gateways[gateway_index].nexthop_ip;
+
+        route->rt_flags |= RTF_GATEWAY;
+    }
 }
 
 void add_route(int32_t gateway_index, uint32_t dst)
@@ -102,7 +115,7 @@ void add_route(int32_t gateway_index, uint32_t dst)
         struct in_addr rec_ip;
         rec_ip.s_addr = dst;
         printf("Ioctl can't add %s for routing via %s \"%s\"\n", inet_ntoa(rec_ip),
-               gateway_name[gateway_index], strerror(errno));
+               gateways[gateway_index].name, strerror(errno));
     }
 }
 
@@ -124,7 +137,7 @@ static void del_route(int32_t gateway_index, uint32_t dst)
         struct in_addr rec_ip;
         rec_ip.s_addr = dst;
         printf("Ioctl can't delete %s for routing via %s \"%s\"\n", inet_ntoa(rec_ip),
-               gateway_name[gateway_index], strerror(errno));
+               gateways[gateway_index].name, strerror(errno));
     }
 }
 
@@ -152,13 +165,46 @@ static void clean_route_table(void)
     while (fscanf(route_fd, "%s %x %x %x %x %x %x %x %x %x %x", iface, &dest_ip, &gate_ip, &flags,
                   &refcnt, &use, &metric, &mask, &mtu, &window, &irtt) != EOF) {
         for (int32_t i = 0; i < gateways_count; i++) {
-            if ((!strcmp(iface, gateway_name[i])) && (mask == INADDR_NONE)) {
+            if ((!strcmp(iface, gateways[i].name)) && (mask == INADDR_NONE)) {
                 del_route(i, dest_ip);
             }
         }
     }
 
     fclose(route_fd);
+}
+
+static uint32_t get_iface_default_gw(char *iface_in)
+{
+    FILE *route_fd = fopen("/proc/net/route", "r");
+    if (route_fd == NULL) {
+        errmsg("Can't open /proc/net/route\n");
+    }
+
+    fseek(route_fd, 128, SEEK_SET);
+
+    char iface[IFNAMSIZ];
+    uint32_t dest_ip;
+    uint32_t gate_ip;
+    uint32_t flags;
+    uint32_t refcnt;
+    uint32_t use;
+    uint32_t metric;
+    uint32_t mask;
+    uint32_t mtu;
+    uint32_t window;
+    uint32_t irtt;
+
+    while (fscanf(route_fd, "%s %x %x %x %x %x %x %x %x %x %x", iface, &dest_ip, &gate_ip, &flags,
+                  &refcnt, &use, &metric, &mask, &mtu, &window, &irtt) != EOF) {
+        if ((!strcmp(iface, iface_in)) && (dest_ip == 0)) {
+            fclose(route_fd);
+            return gate_ip;
+        }
+    }
+
+    fclose(route_fd);
+    return 0;
 }
 #endif
 
@@ -303,7 +349,7 @@ int32_t main(int32_t argc, char *argv[])
                         *second_space_ptr = 0;
                         if (gateways_count < GATEWAY_MAX_COUNT) {
                             if (strlen(first_space_ptr + 1) < IFNAMSIZ) {
-                                strcpy(gateway_name[gateways_count], first_space_ptr + 1);
+                                strcpy(gateways[gateways_count].name, first_space_ptr + 1);
                             }
                             gateway_domains_paths[gateways_count] = second_space_ptr + 1;
                         }
@@ -314,7 +360,7 @@ int32_t main(int32_t argc, char *argv[])
                     *first_space_ptr = 0;
                     if (gateways_count < GATEWAY_MAX_COUNT) {
                         if (strlen(argv[i + 1]) < IFNAMSIZ) {
-                            strcpy(gateway_name[gateways_count], argv[i + 1]);
+                            strcpy(gateways[gateways_count].name, argv[i + 1]);
                         }
                         gateway_domains_paths[gateways_count] = first_space_ptr + 1;
                     }
@@ -435,15 +481,13 @@ int32_t main(int32_t argc, char *argv[])
     }
 
     if (gateways_count > GATEWAY_MAX_COUNT) {
-        int32_t tmp_gateways_count = gateways_count;
-        gateways_count = GATEWAY_MAX_COUNT;
         print_help();
         errmsg("The program needs a maximum of %d pair of \"gateway domains\", seted %d\n",
-               GATEWAY_MAX_COUNT, tmp_gateways_count);
+               GATEWAY_MAX_COUNT, gateways_count);
     }
 
     for (int32_t i = 0; i < gateways_count; i++) {
-        if ((gateway_name[i][0] == 0) || (gateway_domains_paths[i][0] == 0)) {
+        if ((gateways[i].name[0] == 0) || (gateway_domains_paths[i][0] == 0)) {
             print_help();
             errmsg("The program needs correct pairs of \"gateway domains\"\n");
         }
@@ -562,6 +606,22 @@ int32_t main(int32_t argc, char *argv[])
     route_socket = socket(AF_INET, SOCK_DGRAM, 0);
     if (route_socket < 0) {
         errmsg("Can't create route_socket \"%s\"\n", strerror(errno));
+    }
+
+    for (int32_t i = 0; i < gateways_count; i++) {
+        struct ifreq ifreq;
+        memset(&ifreq, 0, sizeof(ifreq));
+        strcpy(ifreq.ifr_name, gateways[i].name);
+
+        int32_t ret;
+        ret = ioctl(route_socket, SIOCGIFHWADDR, &ifreq);
+        if (ret < 0) {
+            errmsg("Can't get mac address of interface %s\n", gateways[i].name);
+        }
+
+        if (ifreq.ifr_hwaddr.sa_family == ARPHRD_ETHER) {
+            gateways[i].nexthop_ip = get_iface_default_gw(gateways[i].name);
+        }
     }
 #endif
 

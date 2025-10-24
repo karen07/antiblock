@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <linux/if.h>
+#include <linux/if_arp.h>
 #include <linux/limits.h>
 #include <linux/route.h>
 #include <pthread.h>
