@@ -111,18 +111,15 @@ static int32_t get_domain_from_packet(memory_t *receive_msg, char *cur_pos_ptr,
 
 static int32_t get_gateway(memory_t *domain)
 {
-    char *dot_pos = NULL;
-    for (int32_t i = 0; i < (int32_t)domain->size; i++) {
-        if (domain->data[i] == '.') {
-            dot_pos = &domain->data[i + 1];
+    char *dot_pos = domain->data;
+    if (!memcmp(domain->data, "www.", 4)) {
+        dot_pos += strlen("www.");
+    }
 
-            domains_gateway_t res_elem;
-
-            int32_t find_res = array_hashmap_find_elem(domains_map_struct, dot_pos, &res_elem);
-            if (find_res == array_hashmap_elem_finded) {
-                return res_elem.gateway;
-            }
-        }
+    domains_gateway_t res_elem;
+    int32_t find_res = array_hashmap_find_elem(domains_map_struct, domain->data, &res_elem);
+    if (find_res == array_hashmap_elem_finded) {
+        return res_elem.gateway;
     }
 
     return GET_GATEWAY_NOT_IN_ROUTES;

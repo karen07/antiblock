@@ -198,7 +198,7 @@ int32_t domains_read(void)
             }
 
             if (!memcmp(&domains.data[domain_offset], "www.", 4)) {
-                domain_offset += 4;
+                domain_offset += strlen("www.");
             }
 
             domains_gateway_t add_elem;
