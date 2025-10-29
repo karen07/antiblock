@@ -197,7 +197,7 @@ int32_t domains_read(void)
                 }
             }
 
-            if (!memcmp(&domains.data[domain_offset], "www.", 4)) {
+            if (!memcmp(&domains.data[domain_offset], "www.", strlen("www."))) {
                 domain_offset += strlen("www.");
             }
 
