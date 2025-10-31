@@ -112,7 +112,7 @@ static int32_t get_domain_from_packet(memory_t *receive_msg, char *cur_pos_ptr,
 static int32_t get_gateway(memory_t *domain)
 {
     char *dot_pos = domain->data + 1;
-    if (!memcmp(domain->data, "www.", strlen("www."))) {
+    if (!memcmp(dot_pos, "www.", strlen("www."))) {
         dot_pos += strlen("www.");
     }
 
