@@ -1,8 +1,4 @@
 #include "antiblock.h"
 
-typedef struct id_map {
-    uint32_t ip;
-    uint16_t port;
-} id_map_t;
-
+int32_t add_route_to_hashmap(int32_t gateway_index, uint32_t dst, uint32_t ans_ttl);
 void init_net_data_threads(void);

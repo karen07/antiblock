@@ -1,6 +1,5 @@
 #include "antiblock.h"
 #include "config.h"
-#include "const.h"
 #include "dns_ans.h"
 #include "hash.h"
 #include "net_data.h"

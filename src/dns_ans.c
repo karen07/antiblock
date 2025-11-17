@@ -1,6 +1,5 @@
 #include "antiblock.h"
 #include "config.h"
-#include "const.h"
 #include "dns_ans.h"
 #include "hash.h"
 #include "net_data.h"
@@ -22,8 +21,6 @@
 #define GET_DOMAIN_ADD_CH_DOMAIN_ERROR 7
 #define GET_DOMAIN_NULL_CH_DOMAIN_ERROR 8
 
-#define GET_GATEWAY_NOT_IN_ROUTES -1
-
 #define DNS_ANS_CHECK_HEADER_SIZE_ERROR -2
 #define DNS_ANS_CHECK_ID_DUBLICATION -3
 #define DNS_ANS_CHECK_RES_TYPE_ERROR -4
@@ -36,6 +33,9 @@
 #define DNS_ANS_CHECK_ANS_LEN_ERROR -11
 #define DNS_ANS_CHECK_CNAME_URL_GET_ERROR -12
 #define DNS_ANS_CHECK_NOT_END_ERROR -13
+
+#define FIRST_BIT_UINT16 0x8000
+#define FIRST_TWO_BITS_UINT8 0xC0
 
 static int32_t get_domain_from_packet(memory_t *receive_msg, char *cur_pos_ptr,
                                       char **new_cur_pos_ptr, memory_t *domain)
@@ -107,22 +107,6 @@ static int32_t get_domain_from_packet(memory_t *receive_msg, char *cur_pos_ptr,
     domain->size = domain_len;
 
     return GET_DOMAIN_OK;
-}
-
-static int32_t get_gateway(memory_t *domain)
-{
-    char *dot_pos = domain->data + 1;
-    if (!memcmp(dot_pos, "www.", strlen("www."))) {
-        dot_pos += strlen("www.");
-    }
-
-    domains_gateway_t res_elem;
-    int32_t find_res = array_hashmap_find_elem(domain_routes, dot_pos, &res_elem);
-    if (find_res == array_hashmap_elem_finded) {
-        return res_elem.gateway;
-    }
-
-    return GET_GATEWAY_NOT_IN_ROUTES;
 }
 
 static int32_t in_subnet(uint32_t ip, subnet_t *subnet)
@@ -250,7 +234,7 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
         dns_ans_t *ans = (dns_ans_t *)cur_pos_ptr;
 
         uint16_t ans_type = ntohs(ans->type);
-        __attribute__((unused)) uint32_t ans_ttl = ntohl(ans->ttl);
+        uint32_t ans_ttl = ntohl(ans->ttl);
         uint16_t ans_len = ntohs(ans->len);
 
         if (cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t) + ans_len > receive_msg_end) {
@@ -297,7 +281,7 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
                 }
 
                 if (correct_ip4_flag) {
-                    add_route(ans_domain_gateway, ans->ip4);
+                    add_route(ans_domain_gateway, ans->ip4, ans_ttl);
                 }
 
                 if (log_fd) {
@@ -337,19 +321,7 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
             if (ans_domain_gateway != GET_GATEWAY_NOT_IN_ROUTES &&
                 cname_domain_gateway == GET_GATEWAY_NOT_IN_ROUTES) {
                 cname_domain_gateway = ans_domain_gateway;
-                if (domain_routes) {
-                    if (domains.size + cname_domain->size < domains.max_size) {
-                        strcpy(&(domains.data[domains.size]), cname_domain->data + 1);
-
-                        domains_gateway_t add_elem;
-                        add_elem.offset = domains.size;
-                        add_elem.gateway = cname_domain_gateway;
-
-                        domains.size += cname_domain->size;
-
-                        array_hashmap_add_elem(domain_routes, &add_elem, NULL, NULL);
-                    }
-                }
+                add_domain(cname_domain, cname_domain_gateway);
             }
 
             if (cname_domain_gateway != GET_GATEWAY_NOT_IN_ROUTES) {

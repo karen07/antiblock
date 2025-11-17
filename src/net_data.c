@@ -1,6 +1,5 @@
 #include "antiblock.h"
 #include "config.h"
-#include "const.h"
 #include "dns_ans.h"
 #include "hash.h"
 #include "net_data.h"
@@ -9,6 +8,11 @@
 #include "domains_read.h"
 
 #ifdef PROXY_MODE
+
+typedef struct id_map {
+    uint32_t ip;
+    uint16_t port;
+} id_map_t;
 
 static id_map_t *id_map;
 static int32_t repeater_DNS_socket;
@@ -201,63 +205,73 @@ void init_net_data_threads(void)
 
 #else
 
+typedef struct route_entry {
+    uint32_t dst;
+    uint64_t expires_at;
+    int32_t gateway_index;
+} route_entry_t;
+
 static memory_t receive_msg;
 static memory_t que_domain;
 static memory_t ans_domain;
 static memory_t cname_domain;
 
-array_hashmap_t ips_map;
+static uint64_t now;
 
-typedef struct route_entry {
-    int32_t ip;
-    uint64_t expires_at;
-} route_entry_t;
+static array_hashmap_t ips_routes;
 
-static array_hashmap_hash ips_hash(const void *add_elem_data)
+static array_hashmap_hash ips_hash(const void *elem_data)
 {
-    const domains_gateway_t *elem = add_elem_data;
-    return djb33_hash_len(&domains.data[elem->offset], -1);
+    const route_entry_t *elem = elem_data;
+    uint32_t x = elem->dst;
+    x ^= x >> 16;
+    x *= 0x7feb352d;
+    x ^= x >> 15;
+    x *= 0x846ca68b;
+    x ^= x >> 16;
+    return x;
 }
 
-static array_hashmap_bool ips_cmp(const void *add_elem_data, const void *hashmap_elem_data)
+static array_hashmap_bool ips_cmp(const void *elem_data, const void *hashmap_elem_data)
 {
-    const domains_gateway_t *elem1 = add_elem_data;
-    const domains_gateway_t *elem2 = hashmap_elem_data;
-
-    return !strcmp(&domains.data[elem1->offset], &domains.data[elem2->offset]);
+    const route_entry_t *elem1 = elem_data;
+    const route_entry_t *elem2 = hashmap_elem_data;
+    return elem1->dst == elem2->dst;
 }
 
-static void callback_sll(__attribute__((unused)) u_char *useless, const struct pcap_pkthdr *pkthdr,
-                         const u_char *packet)
+static array_hashmap_bool ips_del_func(const void *del_elem_data)
 {
-    if (pkthdr->len != pkthdr->caplen) {
-        return;
+    const route_entry_t *elem = del_elem_data;
+
+    if (elem->expires_at < now) {
+        del_route(elem->gateway_index, elem->dst);
+        return array_hashmap_del_by_func;
+    } else {
+        return array_hashmap_not_del_by_func;
     }
+}
 
-    if (pkthdr->len <
-        (int32_t)(sizeof(struct sll_header) + sizeof(struct iphdr) + sizeof(struct udphdr))) {
-        return;
+static array_hashmap_bool ips_on_already_in(const void *add_elem_data,
+                                            const void *hashmap_elem_data)
+{
+    const route_entry_t *elem1 = add_elem_data;
+    const route_entry_t *elem2 = hashmap_elem_data;
+
+    if (elem1->expires_at > elem2->expires_at) {
+        return array_hashmap_save_new;
+    } else {
+        return array_hashmap_save_old;
     }
+}
 
-    struct sll_header *eth_h = (struct sll_header *)packet;
-    if (eth_h->sll_protocol != htons(ETH_P_IP)) {
-        return;
-    }
+int32_t add_route_to_hashmap(int32_t gateway_index, uint32_t dst, uint32_t ans_ttl)
+{
+    route_entry_t add_elem;
+    add_elem.dst = dst;
+    add_elem.expires_at = now + ans_ttl;
+    add_elem.gateway_index = gateway_index;
 
-    struct iphdr *iph = (struct iphdr *)((char *)eth_h + sizeof(*eth_h));
-    if (iph->protocol != IPPROTO_UDP) {
-        return;
-    }
-
-    struct udphdr *udph = (struct udphdr *)((char *)iph + sizeof(*iph));
-    if (udph->source != listen_addr.sin_port) {
-        return;
-    }
-
-    receive_msg.size = ntohs(udph->len) - sizeof(*udph);
-    receive_msg.data = (char *)udph + sizeof(*udph);
-
-    dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain);
+    return array_hashmap_add_elem(ips_routes, &add_elem, NULL, ips_on_already_in);
 }
 
 static void *PCAP(__attribute__((unused)) void *arg)
@@ -317,15 +331,64 @@ static void *PCAP(__attribute__((unused)) void *arg)
         errmsg("No free memory for cname_domain\n");
     }
 
-    ips_map = array_hashmap_init(1000, 1.0, sizeof(route_entry_t));
-    if (ips_map == NULL) {
-        errmsg("No free memory for ips_map\n");
+    ips_routes = array_hashmap_init(1000, 1.0, sizeof(route_entry_t));
+    if (ips_routes == NULL) {
+        errmsg("No free memory for ips_routes\n");
     }
-    array_hashmap_set_func(ips_map, ips_hash, ips_cmp, ips_hash, ips_cmp, ips_hash, ips_cmp);
+    array_hashmap_set_func(ips_routes, ips_hash, ips_cmp, ips_hash, ips_cmp, ips_hash, ips_cmp);
 
     pthread_barrier_wait(&threads_barrier);
 
-    pcap_loop(handle, 0, callback_sll, NULL);
+    uint64_t last = time(NULL);
+
+    while (1) {
+        struct pcap_pkthdr *pkthdr;
+        const u_char *packet;
+        int32_t ret = pcap_next_ex(handle, &pkthdr, &packet);
+
+        now = time(NULL);
+        if (now != last) {
+            last = now;
+            array_hashmap_del_elem_by_func(ips_routes, ips_del_func);
+        }
+
+        if (ret == 0) {
+            continue;
+        } else if (ret == -1) {
+            errmsg("pcap_next_ex error: %s\n", pcap_geterr(handle));
+        } else if (ret == -2) {
+            break;
+        }
+
+        if (pkthdr->len != pkthdr->caplen) {
+            continue;
+        }
+
+        if (pkthdr->len <
+            (int32_t)(sizeof(struct sll_header) + sizeof(struct iphdr) + sizeof(struct udphdr))) {
+            continue;
+        }
+
+        struct sll_header *eth_h = (struct sll_header *)packet;
+        if (eth_h->sll_protocol != htons(ETH_P_IP)) {
+            continue;
+        }
+
+        struct iphdr *iph = (struct iphdr *)((char *)eth_h + sizeof(*eth_h));
+        if (iph->protocol != IPPROTO_UDP) {
+            continue;
+        }
+
+        struct udphdr *udph = (struct udphdr *)((char *)iph + sizeof(*iph));
+        if (udph->source != listen_addr.sin_port) {
+            continue;
+        }
+
+        receive_msg.size = ntohs(udph->len) - sizeof(*udph);
+        receive_msg.data = (char *)udph + sizeof(*udph);
+
+        dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain);
+    }
 
     return NULL;
 }
