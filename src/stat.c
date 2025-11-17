@@ -1,6 +1,5 @@
 #include "antiblock.h"
 #include "config.h"
-#include "const.h"
 #include "dns_ans.h"
 #include "hash.h"
 #include "net_data.h"
@@ -36,7 +35,7 @@ void stat_print(FILE *stat_fd)
     fprintf(stat_fd, "DNS packets processed: %d\n", statistics_data.processed_count);
     fprintf(stat_fd, "DNS parsing errors   : %d\n", statistics_data.request_parsing_error);
     fprintf(stat_fd, "In route table:\n");
-    for (int i = 0; i < gateways_count; i++) {
+    for (int32_t i = 0; i < gateways_count; i++) {
         fprintf(stat_fd, "    Route %d          : %d\n", i + 1, statistics_data.in_route_table[i]);
     }
 

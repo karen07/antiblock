@@ -1,6 +1,5 @@
 #include "antiblock.h"
 #include "config.h"
-#include "const.h"
 #include "dns_ans.h"
 #include "hash.h"
 #include "net_data.h"
@@ -11,8 +10,41 @@
 
 #define HTTP_OK 200
 
-memory_t domains;
-array_hashmap_t domain_routes;
+static memory_t domains;
+static array_hashmap_t domain_routes;
+
+int32_t get_gateway(memory_t *domain)
+{
+    char *dot_pos = domain->data + 1;
+    if (!memcmp(dot_pos, "www.", strlen("www."))) {
+        dot_pos += strlen("www.");
+    }
+
+    domains_gateway_t res_elem;
+    int32_t find_res = array_hashmap_find_elem(domain_routes, dot_pos, &res_elem);
+    if (find_res == array_hashmap_elem_finded) {
+        return res_elem.gateway;
+    }
+
+    return GET_GATEWAY_NOT_IN_ROUTES;
+}
+
+void add_domain(memory_t *cname_domain, int32_t cname_domain_gateway)
+{
+    if (domain_routes) {
+        if (domains.size + cname_domain->size < domains.max_size) {
+            strcpy(&(domains.data[domains.size]), cname_domain->data + 1);
+
+            domains_gateway_t add_elem;
+            add_elem.offset = domains.size;
+            add_elem.gateway = cname_domain_gateway;
+
+            domains.size += cname_domain->size;
+
+            array_hashmap_add_elem(domain_routes, &add_elem, NULL, NULL);
+        }
+    }
+}
 
 static array_hashmap_hash domain_add_hash(const void *add_elem_data)
 {

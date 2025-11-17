@@ -121,5 +121,6 @@ extern struct sockaddr_in dns_addr[DNS_MAX_COUNT];
 void errmsg(const char *format, ...);
 
 #ifdef ROUTE_TABLE_MODE
-void add_route(int32_t gateway_index, uint32_t dst);
+void add_route(int32_t gateway_index, uint32_t dst, uint32_t ans_ttl);
+void del_route(int32_t gateway_index, uint32_t dst);
 #endif

@@ -1,6 +1,5 @@
 #include "antiblock.h"
 #include "config.h"
-#include "const.h"
 #include "dns_ans.h"
 #include "hash.h"
 #include "net_data.h"
@@ -96,49 +95,51 @@ static void set_route(struct rtentry *route, int32_t gateway_index, uint32_t dst
     }
 }
 
-void add_route(int32_t gateway_index, uint32_t dst)
+void add_route(int32_t gateway_index, uint32_t dst, uint32_t ans_ttl)
 {
     struct rtentry route;
 
-    set_route(&route, gateway_index, dst);
+    int32_t add_res = add_route_to_hashmap(gateway_index, dst, ans_ttl);
+
+    if (add_res == array_hashmap_elem_already_in) {
+        return;
+    }
 
     if (test_mode) {
         return;
     }
+
+    set_route(&route, gateway_index, dst);
 
     if (ioctl(route_socket, SIOCADDRT, &route) >= 0) {
         statistics_data.in_route_table[gateway_index]++;
         return;
     }
 
-    if (strcmp(strerror(errno), "File exists")) {
-        struct in_addr rec_ip;
-        rec_ip.s_addr = dst;
-        printf("Ioctl can't add %s for routing via %s \"%s\"\n", inet_ntoa(rec_ip),
-               gateways[gateway_index].name, strerror(errno));
-    }
+    struct in_addr rec_ip;
+    rec_ip.s_addr = dst;
+    printf("Ioctl can't add %s for routing via %s \"%s\"\n", inet_ntoa(rec_ip),
+           gateways[gateway_index].name, strerror(errno));
 }
 
-static void del_route(int32_t gateway_index, uint32_t dst)
+void del_route(int32_t gateway_index, uint32_t dst)
 {
     struct rtentry route;
-
-    set_route(&route, gateway_index, dst);
 
     if (test_mode) {
         return;
     }
 
+    set_route(&route, gateway_index, dst);
+
     if (ioctl(route_socket, SIOCDELRT, &route) >= 0) {
         return;
     }
 
-    if (strcmp(strerror(errno), "No such process")) {
-        struct in_addr rec_ip;
-        rec_ip.s_addr = dst;
-        printf("Ioctl can't delete %s for routing via %s \"%s\"\n", inet_ntoa(rec_ip),
-               gateways[gateway_index].name, strerror(errno));
-    }
+    struct in_addr rec_ip;
+    rec_ip.s_addr = dst;
+    printf("Ioctl can't delete %s for routing via %s \"%s\"\n", inet_ntoa(rec_ip),
+           gateways[gateway_index].name, strerror(errno));
 }
 
 static void clean_route_table(void)
