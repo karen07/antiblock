@@ -244,6 +244,10 @@ static array_hashmap_bool ips_del_func(const void *del_elem_data)
     const route_entry_t *elem = del_elem_data;
 
     if (elem->expires_at < now) {
+        struct in_addr new_ip;
+        new_ip.s_addr = elem->dst;
+        printf("DEL ROUTE TO HASHMAP %s %lu %lu %d\n", inet_ntoa(new_ip), elem->expires_at, now,
+               elem->gateway_index);
         del_route(elem->gateway_index, elem->dst);
         return array_hashmap_del_by_func;
     } else {
@@ -270,6 +274,12 @@ int32_t add_route_to_hashmap(int32_t gateway_index, uint32_t dst, uint32_t ans_t
     add_elem.dst = dst;
     add_elem.expires_at = now + ans_ttl;
     add_elem.gateway_index = gateway_index;
+
+    struct in_addr new_ip;
+    new_ip.s_addr = add_elem.dst;
+
+    printf("ADD ROUTE TO HASHMAP %s %lu %lu %d\n", inet_ntoa(new_ip), add_elem.expires_at, now,
+           add_elem.gateway_index);
 
     return array_hashmap_add_elem(ips_routes, &add_elem, NULL, ips_on_already_in);
 }
@@ -301,6 +311,9 @@ static void *PCAP(__attribute__((unused)) void *arg)
     }
     if (pcap_setfilter(handle, &fp) != 0) {
         errmsg("Can't install filter %s: %s\n", filter_exp, pcap_geterr(handle));
+    }
+    if (pcap_setnonblock(handle, 1, errbuf) != 0) {
+        errmsg("Can't pcap setnonblock %s\n", errbuf);
     }
 
     receive_msg.size = 0;
@@ -352,12 +365,8 @@ static void *PCAP(__attribute__((unused)) void *arg)
             array_hashmap_del_elem_by_func(ips_routes, ips_del_func);
         }
 
-        if (ret == 0) {
+        if (ret != 1) {
             continue;
-        } else if (ret == -1) {
-            errmsg("pcap_next_ex error: %s\n", pcap_geterr(handle));
-        } else if (ret == -2) {
-            break;
         }
 
         if (pkthdr->len != pkthdr->caplen) {
