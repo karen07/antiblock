@@ -206,6 +206,27 @@ static memory_t que_domain;
 static memory_t ans_domain;
 static memory_t cname_domain;
 
+array_hashmap_t ips_map;
+
+typedef struct route_entry {
+    int32_t ip;
+    uint64_t expires_at;
+} route_entry_t;
+
+static array_hashmap_hash ips_hash(const void *add_elem_data)
+{
+    const domains_gateway_t *elem = add_elem_data;
+    return djb33_hash_len(&domains.data[elem->offset], -1);
+}
+
+static array_hashmap_bool ips_cmp(const void *add_elem_data, const void *hashmap_elem_data)
+{
+    const domains_gateway_t *elem1 = add_elem_data;
+    const domains_gateway_t *elem2 = hashmap_elem_data;
+
+    return !strcmp(&domains.data[elem1->offset], &domains.data[elem2->offset]);
+}
+
 static void callback_sll(__attribute__((unused)) u_char *useless, const struct pcap_pkthdr *pkthdr,
                          const u_char *packet)
 {
@@ -295,6 +316,12 @@ static void *PCAP(__attribute__((unused)) void *arg)
     if (cname_domain.data == 0) {
         errmsg("No free memory for cname_domain\n");
     }
+
+    ips_map = array_hashmap_init(1000, 1.0, sizeof(route_entry_t));
+    if (ips_map == NULL) {
+        errmsg("No free memory for ips_map\n");
+    }
+    array_hashmap_set_func(ips_map, ips_hash, ips_cmp, ips_hash, ips_cmp, ips_hash, ips_cmp);
 
     pthread_barrier_wait(&threads_barrier);
 

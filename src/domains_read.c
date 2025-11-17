@@ -12,7 +12,7 @@
 #define HTTP_OK 200
 
 memory_t domains;
-array_hashmap_t domains_map_struct;
+array_hashmap_t domains_map;
 
 static array_hashmap_hash domain_add_hash(const void *add_elem_data)
 {
@@ -61,7 +61,7 @@ static size_t cb(void *data, size_t size, size_t nmemb, void *clientp)
 
 int32_t domains_read(void)
 {
-    array_hashmap_del(&domains_map_struct);
+    array_hashmap_del(&domains_map);
 
     if (domains.data) {
         free(domains.data);
@@ -169,21 +169,19 @@ int32_t domains_read(void)
         }
 
         int32_t domains_map_size_cname = domains_map_size + CNAME_DOMAINS_MAP_MAX_SIZE;
-        domains_map_struct =
-            array_hashmap_init(domains_map_size_cname, 1.0, sizeof(domains_gateway_t));
-        if (domains_map_struct == NULL) {
+        domains_map = array_hashmap_init(domains_map_size_cname, 1.0, sizeof(domains_gateway_t));
+        if (domains_map == NULL) {
             errmsg("No free memory for domains_map\n");
         }
 
         int32_t is_thread_safety = 0;
-        is_thread_safety = array_hashmap_is_thread_safety(domains_map_struct);
+        is_thread_safety = array_hashmap_is_thread_safety(domains_map);
         if (is_thread_safety == 0) {
             errmsg("No thread safety hashmap\n");
         }
 
-        array_hashmap_set_func(domains_map_struct, domain_add_hash, domain_add_cmp,
-                               domain_find_hash, domain_find_cmp, domain_find_hash,
-                               domain_find_cmp);
+        array_hashmap_set_func(domains_map, domain_add_hash, domain_add_cmp, domain_find_hash,
+                               domain_find_cmp, domain_find_hash, domain_find_cmp);
 
         uint32_t domain_offset = 0;
         int32_t gateway_id = 0;
@@ -205,7 +203,7 @@ int32_t domains_read(void)
             add_elem.offset = domain_offset;
             add_elem.gateway = gateway_id;
 
-            array_hashmap_add_elem(domains_map_struct, &add_elem, NULL, NULL);
+            array_hashmap_add_elem(domains_map, &add_elem, NULL, NULL);
 
             domain_offset = strchr(&domains.data[domain_offset + 1], 0) - domains.data + 1;
         }
