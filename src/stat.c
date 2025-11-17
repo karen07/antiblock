@@ -20,16 +20,16 @@ void stat_print(FILE *stat_fd)
 
     fprintf(stat_fd, "Statistics ");
 
-    struct tm *tm_struct = localtime(&statistics_data.stat_start);
-    fprintf(stat_fd, "%02d.%02d.%04d %02d:%02d:%02d", tm_struct->tm_mday, tm_struct->tm_mon + 1,
-            tm_struct->tm_year + 1900, tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+    struct tm *tm = localtime(&statistics_data.stat_start);
+    fprintf(stat_fd, "%02d.%02d.%04d %02d:%02d:%02d", tm->tm_mday, tm->tm_mon + 1,
+            tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
 
     fprintf(stat_fd, " - ");
 
     time_t now = time(NULL);
-    tm_struct = localtime(&now);
-    fprintf(stat_fd, "%02d.%02d.%04d %02d:%02d:%02d", tm_struct->tm_mday, tm_struct->tm_mon + 1,
-            tm_struct->tm_year + 1900, tm_struct->tm_hour, tm_struct->tm_min, tm_struct->tm_sec);
+    tm = localtime(&now);
+    fprintf(stat_fd, "%02d.%02d.%04d %02d:%02d:%02d", tm->tm_mday, tm->tm_mon + 1,
+            tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec);
 
     fprintf(stat_fd, "\n");
 

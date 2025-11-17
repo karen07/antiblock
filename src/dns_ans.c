@@ -117,7 +117,7 @@ static int32_t get_gateway(memory_t *domain)
     }
 
     domains_gateway_t res_elem;
-    int32_t find_res = array_hashmap_find_elem(domains_map_struct, dot_pos, &res_elem);
+    int32_t find_res = array_hashmap_find_elem(domains_map, dot_pos, &res_elem);
     if (find_res == array_hashmap_elem_finded) {
         return res_elem.gateway;
     }
@@ -219,9 +219,8 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
 
     if (log_fd) {
         time_t now = time(NULL);
-        struct tm *tm_struct = localtime(&now);
-        fprintf(log_fd, "\n%02d:%02d:%02d ", tm_struct->tm_hour, tm_struct->tm_min,
-                tm_struct->tm_sec);
+        struct tm *tm = localtime(&now);
+        fprintf(log_fd, "\n%02d:%02d:%02d ", tm->tm_hour, tm->tm_min, tm->tm_sec);
         fprintf(log_fd, "Q(%d) %s\n", que_type, que_domain->data + 1);
     }
 
@@ -273,8 +272,7 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
                 add_elem.ip_local = NAT_subnet_start_n;
                 add_elem.ip_global = ans->ip4;
 
-                array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL,
-                                       array_hashmap_save_new_func);
+                array_hashmap_add_elem(ip_ip_map, &add_elem, NULL, array_hashmap_save_new_func);
 
                 ans->ip4 = NAT_subnet_start_n;
 
@@ -339,7 +337,7 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
             if (ans_domain_gateway != GET_GATEWAY_NOT_IN_ROUTES &&
                 cname_domain_gateway == GET_GATEWAY_NOT_IN_ROUTES) {
                 cname_domain_gateway = ans_domain_gateway;
-                if (domains_map_struct) {
+                if (domains_map) {
                     if (domains.size + cname_domain->size < domains.max_size) {
                         strcpy(&(domains.data[domains.size]), cname_domain->data + 1);
 
@@ -349,7 +347,7 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
 
                         domains.size += cname_domain->size;
 
-                        array_hashmap_add_elem(domains_map_struct, &add_elem, NULL, NULL);
+                        array_hashmap_add_elem(domains_map, &add_elem, NULL, NULL);
                     }
                 }
             }

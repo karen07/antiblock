@@ -40,7 +40,7 @@ typedef struct subnet_range {
     int32_t subnet_size;
 } subnet_range_t;
 
-extern array_hashmap_t ip_ip_map_struct;
+extern array_hashmap_t ip_ip_map;
 
 extern subnet_range_t NAT;
 

@@ -10,8 +10,8 @@
 
 #ifdef TUN_MODE
 
-array_hashmap_t ip_ip_map_struct;
-static array_hashmap_t nat_map_struct;
+array_hashmap_t ip_ip_map;
+static array_hashmap_t nat_map;
 
 subnet_range_t NAT;
 
@@ -202,7 +202,7 @@ static void *tun(__attribute__((unused)) void *arg)
                 int32_t find_elem_ip_ip_flag = 0;
 
                 find_elem_ip_ip_flag =
-                    array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
+                    array_hashmap_find_elem(ip_ip_map, &find_elem_ip_ip, &res_elem_ip_ip);
                 if (find_elem_ip_ip_flag != array_hashmap_elem_finded) {
                     statistics_data.nat_sended_to_dev_error++;
                     continue;
@@ -279,8 +279,7 @@ static void *tun(__attribute__((unused)) void *arg)
             nat_map_t res_elem_nat;
             int32_t find_elem_nat_flag = 0;
 
-            find_elem_nat_flag =
-                array_hashmap_find_elem(nat_map_struct, &find_elem_nat, &res_elem_nat);
+            find_elem_nat_flag = array_hashmap_find_elem(nat_map, &find_elem_nat, &res_elem_nat);
             if (find_elem_nat_flag != array_hashmap_elem_finded) {
                 statistics_data.nat_sended_to_client_error++;
 
@@ -304,7 +303,7 @@ static void *tun(__attribute__((unused)) void *arg)
             int32_t find_elem_ip_ip_flag = 0;
 
             find_elem_ip_ip_flag =
-                array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
+                array_hashmap_find_elem(ip_ip_map, &find_elem_ip_ip, &res_elem_ip_ip);
             if (find_elem_ip_ip_flag != array_hashmap_elem_finded) {
                 statistics_data.nat_sended_to_dev_error++;
                 continue;
@@ -327,7 +326,7 @@ static void *tun(__attribute__((unused)) void *arg)
                 nat_map_t res_elem_nat;
                 int32_t add_elem_nat_flag = 0;
                 add_elem_nat_flag =
-                    array_hashmap_add_elem(nat_map_struct, &add_elem_nat, &res_elem_nat, NULL);
+                    array_hashmap_add_elem(nat_map, &add_elem_nat, &res_elem_nat, NULL);
                 if (add_elem_nat_flag == array_hashmap_elem_finded) {
                     correct_new_srt_port = 0;
                     statistics_data.nat_records++;
@@ -414,26 +413,26 @@ void init_tun_thread(void)
     NAT.network_prefix = tun_prefix;
     subnet_init(&NAT);
 
-    ip_ip_map_struct = array_hashmap_init(NAT.subnet_size, 1.0, sizeof(ip_ip_map_t));
-    if (ip_ip_map_struct == NULL) {
-        errmsg("No free memory for ip_ip_map_struct\n");
+    ip_ip_map = array_hashmap_init(NAT.subnet_size, 1.0, sizeof(ip_ip_map_t));
+    if (ip_ip_map == NULL) {
+        errmsg("No free memory for ip_ip_map\n");
     }
 
-    array_hashmap_set_func(ip_ip_map_struct, ip_ip_hash, ip_ip_cmp, ip_ip_hash, ip_ip_cmp,
-                           ip_ip_hash, ip_ip_cmp);
+    array_hashmap_set_func(ip_ip_map, ip_ip_hash, ip_ip_cmp, ip_ip_hash, ip_ip_cmp, ip_ip_hash,
+                           ip_ip_cmp);
 
     //uint32_t NAT_subnet_start_n = htonl(NAT.start_ip++);
     //ip_ip_map_t add_elem;
     //add_elem.ip_local = NAT_subnet_start_n;
     //add_elem.ip_global = inet_addr("192.168.1.10");
-    //array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, array_hashmap_save_new_func);
+    //array_hashmap_add_elem(ip_ip_map, &add_elem, NULL, array_hashmap_save_new_func);
 
-    nat_map_struct = array_hashmap_init(NAT_MAP_MAX_SIZE, 1.0, sizeof(nat_map_t));
-    if (nat_map_struct == NULL) {
-        errmsg("No free memory for nat_map_struct\n");
+    nat_map = array_hashmap_init(NAT_MAP_MAX_SIZE, 1.0, sizeof(nat_map_t));
+    if (nat_map == NULL) {
+        errmsg("No free memory for nat_map\n");
     }
 
-    array_hashmap_set_func(nat_map_struct, nat_hash, nat_cmp, nat_hash, nat_cmp, nat_hash, nat_cmp);
+    array_hashmap_set_func(nat_map, nat_hash, nat_cmp, nat_hash, nat_cmp, nat_hash, nat_cmp);
 
     pthread_t tun_thread;
     if (pthread_create(&tun_thread, NULL, tun, NULL)) {
