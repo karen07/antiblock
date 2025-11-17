@@ -133,6 +133,7 @@ void del_route(int32_t gateway_index, uint32_t dst)
     set_route(&route, gateway_index, dst);
 
     if (ioctl(route_socket, SIOCDELRT, &route) >= 0) {
+        statistics_data.in_route_table[gateway_index]--;
         return;
     }
 
@@ -649,12 +650,12 @@ int32_t main(int32_t argc, char *argv[])
                 }
             }
 
-            memset(&statistics_data, 0, sizeof(statistics_data));
-            statistics_data.stat_start = time(NULL);
-
 #ifdef ROUTE_TABLE_MODE
             clean_route_table();
 #endif
+
+            memset(&statistics_data, 0, sizeof(statistics_data));
+            statistics_data.stat_start = time(NULL);
 
             int32_t domains_read_status = 0;
             domains_read_status = domains_read();
