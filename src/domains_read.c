@@ -12,7 +12,7 @@
 #define HTTP_OK 200
 
 memory_t domains;
-array_hashmap_t domains_map;
+array_hashmap_t domain_routes;
 
 static array_hashmap_hash domain_add_hash(const void *add_elem_data)
 {
@@ -61,7 +61,7 @@ static size_t cb(void *data, size_t size, size_t nmemb, void *clientp)
 
 int32_t domains_read(void)
 {
-    array_hashmap_del(&domains_map);
+    array_hashmap_del(&domain_routes);
 
     if (domains.data) {
         free(domains.data);
@@ -159,34 +159,35 @@ int32_t domains_read(void)
     memset(gateway_domains_count, 0, sizeof(int32_t) * GATEWAY_MAX_COUNT);
 
     if (domains.size > 0) {
-        int32_t domains_map_size = 0;
+        int32_t domain_routes_size = 0;
         for (int32_t i = 0; i < (int32_t)domains.size; i++) {
             if (domains.data[i] == '\n') {
                 domains.data[i] = 0;
 
-                domains_map_size++;
+                domain_routes_size++;
             }
         }
 
-        int32_t domains_map_size_cname = domains_map_size + CNAME_DOMAINS_MAP_MAX_SIZE;
-        domains_map = array_hashmap_init(domains_map_size_cname, 1.0, sizeof(domains_gateway_t));
-        if (domains_map == NULL) {
-            errmsg("No free memory for domains_map\n");
+        int32_t domain_routes_size_cname = domain_routes_size + CNAME_DOMAINS_MAP_MAX_SIZE;
+        domain_routes =
+            array_hashmap_init(domain_routes_size_cname, 1.0, sizeof(domains_gateway_t));
+        if (domain_routes == NULL) {
+            errmsg("No free memory for domain_routes\n");
         }
 
         int32_t is_thread_safety = 0;
-        is_thread_safety = array_hashmap_is_thread_safety(domains_map);
+        is_thread_safety = array_hashmap_is_thread_safety(domain_routes);
         if (is_thread_safety == 0) {
             errmsg("No thread safety hashmap\n");
         }
 
-        array_hashmap_set_func(domains_map, domain_add_hash, domain_add_cmp, domain_find_hash,
+        array_hashmap_set_func(domain_routes, domain_add_hash, domain_add_cmp, domain_find_hash,
                                domain_find_cmp, domain_find_hash, domain_find_cmp);
 
         uint32_t domain_offset = 0;
         int32_t gateway_id = 0;
 
-        for (int32_t i = 0; i < domains_map_size; i++) {
+        for (int32_t i = 0; i < domain_routes_size; i++) {
             for (int32_t j = 1; j <= gateways_count; j++) {
                 if ((gateway_domains_offset[j - 1] <= domain_offset) &&
                     (domain_offset < gateway_domains_offset[j])) {
@@ -203,7 +204,7 @@ int32_t domains_read(void)
             add_elem.offset = domain_offset;
             add_elem.gateway = gateway_id;
 
-            array_hashmap_add_elem(domains_map, &add_elem, NULL, NULL);
+            array_hashmap_add_elem(domain_routes, &add_elem, NULL, NULL);
 
             domain_offset = strchr(&domains.data[domain_offset + 1], 0) - domains.data + 1;
         }
