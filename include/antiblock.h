@@ -5,7 +5,6 @@
 #include <linux/if_arp.h>
 #include <linux/limits.h>
 #include <linux/route.h>
-#include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -14,19 +13,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <time.h>
 #include <unistd.h>
 
 /* Initial setup */
-//#define MULTIPLE_DNS
+/* #define MULTIPLE_DNS */
 
-//#define PROXY_MODE
+/* #define PROXY_MODE */
 #define PCAP_MODE
-
-#define ROUTE_TABLE_MODE
-//#define TUN_MODE
 /* Initial setup */
 
-//Defines check
+/* Defines check */
 #ifdef PCAP_MODE
 #ifdef MULTIPLE_DNS
 #error "You can't use PCAP_MODE and MULTIPLE_DNS"
@@ -34,11 +31,8 @@
 #ifdef PROXY_MODE
 #error "You can't use PCAP_MODE and PROXY_MODE"
 #endif
-#ifdef TUN_MODE
-#error "You can't use PCAP_MODE and TUN_MODE"
 #endif
-#endif
-//Defines check
+/* Defines check */
 
 #ifdef PCAP_MODE
 #include <linux/if_ether.h>
@@ -46,14 +40,6 @@
 #include <linux/udp.h>
 #include <pcap.h>
 #include <pcap/sll.h>
-#endif
-
-#ifdef TUN_MODE
-#include <fcntl.h>
-#include <linux/if_tun.h>
-#include <linux/ip.h>
-#include <linux/tcp.h>
-#include <linux/udp.h>
 #endif
 
 #include "array_hashmap.h"
@@ -99,12 +85,8 @@ extern int32_t blacklist_count;
 extern subnet_t blacklist[BLACKLIST_MAX_COUNT];
 
 extern struct sockaddr_in listen_addr;
-extern pthread_barrier_t threads_barrier;
 
-#ifdef TUN_MODE
-extern uint32_t tun_ip;
-extern uint32_t tun_prefix;
-#endif
+extern volatile uint64_t now_unix_time;
 
 #ifdef PROXY_MODE
 #ifdef MULTIPLE_DNS
@@ -120,7 +102,5 @@ extern struct sockaddr_in dns_addr[DNS_MAX_COUNT];
 
 void errmsg(const char *format, ...);
 
-#ifdef ROUTE_TABLE_MODE
 void add_route(int32_t gateway_index, uint32_t dst, uint32_t ans_ttl);
 void del_route(int32_t gateway_index, uint32_t dst);
-#endif

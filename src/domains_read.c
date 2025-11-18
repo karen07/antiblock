@@ -4,7 +4,6 @@
 #include "hash.h"
 #include "net_data.h"
 #include "stat.h"
-#include "tun.h"
 #include "domains_read.h"
 #include <curl/curl.h>
 
@@ -205,12 +204,6 @@ int32_t domains_read(void)
             array_hashmap_init(domain_routes_size_cname, 1.0, sizeof(domains_gateway_t));
         if (domain_routes == NULL) {
             errmsg("No free memory for domain_routes\n");
-        }
-
-        int32_t is_thread_safety = 0;
-        is_thread_safety = array_hashmap_is_thread_safety(domain_routes);
-        if (is_thread_safety == 0) {
-            errmsg("No thread safety hashmap\n");
         }
 
         array_hashmap_set_func(domain_routes, domain_add_hash, domain_add_cmp, domain_find_hash,

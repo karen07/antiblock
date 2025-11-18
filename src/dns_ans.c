@@ -4,7 +4,6 @@
 #include "hash.h"
 #include "net_data.h"
 #include "stat.h"
-#include "tun.h"
 #include "domains_read.h"
 
 #define DNS_TypeA 1
@@ -139,7 +138,7 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
     char *cur_pos_ptr = receive_msg->data;
     char *receive_msg_end = receive_msg->data + receive_msg->size;
 
-    // DNS HEADER
+    /* DNS HEADER */
     if (cur_pos_ptr + sizeof(dns_header_t) > receive_msg_end) {
         statistics_data.request_parsing_error++;
         dump_dns_data(DNS_ANS_CHECK_HEADER_SIZE_ERROR, receive_msg);
@@ -166,14 +165,14 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
     uint16_t ans_count = ntohs(header->ans);
 
     cur_pos_ptr += sizeof(dns_header_t);
-    // DNS HEADER
+    /* DNS HEADER */
 
     if (last_processed_id == header->id) {
         return DNS_ANS_CHECK_ID_DUBLICATION;
     }
     last_processed_id = header->id;
 
-    // QUE DOMAIN
+    /* QUE DOMAIN */
     char *que_domain_start = cur_pos_ptr;
     char *que_domain_end = NULL;
     if (get_domain_from_packet(receive_msg, que_domain_start, &que_domain_end, que_domain) != 0) {
@@ -185,9 +184,9 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
 
     int32_t que_domain_gateway = GET_GATEWAY_NOT_IN_ROUTES;
     que_domain_gateway = get_gateway(que_domain);
-    // QUE DOMAIN
+    /* QUE DOMAIN */
 
-    // QUE DATA
+    /* QUE DATA */
     if (cur_pos_ptr + sizeof(dns_que_t) > receive_msg_end) {
         statistics_data.request_parsing_error++;
         dump_dns_data(DNS_ANS_CHECK_QUE_DATA_GET_ERROR, receive_msg);
@@ -199,7 +198,7 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
     uint16_t que_type = ntohs(que->type);
 
     cur_pos_ptr += sizeof(dns_que_t);
-    // QUE DATA
+    /* QUE DATA */
 
     if (log_fd) {
         time_t now = time(NULL);
@@ -209,7 +208,7 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
     }
 
     for (int32_t i = 0; i < ans_count; i++) {
-        // ANS DOMAIN
+        /* ANS DOMAIN */
         char *ans_domain_start = cur_pos_ptr;
         char *ans_domain_end = NULL;
         if (get_domain_from_packet(receive_msg, ans_domain_start, &ans_domain_end, ans_domain) !=
@@ -222,9 +221,9 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
 
         int32_t ans_domain_gateway = GET_GATEWAY_NOT_IN_ROUTES;
         ans_domain_gateway = get_gateway(ans_domain);
-        // ANS DOMAIN
+        /* ANS DOMAIN */
 
-        // ANS DATA
+        /* ANS DATA */
         if (cur_pos_ptr + sizeof(dns_ans_t) - sizeof(uint32_t) > receive_msg_end) {
             statistics_data.request_parsing_error++;
             dump_dns_data(DNS_ANS_CHECK_ANS_DATA_GET_ERROR, receive_msg);
@@ -245,29 +244,6 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
 
         if (ans_type == DNS_TypeA) {
             if (ans_domain_gateway != GET_GATEWAY_NOT_IN_ROUTES) {
-#ifdef TUN_MODE
-                uint32_t NAT_subnet_start_n = htonl(NAT.start_ip++);
-
-                if (NAT.start_ip == NAT.end_ip) {
-                    subnet_init(&NAT);
-                }
-
-                ip_ip_map_t add_elem;
-                add_elem.ip_local = NAT_subnet_start_n;
-                add_elem.ip_global = ans->ip4;
-
-                array_hashmap_add_elem(ip_ip_map, &add_elem, NULL, array_hashmap_save_new_func);
-
-                ans->ip4 = NAT_subnet_start_n;
-
-                if (log_fd) {
-                    struct in_addr new_ip;
-                    new_ip.s_addr = add_elem.ip_local;
-
-                    fprintf(log_fd, "    BA(%d) %s", ans_domain_gateway + 1, inet_ntoa(new_ip));
-                }
-#else
-
                 int32_t correct_ip4_flag = 1;
                 if (ans->ip4 == 0) {
                     correct_ip4_flag = 0;
@@ -291,7 +267,6 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
                         fprintf(log_fd, "    BL");
                     }
                 }
-#endif
             } else {
                 if (log_fd) {
                     fprintf(log_fd, "    NA");
@@ -346,7 +321,7 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
         }
 
         cur_pos_ptr += sizeof(dns_ans_t) - sizeof(uint32_t) + ans_len;
-        // ANS DATA
+        /* ANS DATA */
     }
 
     if ((header->auth == 0) && (header->add == 0)) {
