@@ -629,6 +629,8 @@ int32_t main(int32_t argc, char *argv[])
 
     PCAP_mode_init();
 
+    clean_route_table();
+
     /* Init tick timers */
     uint32_t sec_counter = SEC_TICKS;
     uint32_t ten_sec_counter = TEN_SEC_TICKS;
@@ -639,8 +641,6 @@ int32_t main(int32_t argc, char *argv[])
 
     while (true) {
         if (first_cycle || --day_counter == 0) {
-            clean_route_table();
-
             print_log_head();
 
             memset(&statistics_data, 0, sizeof(statistics_data));

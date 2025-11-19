@@ -14,15 +14,23 @@ static array_hashmap_t domain_routes;
 
 int32_t get_gateway(memory_t *domain)
 {
-    char *dot_pos = domain->data + 1;
-    if (!memcmp(dot_pos, "www.", strlen("www."))) {
-        dot_pos += strlen("www.");
+    int32_t offset = 0;
+    if (!memcmp(domain->data, ".www.", strlen(".www."))) {
+        offset = strlen(".www");
     }
 
-    domains_gateway_t res_elem;
-    int32_t find_res = array_hashmap_find_elem(domain_routes, dot_pos, &res_elem);
-    if (find_res == array_hashmap_elem_finded) {
-        return res_elem.gateway;
+    for (int32_t i = offset; i < (int32_t)domain->size; i++) {
+        if (domain->data[i] == '.') {
+            char *dot_pos = &domain->data[i + 1];
+
+            domains_gateway_t res_elem;
+            int32_t find_res = array_hashmap_find_elem(domain_routes, dot_pos, &res_elem);
+            if (find_res == array_hashmap_elem_finded) {
+                if ((!res_elem.match_subdomains && (i == offset)) || res_elem.match_subdomains) {
+                    return res_elem.gateway;
+                }
+            }
+        }
     }
 
     return GET_GATEWAY_NOT_IN_ROUTES;
@@ -37,6 +45,7 @@ void add_domain(memory_t *cname_domain, int32_t cname_domain_gateway)
             domains_gateway_t add_elem;
             add_elem.offset = domains.size;
             add_elem.gateway = cname_domain_gateway;
+            add_elem.match_subdomains = 1;
 
             domains.size += cname_domain->size;
 
@@ -226,6 +235,12 @@ int32_t domains_read(void)
             }
 
             domains_gateway_t add_elem;
+            if (domains.data[domain_offset] == '!') {
+                domain_offset += 1;
+                add_elem.match_subdomains = 0;
+            } else {
+                add_elem.match_subdomains = 1;
+            }
             add_elem.offset = domain_offset;
             add_elem.gateway = gateway_id;
 

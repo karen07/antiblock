@@ -318,7 +318,7 @@ void PCAP_mode_init(void)
         errmsg("Can't pcap setnonblock %s\n", errbuf);
     }
 
-    ips_routes = array_hashmap_init(1000, 1.0, sizeof(route_entry_t));
+    ips_routes = array_hashmap_init(ROUTES_MAP_MAX_SIZE, 1.0, sizeof(route_entry_t));
     if (ips_routes == NULL) {
         errmsg("No free memory for ips_routes\n");
     }
