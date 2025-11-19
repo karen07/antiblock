@@ -118,8 +118,6 @@ int32_t domains_read(void)
             CURL *curl = curl_easy_init();
             if (curl) {
                 curl_easy_setopt(curl, CURLOPT_URL, gateway_domains_paths[i]);
-                curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-                curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
                 curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
                 curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&domains);
 
