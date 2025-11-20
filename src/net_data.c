@@ -24,7 +24,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
     repeater_DNS_addr = listen_addr;
     repeater_DNS_addr.sin_port = htons(ntohs(repeater_DNS_addr.sin_port) + 1);
 
-    uint32_t receive_DNS_addr_length = sizeof(receive_DNS_addr);
+    socklen_t receive_DNS_addr_length = sizeof(receive_DNS_addr);
 
     repeater_DNS_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (repeater_DNS_socket < 0) {
@@ -112,7 +112,7 @@ static void *client_data(__attribute__((unused)) void *arg)
 {
     struct sockaddr_in receive_client_addr;
 
-    uint32_t receive_client_addr_length = sizeof(receive_client_addr);
+    socklen_t receive_client_addr_length = sizeof(receive_client_addr);
 
     repeater_client_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (repeater_client_socket < 0) {
