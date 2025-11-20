@@ -142,7 +142,8 @@ static void clean_route_table(void)
 {
     FILE *route_fd = fopen("/proc/net/route", "r");
     if (route_fd == NULL) {
-        errmsg("Can't open /proc/net/route\n");
+        printf("Can't open /proc/net/route\n");
+        return;
     }
 
     int ch;
@@ -177,7 +178,8 @@ static uint32_t get_iface_default_gw(char *iface_in)
 {
     FILE *route_fd = fopen("/proc/net/route", "r");
     if (route_fd == NULL) {
-        errmsg("Can't open /proc/net/route\n");
+        printf("Can't open /proc/net/route\n");
+        return 0;
     }
 
     int ch;
@@ -556,6 +558,8 @@ int32_t main(int32_t argc, char *argv[])
         while (fscanf(blacklist_fd, "%99s", tmp_line) != EOF) {
             add_blacklist(tmp_line);
         }
+
+        fclose(blacklist_fd);
 
         if (blacklist_count > BLACKLIST_MAX_COUNT) {
             errmsg("The program needs a maximum of %d blacklist subnets, seted %d\n",
