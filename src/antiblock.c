@@ -145,7 +145,9 @@ static void clean_route_table(void)
         errmsg("Can't open /proc/net/route\n");
     }
 
-    fseek(route_fd, 128, SEEK_SET);
+    int ch;
+    while ((ch = fgetc(route_fd)) != '\n' && ch != EOF) {
+    }
 
     char iface[IFNAMSIZ];
     uint32_t dest_ip;
@@ -178,7 +180,9 @@ static uint32_t get_iface_default_gw(char *iface_in)
         errmsg("Can't open /proc/net/route\n");
     }
 
-    fseek(route_fd, 128, SEEK_SET);
+    int ch;
+    while ((ch = fgetc(route_fd)) != '\n' && ch != EOF) {
+    }
 
     char iface[IFNAMSIZ];
     uint32_t dest_ip;
@@ -207,12 +211,20 @@ static uint32_t get_iface_default_gw(char *iface_in)
 static void add_blacklist(const char *subnet_str)
 {
     char tmp_subnet[100];
+
+    if (strlen(subnet_str) >= sizeof(tmp_subnet)) {
+        errmsg("Blacklist entry is too long (max %zu chars)\n", sizeof(tmp_subnet) - 1);
+    }
+
     strcpy(tmp_subnet, subnet_str);
 
     char *slash_ptr = strchr(tmp_subnet, '/');
     if (slash_ptr) {
         uint32_t tmp_prefix = 0;
         sscanf(slash_ptr + 1, "%u", &tmp_prefix);
+        if ((tmp_prefix > 32) || (tmp_prefix <= 0)) {
+            errmsg("Invalid blacklist prefix: expected value from 1 to 32\n");
+        }
         *slash_ptr = 0;
         if (strlen(tmp_subnet) < INET_ADDRSTRLEN) {
             if (blacklist_count < BLACKLIST_MAX_COUNT) {
@@ -223,7 +235,7 @@ static void add_blacklist(const char *subnet_str)
         }
         *slash_ptr = '/';
     } else {
-        errmsg("Every blacklist line \"x.x.x.x/xx\"\n");
+        errmsg("Invalid blacklist entry: expected format \"x.x.x.x/xx\"\n");
     }
 }
 
@@ -541,7 +553,7 @@ int32_t main(int32_t argc, char *argv[])
 
         char tmp_line[100];
 
-        while (fscanf(blacklist_fd, "%s", tmp_line) != EOF) {
+        while (fscanf(blacklist_fd, "%99s", tmp_line) != EOF) {
             add_blacklist(tmp_line);
         }
 
