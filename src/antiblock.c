@@ -1,15 +1,13 @@
 #include "antiblock.h"
-#include "config.h"
 #include "dns_ans.h"
-#include "hash.h"
+#include "domains_read.h"
 #include "net_data.h"
 #include "stat.h"
-#include "domains_read.h"
 
 #define TICK_MS 10
 #define SEC_TICKS (1000 / TICK_MS)
-#define TEN_SEC_TICKS (10 * SEC_TICKS)
-#define DAY_TICKS ((24 * 60 * 60 * 1000) / TICK_MS)
+#define STAT_PRINT_TICKS (STAT_PRINT_TIME * SEC_TICKS)
+#define DOMAINS_UPDATE_TICKS (DOMAINS_UPDATE_TIME * SEC_TICKS)
 
 typedef struct gateway_data {
     char name[IFNAMSIZ];
@@ -649,8 +647,8 @@ int32_t main(int32_t argc, char *argv[])
 
     /* Init tick timers */
     uint32_t sec_counter = SEC_TICKS;
-    uint32_t ten_sec_counter = TEN_SEC_TICKS;
-    uint32_t day_counter = DAY_TICKS;
+    uint32_t ten_sec_counter = STAT_PRINT_TICKS;
+    uint32_t day_counter = DOMAINS_UPDATE_TICKS;
 
     int32_t first_cycle = true;
     /* Init tick timers */
@@ -664,7 +662,7 @@ int32_t main(int32_t argc, char *argv[])
 
             domains_read();
 
-            day_counter = DAY_TICKS;
+            day_counter = DOMAINS_UPDATE_TICKS;
         }
 
         if (first_cycle || --ten_sec_counter == 0) {
@@ -678,7 +676,7 @@ int32_t main(int32_t argc, char *argv[])
 
             fflush(stdout);
 
-            ten_sec_counter = TEN_SEC_TICKS;
+            ten_sec_counter = STAT_PRINT_TICKS;
         }
 
         if (first_cycle || --sec_counter == 0) {

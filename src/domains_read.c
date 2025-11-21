@@ -1,16 +1,24 @@
 #include "antiblock.h"
-#include "config.h"
 #include "dns_ans.h"
-#include "hash.h"
+#include "domains_read.h"
 #include "net_data.h"
 #include "stat.h"
-#include "domains_read.h"
 #include <curl/curl.h>
 
 #define HTTP_OK 200
 
 static memory_t domains;
 static array_hashmap_t domain_routes;
+
+static uint32_t djb33_hash_len(const char *s, size_t len)
+{
+    uint32_t h = 5381;
+    while (*s && len--) {
+        h += (h << 5);
+        h ^= *s++;
+    }
+    return h;
+}
 
 int32_t get_gateway(memory_t *domain)
 {
