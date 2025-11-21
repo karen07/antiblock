@@ -53,15 +53,16 @@
 #define BLACKLIST_MAX_COUNT 128
 
 #define GATEWAY_BITS_COUNT 5
-#define MATCH_SUBDOMAINS 1
-#define OFFSET_BITS_COUNT (32 - GATEWAY_BITS_COUNT - MATCH_SUBDOMAINS)
+#define MATCH_SUBDOMAINS_BITS_COUNT 1
+#define OFFSET_BITS_COUNT (32 - GATEWAY_BITS_COUNT - MATCH_SUBDOMAINS_BITS_COUNT)
+
 #define GATEWAY_MAX_COUNT (1 << GATEWAY_BITS_COUNT)
 
 #ifndef _DOMAINS_TYPE
 #define _DOMAINS_TYPE
 typedef struct domains_gateway {
     unsigned int gateway : GATEWAY_BITS_COUNT;
-    unsigned int match_subdomains : MATCH_SUBDOMAINS;
+    unsigned int match_subdomains : MATCH_SUBDOMAINS_BITS_COUNT;
     unsigned int offset : OFFSET_BITS_COUNT;
 } domains_gateway_t;
 #endif
