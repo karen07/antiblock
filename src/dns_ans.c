@@ -1,10 +1,8 @@
 #include "antiblock.h"
-#include "config.h"
 #include "dns_ans.h"
-#include "hash.h"
+#include "domains_read.h"
 #include "net_data.h"
 #include "stat.h"
-#include "domains_read.h"
 
 #define DNS_TypeA 1
 #define DNS_TypeCNAME 5

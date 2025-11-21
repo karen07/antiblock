@@ -1,10 +1,8 @@
 #include "antiblock.h"
-#include "config.h"
 #include "dns_ans.h"
-#include "hash.h"
+#include "domains_read.h"
 #include "net_data.h"
 #include "stat.h"
-#include "domains_read.h"
 
 statistics_t statistics_data;
 
