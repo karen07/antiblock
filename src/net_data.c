@@ -337,8 +337,7 @@ int32_t PCAP_get_msg(memory_t *receive_msg)
         return 0;
     }
 
-    if (pkthdr->len <
-        (int32_t)(sizeof(struct sll_header) + sizeof(struct iphdr) + sizeof(struct udphdr))) {
+    if (pkthdr->len < (int32_t)(sizeof(struct sll_header) + sizeof(struct iphdr))) {
         return 0;
     }
 
@@ -352,12 +351,31 @@ int32_t PCAP_get_msg(memory_t *receive_msg)
         return 0;
     }
 
-    struct udphdr *udph = (struct udphdr *)((char *)iph + sizeof(*iph));
+    uint32_t iphdr_len = iph->ihl * 4;
+    if (iphdr_len < sizeof(struct iphdr)) {
+        return 0;
+    }
+
+    if (pkthdr->len < (int32_t)(sizeof(struct sll_header) + iphdr_len + sizeof(struct udphdr))) {
+        return 0;
+    }
+
+    struct udphdr *udph = (struct udphdr *)((char *)iph + iphdr_len);
+
+    uint16_t udp_len = ntohs(udph->len);
+    if (udp_len < sizeof(struct udphdr)) {
+        return 0;
+    }
+
+    if (pkthdr->len < (int32_t)(sizeof(struct sll_header) + iphdr_len + udp_len)) {
+        return 0;
+    }
+
     if (udph->source != listen_addr.sin_port) {
         return 0;
     }
 
-    receive_msg->size = ntohs(udph->len) - sizeof(*udph);
+    receive_msg->size = udp_len - sizeof(*udph);
     receive_msg->max_size = receive_msg->size;
     receive_msg->data = (char *)udph + sizeof(*udph);
 

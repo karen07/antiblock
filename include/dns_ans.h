@@ -22,7 +22,7 @@ typedef struct dns_ans {
     uint32_t ip4;
 } __attribute__((packed)) dns_ans_t;
 
-#define DNS_QUE 1
+#define DNS_QUE 0x8000
 #define DNS_ANS 0
 
 int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_domain,
