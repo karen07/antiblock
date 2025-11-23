@@ -28,8 +28,9 @@
 #define DNS_ANS_CHECK_ANS_URL_GET_ERROR -9
 #define DNS_ANS_CHECK_ANS_DATA_GET_ERROR -10
 #define DNS_ANS_CHECK_ANS_LEN_ERROR -11
-#define DNS_ANS_CHECK_CNAME_URL_GET_ERROR -12
-#define DNS_ANS_CHECK_NOT_END_ERROR -13
+#define DNS_ANS_CHECK_ANS_A_LEN_ERROR -12
+#define DNS_ANS_CHECK_CNAME_URL_GET_ERROR -13
+#define DNS_ANS_CHECK_NOT_END_ERROR -14
 
 #define FIRST_BIT_UINT16 0x8000
 #define FIRST_TWO_BITS_UINT8 0xC0
@@ -241,6 +242,11 @@ int32_t dns_ans_check(int32_t direction, memory_t *receive_msg, memory_t *que_do
         }
 
         if (ans_type == DNS_TypeA) {
+            if (ans_len != sizeof(uint32_t)) {
+                statistics_data.request_parsing_error++;
+                dump_dns_data(DNS_ANS_CHECK_ANS_A_LEN_ERROR, receive_msg);
+                return DNS_ANS_CHECK_ANS_A_LEN_ERROR;
+            }
             if (ans_domain_gateway != GET_GATEWAY_NOT_IN_ROUTES) {
                 int32_t correct_ip4_flag = 1;
                 if (ans->ip4 == 0) {
@@ -449,6 +455,14 @@ void dns_ans_check_test(void)
         errmsg("Test DNS header ans data size fail\n");
     }
     receive_msg.size = sizeof(correct_test);
+
+    last_processed_id = 0;
+    receive_msg.data[78] = 0;
+    if (dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain) !=
+        DNS_ANS_CHECK_ANS_A_LEN_ERROR) {
+        errmsg("Test DNS header ans A data size fail\n");
+    }
+    receive_msg.data[78] = correct_test[78];
 
     last_processed_id = 0;
     receive_msg.data[58] = 0x3F;
