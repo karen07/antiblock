@@ -337,7 +337,7 @@ int32_t PCAP_get_msg(memory_t *receive_msg)
         return 0;
     }
 
-    if (pkthdr->len < (int32_t)(sizeof(struct sll_header) + sizeof(struct iphdr))) {
+    if (pkthdr->len < (sizeof(struct sll_header) + sizeof(struct iphdr))) {
         return 0;
     }
 
@@ -356,7 +356,7 @@ int32_t PCAP_get_msg(memory_t *receive_msg)
         return 0;
     }
 
-    if (pkthdr->len < (int32_t)(sizeof(struct sll_header) + iphdr_len + sizeof(struct udphdr))) {
+    if (pkthdr->len < (sizeof(struct sll_header) + iphdr_len + sizeof(struct udphdr))) {
         return 0;
     }
 
@@ -367,7 +367,7 @@ int32_t PCAP_get_msg(memory_t *receive_msg)
         return 0;
     }
 
-    if (pkthdr->len < (int32_t)(sizeof(struct sll_header) + iphdr_len + udp_len)) {
+    if (pkthdr->len < (sizeof(struct sll_header) + iphdr_len + udp_len)) {
         return 0;
     }
 
