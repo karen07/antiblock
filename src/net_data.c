@@ -202,6 +202,8 @@ void init_net_data_threads(void)
 
 #else
 
+#define PCAP_FILTER_MAX_SIZE 1000
+
 typedef struct route_entry {
     uint32_t dst;
     uint64_t expires_at;
@@ -234,7 +236,7 @@ static array_hashmap_bool ips_del_func(const void *del_elem_data)
 {
     const route_entry_t *elem = del_elem_data;
 
-    if (elem->expires_at < now_unix_time) {
+    if (elem->expires_at < last_del_expired_routes) {
         /*
         struct in_addr new_ip;
         new_ip.s_addr = elem->dst;
@@ -267,7 +269,7 @@ int32_t add_route_to_hashmap(int32_t gateway_index, uint32_t dst, uint32_t ans_t
 {
     route_entry_t add_elem;
     add_elem.dst = dst;
-    add_elem.expires_at = now_unix_time + ans_ttl;
+    add_elem.expires_at = last_del_expired_routes + ans_ttl;
     add_elem.gateway_index = gateway_index;
 
     /*
@@ -289,7 +291,7 @@ void PCAP_mode_init(void)
 {
     char errbuf[PCAP_ERRBUF_SIZE];
     struct bpf_program fp;
-    char filter_exp[1000];
+    char filter_exp[PCAP_FILTER_MAX_SIZE];
 
     struct in_addr listen_ip;
     listen_ip.s_addr = listen_addr.sin_addr.s_addr;

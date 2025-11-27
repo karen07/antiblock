@@ -4,10 +4,9 @@
 #include "net_data.h"
 #include "stat.h"
 
-#define TICK_MS 10
-#define SEC_TICKS (1000 / TICK_MS)
-#define STAT_PRINT_TICKS (STAT_PRINT_TIME * SEC_TICKS)
-#define DOMAINS_UPDATE_TICKS (DOMAINS_UPDATE_TIME * SEC_TICKS)
+#define MAX_SUBNET_STR_SIZE 100
+#define MAX_FILE_LOG_STAT_NAME 100
+#define MSEC_TO_USEC 1000
 
 typedef struct gateway_data {
     char name[IFNAMSIZ];
@@ -25,7 +24,7 @@ subnet_t blacklist[BLACKLIST_MAX_COUNT];
 
 struct sockaddr_in listen_addr;
 
-volatile uint64_t now_unix_time;
+volatile uint64_t last_del_expired_routes;
 
 static gateway_data_t gateways[GATEWAY_MAX_COUNT];
 
@@ -210,7 +209,7 @@ static uint32_t get_iface_default_gw(char *iface_in)
 
 static void add_blacklist(const char *subnet_str)
 {
-    char tmp_subnet[100];
+    char tmp_subnet[MAX_SUBNET_STR_SIZE];
 
     if (strlen(subnet_str) >= sizeof(tmp_subnet)) {
         errmsg("Blacklist entry is too long (max %zu chars)\n", sizeof(tmp_subnet) - 1);
@@ -334,8 +333,8 @@ int32_t main(int32_t argc, char *argv[])
     int32_t is_log_print = 0;
     int32_t is_stat_print = 0;
 
-    char log_or_stat_folder[PATH_MAX - 100];
-    memset(log_or_stat_folder, 0, PATH_MAX - 100);
+    char log_or_stat_folder[PATH_MAX - MAX_FILE_LOG_STAT_NAME];
+    memset(log_or_stat_folder, 0, PATH_MAX - MAX_FILE_LOG_STAT_NAME);
 
     char blacklist_file_path[PATH_MAX];
     memset(blacklist_file_path, 0, PATH_MAX);
@@ -457,7 +456,7 @@ int32_t main(int32_t argc, char *argv[])
         }
         if (!strcmp(argv[i], "-o")) {
             if (i != argc - 1) {
-                if (strlen(argv[i + 1]) < PATH_MAX - 100) {
+                if (strlen(argv[i + 1]) < PATH_MAX - MAX_FILE_LOG_STAT_NAME) {
                     strcpy(log_or_stat_folder, argv[i + 1]);
                     printf("  Output     \"%s\"\n", log_or_stat_folder);
                 }
@@ -539,8 +538,20 @@ int32_t main(int32_t argc, char *argv[])
     add_blacklist("10.0.0.0/8");
     add_blacklist("100.64.0.0/10");
     add_blacklist("127.0.0.0/8");
+    add_blacklist("169.254.0.0/16");
     add_blacklist("172.16.0.0/12");
+    add_blacklist("192.0.0.0/24");
+    add_blacklist("192.0.2.0/24");
+    add_blacklist("192.31.196.0/24");
+    add_blacklist("192.52.193.0/24");
+    add_blacklist("192.88.99.0/24");
     add_blacklist("192.168.0.0/16");
+    add_blacklist("192.175.48.0/24");
+    add_blacklist("198.18.0.0/15");
+    add_blacklist("198.51.100.0/24");
+    add_blacklist("203.0.113.0/24");
+    add_blacklist("224.0.0.0/4");
+    add_blacklist("240.0.0.0/4");
     /* Set default blacklist subnets */
 
     /* Read blacklist file */
@@ -551,7 +562,7 @@ int32_t main(int32_t argc, char *argv[])
             errmsg("Can't open blacklist file %s\n", blacklist_file_path);
         }
 
-        char tmp_line[100];
+        char tmp_line[MAX_SUBNET_STR_SIZE];
 
         while (fscanf(blacklist_fd, "%99s", tmp_line) != EOF) {
             add_blacklist(tmp_line);
@@ -645,27 +656,27 @@ int32_t main(int32_t argc, char *argv[])
 
     clean_route_table();
 
-    /* Init tick timers */
-    uint32_t sec_counter = SEC_TICKS;
-    uint32_t ten_sec_counter = STAT_PRINT_TICKS;
-    uint32_t day_counter = DOMAINS_UPDATE_TICKS;
-
-    int32_t first_cycle = true;
-    /* Init tick timers */
+    /* Init timers */
+    uint64_t last_domains_update = 0;
+    uint64_t last_stat_print = 0;
+    last_del_expired_routes = 0;
+    /* Init timers */
 
     while (true) {
-        if (first_cycle || --day_counter == 0) {
+        uint64_t now = time(NULL);
+
+        if (last_domains_update == 0 || now - last_domains_update >= DOMAINS_UPDATE_TIME) {
             print_log_head();
 
             memset(&statistics_data, 0, sizeof(statistics_data));
-            statistics_data.stat_start = time(NULL);
+            statistics_data.stat_start = now;
 
             domains_read();
 
-            day_counter = DOMAINS_UPDATE_TICKS;
+            last_domains_update = now;
         }
 
-        if (first_cycle || --ten_sec_counter == 0) {
+        if (last_stat_print == 0 || now - last_stat_print >= STAT_PRINT_TIME) {
             if (stat_fd) {
                 stat_print(stat_fd);
             }
@@ -676,13 +687,12 @@ int32_t main(int32_t argc, char *argv[])
 
             fflush(stdout);
 
-            ten_sec_counter = STAT_PRINT_TICKS;
+            last_stat_print = now;
         }
 
-        if (first_cycle || --sec_counter == 0) {
-            now_unix_time = time(NULL);
+        if (last_del_expired_routes == 0 || now != last_del_expired_routes) {
+            last_del_expired_routes = now;
             del_expired_routes_from_hashmap();
-            sec_counter = SEC_TICKS;
         }
 
         int32_t ret = PCAP_get_msg(&receive_msg);
@@ -690,9 +700,7 @@ int32_t main(int32_t argc, char *argv[])
             dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain);
         }
 
-        first_cycle = false;
-
-        usleep(TICK_MS * 1000);
+        usleep(PCAP_POLL_INTERVAL_MS * MSEC_TO_USEC);
     }
 
     return EXIT_SUCCESS;

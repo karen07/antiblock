@@ -47,6 +47,7 @@
 #define CNAME_DOMAINS_MAP_MAX_SIZE 500
 #define ROUTES_MAP_MAX_SIZE 1000
 
+#define PCAP_POLL_INTERVAL_MS 10
 #define STAT_PRINT_TIME 10
 #define DOMAINS_UPDATE_TIME 60 * 60 * 24
 
@@ -95,7 +96,7 @@ extern subnet_t blacklist[BLACKLIST_MAX_COUNT];
 
 extern struct sockaddr_in listen_addr;
 
-extern volatile uint64_t now_unix_time;
+extern volatile uint64_t last_del_expired_routes;
 
 #ifdef PROXY_MODE
 #ifdef MULTIPLE_DNS
