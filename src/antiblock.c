@@ -1,11 +1,17 @@
 #include "antiblock.h"
-#include "config.h"
 #include "dns_ans.h"
-#include "hash.h"
+#include "domains_read.h"
 #include "net_data.h"
 #include "stat.h"
-#include "tun.h"
-#include "domains_read.h"
+
+#define MAX_SUBNET_STR_SIZE 100
+#define MAX_FILE_LOG_STAT_NAME 100
+#define MSEC_TO_USEC 1000
+
+typedef struct gateway_data {
+    char name[IFNAMSIZ];
+    uint32_t nexthop_ip;
+} gateway_data_t;
 
 FILE *log_fd;
 FILE *stat_fd;
@@ -17,12 +23,8 @@ int32_t blacklist_count;
 subnet_t blacklist[BLACKLIST_MAX_COUNT];
 
 struct sockaddr_in listen_addr;
-pthread_barrier_t threads_barrier;
 
-typedef struct gateway_data {
-    char name[IFNAMSIZ];
-    uint32_t nexthop_ip;
-} gateway_data_t;
+volatile uint64_t last_del_expired_routes;
 
 static gateway_data_t gateways[GATEWAY_MAX_COUNT];
 
@@ -30,16 +32,9 @@ static gateway_data_t gateways[GATEWAY_MAX_COUNT];
 struct sockaddr_in dns_addr[DNS_MAX_COUNT];
 #endif
 
-#ifdef TUN_MODE
-uint32_t tun_ip = INADDR_NONE;
-uint32_t tun_prefix;
-#endif
-
-#ifdef ROUTE_TABLE_MODE
 static int32_t test_mode;
 static int32_t route_socket;
 static void clean_route_table(void);
-#endif
 
 void errmsg(const char *format, ...)
 {
@@ -51,9 +46,7 @@ void errmsg(const char *format, ...)
     vprintf(format, args);
     va_end(args);
 
-#ifdef ROUTE_TABLE_MODE
     clean_route_table();
-#endif
 
     if (stat_fd) {
         stat_print(stat_fd);
@@ -68,7 +61,6 @@ void errmsg(const char *format, ...)
     exit(EXIT_FAILURE);
 }
 
-#ifdef ROUTE_TABLE_MODE
 static void set_route(struct rtentry *route, int32_t gateway_index, uint32_t dst)
 {
     memset(route, 0, sizeof(*route));
@@ -147,10 +139,13 @@ static void clean_route_table(void)
 {
     FILE *route_fd = fopen("/proc/net/route", "r");
     if (route_fd == NULL) {
-        errmsg("Can't open /proc/net/route\n");
+        printf("Can't open /proc/net/route\n");
+        return;
     }
 
-    fseek(route_fd, 128, SEEK_SET);
+    int ch;
+    while ((ch = fgetc(route_fd)) != '\n' && ch != EOF) {
+    }
 
     char iface[IFNAMSIZ];
     uint32_t dest_ip;
@@ -180,10 +175,13 @@ static uint32_t get_iface_default_gw(char *iface_in)
 {
     FILE *route_fd = fopen("/proc/net/route", "r");
     if (route_fd == NULL) {
-        errmsg("Can't open /proc/net/route\n");
+        printf("Can't open /proc/net/route\n");
+        return 0;
     }
 
-    fseek(route_fd, 128, SEEK_SET);
+    int ch;
+    while ((ch = fgetc(route_fd)) != '\n' && ch != EOF) {
+    }
 
     char iface[IFNAMSIZ];
     uint32_t dest_ip;
@@ -208,17 +206,24 @@ static uint32_t get_iface_default_gw(char *iface_in)
     fclose(route_fd);
     return 0;
 }
-#endif
 
 static void add_blacklist(const char *subnet_str)
 {
-    char tmp_subnet[100];
+    char tmp_subnet[MAX_SUBNET_STR_SIZE];
+
+    if (strlen(subnet_str) >= sizeof(tmp_subnet)) {
+        errmsg("Blacklist entry is too long (max %zu chars)\n", sizeof(tmp_subnet) - 1);
+    }
+
     strcpy(tmp_subnet, subnet_str);
 
     char *slash_ptr = strchr(tmp_subnet, '/');
     if (slash_ptr) {
         uint32_t tmp_prefix = 0;
         sscanf(slash_ptr + 1, "%u", &tmp_prefix);
+        if ((tmp_prefix > 32) || (tmp_prefix <= 0)) {
+            errmsg("Invalid blacklist prefix: expected value from 1 to 32\n");
+        }
         *slash_ptr = 0;
         if (strlen(tmp_subnet) < INET_ADDRSTRLEN) {
             if (blacklist_count < BLACKLIST_MAX_COUNT) {
@@ -229,7 +234,24 @@ static void add_blacklist(const char *subnet_str)
         }
         *slash_ptr = '/';
     } else {
-        errmsg("Every blacklist line \"x.x.x.x/xx\"\n");
+        errmsg("Invalid blacklist entry: expected format \"x.x.x.x/xx\"\n");
+    }
+}
+
+static void print_log_head(void)
+{
+    if (log_fd) {
+        if (ftruncate(fileno(log_fd), 0) == 0) {
+            fseek(log_fd, 0, SEEK_SET);
+            fprintf(log_fd, "Reductions:\n");
+            fprintf(log_fd, "    Q(x)-DNS question x type\n");
+            fprintf(log_fd, "    A(x)-DNS answer x type\n");
+            fprintf(log_fd, "    BA(x)-A in x route\n");
+            fprintf(log_fd, "    BC(x)-CNAME in x route\n");
+            fprintf(log_fd, "    BL-IP in blacklist\n");
+            fprintf(log_fd, "    NA-A not in routes\n");
+            fprintf(log_fd, "    NC-CNAME not in routes\n");
+        }
     }
 }
 
@@ -259,9 +281,6 @@ static void print_help(void)
 #else
            "    -l  \"x.x.x.x:xx\"  Address for sniffing packets with this src\n"
 #endif
-#ifdef TUN_MODE
-           "    -n  \"x.x.x.x/xx\"  TUN net\n"
-#endif
            "  Optional parameters:\n"
            "    -b  \"/test.txt\"   Subnets not add to the routing table\n"
            "    -o  \"/test/\"      Log or stat output folder\n"
@@ -284,6 +303,7 @@ static void main_catch_function(int32_t signo)
 
 int32_t main(int32_t argc, char *argv[])
 {
+    /* Init msg */
 #ifdef PCAP_MODE
     printf("AntiBlock " ANTIBLOCK_VERSION " sniffer DNS requests. The IP addresses of\n"
            "the specified domains are added to the routing table for\n"
@@ -293,7 +313,9 @@ int32_t main(int32_t argc, char *argv[])
            "the specified domains are added to the routing table for\n"
            "routing through the specified interfaces.\n");
 #endif
+    /* Init msg */
 
+    /* Set signal catch_functions */
     if (signal(SIGINT, main_catch_function) == SIG_ERR) {
         errmsg("Can't set SIGINT signal handler main\n");
     }
@@ -305,12 +327,14 @@ int32_t main(int32_t argc, char *argv[])
     if (signal(SIGTERM, main_catch_function) == SIG_ERR) {
         errmsg("Can't set SIGTERM signal handler main\n");
     }
+    /* Set signal catch_functions */
 
+    /* Set init values */
     int32_t is_log_print = 0;
     int32_t is_stat_print = 0;
 
-    char log_or_stat_folder[PATH_MAX - 100];
-    memset(log_or_stat_folder, 0, PATH_MAX - 100);
+    char log_or_stat_folder[PATH_MAX - MAX_FILE_LOG_STAT_NAME];
+    memset(log_or_stat_folder, 0, PATH_MAX - MAX_FILE_LOG_STAT_NAME);
 
     char blacklist_file_path[PATH_MAX];
     memset(blacklist_file_path, 0, PATH_MAX);
@@ -322,9 +346,11 @@ int32_t main(int32_t argc, char *argv[])
         dns_addr[i].sin_addr.s_addr = INADDR_NONE;
     }
 #endif
+    /* Set init values */
 
     printf("Launch parameters:\n");
 
+    /* Process command-line arguments */
     for (int32_t i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-r")) {
             if (i != argc - 1) {
@@ -418,24 +444,6 @@ int32_t main(int32_t argc, char *argv[])
             continue;
         }
 #endif
-#ifdef TUN_MODE
-        if (!strcmp(argv[i], "-n")) {
-            if (i != argc - 1) {
-                printf("  TUN     \"%s\"\n", argv[i + 1]);
-                char *slash_ptr = strchr(argv[i + 1], '/');
-                if (slash_ptr) {
-                    sscanf(slash_ptr + 1, "%u", &tun_prefix);
-                    *slash_ptr = 0;
-                    if (strlen(argv[i + 1]) < INET_ADDRSTRLEN) {
-                        tun_ip = inet_addr(argv[i + 1]);
-                    }
-                    *slash_ptr = '/';
-                }
-                i++;
-            }
-            continue;
-        }
-#endif
         if (!strcmp(argv[i], "-b")) {
             if (i != argc - 1) {
                 if (strlen(argv[i + 1]) < PATH_MAX) {
@@ -448,7 +456,7 @@ int32_t main(int32_t argc, char *argv[])
         }
         if (!strcmp(argv[i], "-o")) {
             if (i != argc - 1) {
-                if (strlen(argv[i + 1]) < PATH_MAX - 100) {
+                if (strlen(argv[i + 1]) < PATH_MAX - MAX_FILE_LOG_STAT_NAME) {
                     strcpy(log_or_stat_folder, argv[i + 1]);
                     printf("  Output     \"%s\"\n", log_or_stat_folder);
                 }
@@ -467,16 +475,16 @@ int32_t main(int32_t argc, char *argv[])
             continue;
         }
         if (!strcmp(argv[i], "--test")) {
-#ifdef ROUTE_TABLE_MODE
             test_mode = 1;
-#endif
             printf("  Test       enabled\n");
             continue;
         }
         print_help();
         errmsg("Unknown command: %s\n", argv[i]);
     }
+    /* Process command-line arguments */
 
+    /* Check arguments */
     if (gateways_count == 0) {
         print_help();
         errmsg("The program needs at least one correct pair of \"gateway domains\"\n");
@@ -518,37 +526,35 @@ int32_t main(int32_t argc, char *argv[])
     }
 #endif
 
-#ifdef TUN_MODE
-    if (tun_ip == INADDR_NONE) {
-        print_help();
-        errmsg("The program need correct TUN IP\n");
-    }
-
-    if (tun_prefix == 0) {
-        print_help();
-        errmsg("The program need correct TUN prefix\n");
-    }
-
-    if (tun_prefix > 24) {
-        print_help();
-        errmsg("The program need TUN net prefix 1 - 24\n");
-    }
-#endif
-
     if (is_log_print || is_stat_print) {
         if (log_or_stat_folder[0] == 0) {
-            print_help();
-            errmsg("The program need output folder for log or statistics\n");
+            strcpy(log_or_stat_folder, ".");
         }
     }
+    /* Check arguments */
 
+    /* Set default blacklist subnets */
     add_blacklist("0.0.0.0/8");
     add_blacklist("10.0.0.0/8");
     add_blacklist("100.64.0.0/10");
     add_blacklist("127.0.0.0/8");
+    add_blacklist("169.254.0.0/16");
     add_blacklist("172.16.0.0/12");
+    add_blacklist("192.0.0.0/24");
+    add_blacklist("192.0.2.0/24");
+    add_blacklist("192.31.196.0/24");
+    add_blacklist("192.52.193.0/24");
+    add_blacklist("192.88.99.0/24");
     add_blacklist("192.168.0.0/16");
+    add_blacklist("192.175.48.0/24");
+    add_blacklist("198.18.0.0/15");
+    add_blacklist("198.51.100.0/24");
+    add_blacklist("203.0.113.0/24");
+    add_blacklist("224.0.0.0/4");
+    add_blacklist("240.0.0.0/4");
+    /* Set default blacklist subnets */
 
+    /* Read blacklist file */
     if (blacklist_file_path[0] != 0) {
         FILE *blacklist_fd;
         blacklist_fd = fopen(blacklist_file_path, "r");
@@ -556,20 +562,24 @@ int32_t main(int32_t argc, char *argv[])
             errmsg("Can't open blacklist file %s\n", blacklist_file_path);
         }
 
-        char tmp_line[100];
+        char tmp_line[MAX_SUBNET_STR_SIZE];
 
-        while (fscanf(blacklist_fd, "%s", tmp_line) != EOF) {
+        while (fscanf(blacklist_fd, "%99s", tmp_line) != EOF) {
             add_blacklist(tmp_line);
         }
+
+        fclose(blacklist_fd);
 
         if (blacklist_count > BLACKLIST_MAX_COUNT) {
             errmsg("The program needs a maximum of %d blacklist subnets, seted %d\n",
                    BLACKLIST_MAX_COUNT, blacklist_count);
         }
     }
+    /* Read blacklist file */
 
     dns_ans_check_test();
 
+    /* Open log and stat files */
     if (is_log_print) {
         char log_path[PATH_MAX];
         sprintf(log_path, "%s%s", log_or_stat_folder, "/log.txt");
@@ -587,29 +597,16 @@ int32_t main(int32_t argc, char *argv[])
             errmsg("Can't open stat file\n");
         }
     }
+    /* Open log and stat files */
 
-    int32_t threads_barrier_count = 3;
-
-#ifdef TUN_MODE
-    threads_barrier_count += 1;
-#endif
-
-#ifdef PCAP_MODE
-    threads_barrier_count -= 1;
-#endif
-
-    if (pthread_barrier_init(&threads_barrier, NULL, threads_barrier_count)) {
-        errmsg("Can't create threads_barrier\n");
-    }
-
-#ifdef TUN_MODE
-    init_tun_thread();
-#else
+    /* Init ioctl socket */
     route_socket = socket(AF_INET, SOCK_DGRAM, 0);
     if (route_socket < 0) {
         errmsg("Can't create route_socket \"%s\"\n", strerror(errno));
     }
+    /* Init ioctl socket */
 
+    /* Get nexthop ip for L2 gateways */
     for (int32_t i = 0; i < gateways_count; i++) {
         struct ifreq ifreq;
         memset(&ifreq, 0, sizeof(ifreq));
@@ -625,63 +622,85 @@ int32_t main(int32_t argc, char *argv[])
             gateways[i].nexthop_ip = get_iface_default_gw(gateways[i].name);
         }
     }
-#endif
+    /* Get nexthop ip for L2 gateways */
 
-    init_net_data_threads();
+    /* Init memory for msgs */
+    memory_t receive_msg;
 
-    pthread_barrier_wait(&threads_barrier);
+    memory_t que_domain;
+    que_domain.size = 0;
+    que_domain.max_size = DOMAIN_MAX_SIZE;
+    que_domain.data = (char *)malloc(que_domain.max_size * sizeof(char));
+    if (que_domain.data == 0) {
+        errmsg("No free memory for que_domain\n");
+    }
 
-    int32_t circles = 0;
-    int32_t sleep_circles = 0;
+    memory_t ans_domain;
+    ans_domain.size = 0;
+    ans_domain.max_size = DOMAIN_MAX_SIZE;
+    ans_domain.data = (char *)malloc(ans_domain.max_size * sizeof(char));
+    if (ans_domain.data == 0) {
+        errmsg("No free memory for ans_domain\n");
+    }
+
+    memory_t cname_domain;
+    cname_domain.size = 0;
+    cname_domain.max_size = DOMAIN_MAX_SIZE;
+    cname_domain.data = (char *)malloc(cname_domain.max_size * sizeof(char));
+    if (cname_domain.data == 0) {
+        errmsg("No free memory for cname_domain\n");
+    }
+    /* Init memory for msgs */
+
+    PCAP_mode_init();
+
+    clean_route_table();
+
+    /* Init timers */
+    uint64_t last_domains_update = 0;
+    uint64_t last_stat_print = 0;
+    last_del_expired_routes = 0;
+    /* Init timers */
 
     while (true) {
-        if (circles++ == 0) {
-            if (log_fd) {
-                if (ftruncate(fileno(log_fd), 0) == 0) {
-                    fseek(log_fd, 0, SEEK_SET);
-                    fprintf(log_fd, "Reductions:\n");
-                    fprintf(log_fd, "    Q(x)-DNS question x type\n");
-                    fprintf(log_fd, "    A(x)-DNS answer x type\n");
-                    fprintf(log_fd, "    BA(x)-A in x route\n");
-                    fprintf(log_fd, "    BC(x)-CNAME in x route\n");
-                    fprintf(log_fd, "    BL-IP in blacklist\n");
-                    fprintf(log_fd, "    NA-A not in routes\n");
-                    fprintf(log_fd, "    NC-CNAME not in routes\n");
-                }
-            }
+        uint64_t now = time(NULL);
 
-#ifdef ROUTE_TABLE_MODE
-            clean_route_table();
-#endif
+        if (last_domains_update == 0 || now - last_domains_update >= DOMAINS_UPDATE_TIME) {
+            print_log_head();
 
             memset(&statistics_data, 0, sizeof(statistics_data));
-            statistics_data.stat_start = time(NULL);
+            statistics_data.stat_start = now;
 
-            int32_t domains_read_status = 0;
-            domains_read_status = domains_read();
+            domains_read();
 
-            if (domains_read_status) {
-                sleep_circles = DOMAINS_UPDATE_TIME;
-            } else {
-                sleep_circles = DOMAINS_ERROR_UPDATE_TIME;
+            last_domains_update = now;
+        }
+
+        if (last_stat_print == 0 || now - last_stat_print >= STAT_PRINT_TIME) {
+            if (stat_fd) {
+                stat_print(stat_fd);
             }
 
-            sleep_circles /= STAT_PRINT_TIME;
+            if (log_fd) {
+                fflush(log_fd);
+            }
+
+            fflush(stdout);
+
+            last_stat_print = now;
         }
 
-        circles %= sleep_circles;
-
-        if (stat_fd) {
-            stat_print(stat_fd);
+        if (last_del_expired_routes == 0 || now != last_del_expired_routes) {
+            last_del_expired_routes = now;
+            del_expired_routes_from_hashmap();
         }
 
-        if (log_fd) {
-            fflush(log_fd);
+        int32_t ret = PCAP_get_msg(&receive_msg);
+        if (ret) {
+            dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain);
         }
 
-        fflush(stdout);
-
-        sleep(STAT_PRINT_TIME);
+        usleep(PCAP_POLL_INTERVAL_MS * MSEC_TO_USEC);
     }
 
     return EXIT_SUCCESS;

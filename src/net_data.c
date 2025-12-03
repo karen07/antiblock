@@ -1,11 +1,8 @@
 #include "antiblock.h"
-#include "config.h"
 #include "dns_ans.h"
-#include "hash.h"
+#include "domains_read.h"
 #include "net_data.h"
 #include "stat.h"
-#include "tun.h"
-#include "domains_read.h"
 
 #ifdef PROXY_MODE
 
@@ -25,7 +22,7 @@ static void *DNS_data(__attribute__((unused)) void *arg)
     repeater_DNS_addr = listen_addr;
     repeater_DNS_addr.sin_port = htons(ntohs(repeater_DNS_addr.sin_port) + 1);
 
-    uint32_t receive_DNS_addr_length = sizeof(receive_DNS_addr);
+    socklen_t receive_DNS_addr_length = sizeof(receive_DNS_addr);
 
     repeater_DNS_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (repeater_DNS_socket < 0) {
@@ -113,7 +110,7 @@ static void *client_data(__attribute__((unused)) void *arg)
 {
     struct sockaddr_in receive_client_addr;
 
-    uint32_t receive_client_addr_length = sizeof(receive_client_addr);
+    socklen_t receive_client_addr_length = sizeof(receive_client_addr);
 
     repeater_client_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (repeater_client_socket < 0) {
@@ -205,19 +202,15 @@ void init_net_data_threads(void)
 
 #else
 
+#define PCAP_FILTER_MAX_SIZE 1000
+
 typedef struct route_entry {
     uint32_t dst;
     uint64_t expires_at;
     int32_t gateway_index;
 } route_entry_t;
 
-static memory_t receive_msg;
-static memory_t que_domain;
-static memory_t ans_domain;
-static memory_t cname_domain;
-
-static uint64_t now;
-
+static pcap_t *handle;
 static array_hashmap_t ips_routes;
 
 static array_hashmap_hash ips_hash(const void *elem_data)
@@ -243,7 +236,7 @@ static array_hashmap_bool ips_del_func(const void *del_elem_data)
 {
     const route_entry_t *elem = del_elem_data;
 
-    if (elem->expires_at < now) {
+    if (elem->expires_at < last_del_expired_routes) {
         /*
         struct in_addr new_ip;
         new_ip.s_addr = elem->dst;
@@ -276,7 +269,7 @@ int32_t add_route_to_hashmap(int32_t gateway_index, uint32_t dst, uint32_t ans_t
 {
     route_entry_t add_elem;
     add_elem.dst = dst;
-    add_elem.expires_at = now + ans_ttl;
+    add_elem.expires_at = last_del_expired_routes + ans_ttl;
     add_elem.gateway_index = gateway_index;
 
     /*
@@ -289,12 +282,16 @@ int32_t add_route_to_hashmap(int32_t gateway_index, uint32_t dst, uint32_t ans_t
     return array_hashmap_add_elem(ips_routes, &add_elem, NULL, ips_on_already_in);
 }
 
-static void *PCAP(__attribute__((unused)) void *arg)
+void del_expired_routes_from_hashmap(void)
 {
-    pcap_t *handle;
+    array_hashmap_del_elem_by_func(ips_routes, ips_del_func);
+}
+
+void PCAP_mode_init(void)
+{
     char errbuf[PCAP_ERRBUF_SIZE];
     struct bpf_program fp;
-    char filter_exp[1000];
+    char filter_exp[PCAP_FILTER_MAX_SIZE];
 
     struct in_addr listen_ip;
     listen_ip.s_addr = listen_addr.sin_addr.s_addr;
@@ -321,102 +318,70 @@ static void *PCAP(__attribute__((unused)) void *arg)
         errmsg("Can't pcap setnonblock %s\n", errbuf);
     }
 
-    receive_msg.size = 0;
-    receive_msg.max_size = PACKET_MAX_SIZE;
-    receive_msg.data = (char *)malloc(receive_msg.max_size * sizeof(char));
-    if (receive_msg.data == 0) {
-        errmsg("No free memory for receive_msg from DNS\n");
-    }
-
-    que_domain.size = 0;
-    que_domain.max_size = DOMAIN_MAX_SIZE;
-    que_domain.data = (char *)malloc(que_domain.max_size * sizeof(char));
-    if (que_domain.data == 0) {
-        errmsg("No free memory for que_domain\n");
-    }
-
-    ans_domain.size = 0;
-    ans_domain.max_size = DOMAIN_MAX_SIZE;
-    ans_domain.data = (char *)malloc(ans_domain.max_size * sizeof(char));
-    if (ans_domain.data == 0) {
-        errmsg("No free memory for ans_domain\n");
-    }
-
-    cname_domain.size = 0;
-    cname_domain.max_size = DOMAIN_MAX_SIZE;
-    cname_domain.data = (char *)malloc(cname_domain.max_size * sizeof(char));
-    if (cname_domain.data == 0) {
-        errmsg("No free memory for cname_domain\n");
-    }
-
-    ips_routes = array_hashmap_init(1000, 1.0, sizeof(route_entry_t));
+    ips_routes = array_hashmap_init(ROUTES_MAP_MAX_SIZE, 1.0, sizeof(route_entry_t));
     if (ips_routes == NULL) {
         errmsg("No free memory for ips_routes\n");
     }
     array_hashmap_set_func(ips_routes, ips_hash, ips_cmp, ips_hash, ips_cmp, ips_hash, ips_cmp);
-
-    pthread_barrier_wait(&threads_barrier);
-
-    uint64_t last = time(NULL);
-
-    while (1) {
-        struct pcap_pkthdr *pkthdr;
-        const u_char *packet;
-        int32_t ret = pcap_next_ex(handle, &pkthdr, &packet);
-
-        now = time(NULL);
-        if (now != last) {
-            last = now;
-            array_hashmap_del_elem_by_func(ips_routes, ips_del_func);
-        }
-
-        if (ret != 1) {
-            continue;
-        }
-
-        if (pkthdr->len != pkthdr->caplen) {
-            continue;
-        }
-
-        if (pkthdr->len <
-            (int32_t)(sizeof(struct sll_header) + sizeof(struct iphdr) + sizeof(struct udphdr))) {
-            continue;
-        }
-
-        struct sll_header *eth_h = (struct sll_header *)packet;
-        if (eth_h->sll_protocol != htons(ETH_P_IP)) {
-            continue;
-        }
-
-        struct iphdr *iph = (struct iphdr *)((char *)eth_h + sizeof(*eth_h));
-        if (iph->protocol != IPPROTO_UDP) {
-            continue;
-        }
-
-        struct udphdr *udph = (struct udphdr *)((char *)iph + sizeof(*iph));
-        if (udph->source != listen_addr.sin_port) {
-            continue;
-        }
-
-        receive_msg.size = ntohs(udph->len) - sizeof(*udph);
-        receive_msg.data = (char *)udph + sizeof(*udph);
-
-        dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain);
-    }
-
-    return NULL;
 }
 
-void init_net_data_threads(void)
+int32_t PCAP_get_msg(memory_t *receive_msg)
 {
-    pthread_t PCAP_thread;
-    if (pthread_create(&PCAP_thread, NULL, PCAP, NULL)) {
-        errmsg("Can't create client_data_thread\n");
+    struct pcap_pkthdr *pkthdr;
+    const u_char *packet;
+    int32_t ret = pcap_next_ex(handle, &pkthdr, &packet);
+
+    if (ret != 1) {
+        return 0;
     }
 
-    if (pthread_detach(PCAP_thread)) {
-        errmsg("Can't detach client_data_thread\n");
+    if (pkthdr->len != pkthdr->caplen) {
+        return 0;
     }
+
+    if (pkthdr->len < (sizeof(struct sll_header) + sizeof(struct iphdr))) {
+        return 0;
+    }
+
+    struct sll_header *eth_h = (struct sll_header *)packet;
+    if (eth_h->sll_protocol != htons(ETH_P_IP)) {
+        return 0;
+    }
+
+    struct iphdr *iph = (struct iphdr *)((char *)eth_h + sizeof(*eth_h));
+    if (iph->protocol != IPPROTO_UDP) {
+        return 0;
+    }
+
+    uint32_t iphdr_len = iph->ihl * 4;
+    if (iphdr_len < sizeof(struct iphdr)) {
+        return 0;
+    }
+
+    if (pkthdr->len < (sizeof(struct sll_header) + iphdr_len + sizeof(struct udphdr))) {
+        return 0;
+    }
+
+    struct udphdr *udph = (struct udphdr *)((char *)iph + iphdr_len);
+
+    uint16_t udp_len = ntohs(udph->len);
+    if (udp_len < sizeof(struct udphdr)) {
+        return 0;
+    }
+
+    if (pkthdr->len < (sizeof(struct sll_header) + iphdr_len + udp_len)) {
+        return 0;
+    }
+
+    if (udph->source != listen_addr.sin_port) {
+        return 0;
+    }
+
+    receive_msg->size = udp_len - sizeof(*udph);
+    receive_msg->max_size = receive_msg->size;
+    receive_msg->data = (char *)udph + sizeof(*udph);
+
+    return 1;
 }
 
 #endif

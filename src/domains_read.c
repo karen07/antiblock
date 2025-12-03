@@ -1,11 +1,8 @@
 #include "antiblock.h"
-#include "config.h"
 #include "dns_ans.h"
-#include "hash.h"
+#include "domains_read.h"
 #include "net_data.h"
 #include "stat.h"
-#include "tun.h"
-#include "domains_read.h"
 #include <curl/curl.h>
 
 #define HTTP_OK 200
@@ -13,17 +10,35 @@
 static memory_t domains;
 static array_hashmap_t domain_routes;
 
+static uint32_t djb33_hash_len(const char *s, size_t len)
+{
+    uint32_t h = 5381;
+    while (*s && len--) {
+        h += (h << 5);
+        h ^= *s++;
+    }
+    return h;
+}
+
 int32_t get_gateway(memory_t *domain)
 {
-    char *dot_pos = domain->data + 1;
-    if (!memcmp(dot_pos, "www.", strlen("www."))) {
-        dot_pos += strlen("www.");
+    int32_t offset = 0;
+    if (!memcmp(domain->data, ".www.", strlen(".www."))) {
+        offset = strlen(".www");
     }
 
-    domains_gateway_t res_elem;
-    int32_t find_res = array_hashmap_find_elem(domain_routes, dot_pos, &res_elem);
-    if (find_res == array_hashmap_elem_finded) {
-        return res_elem.gateway;
+    for (int32_t i = offset; i < (int32_t)domain->size; i++) {
+        if (domain->data[i] == '.') {
+            char *dot_pos = &domain->data[i + 1];
+
+            domains_gateway_t res_elem;
+            int32_t find_res = array_hashmap_find_elem(domain_routes, dot_pos, &res_elem);
+            if (find_res == array_hashmap_elem_finded) {
+                if ((!res_elem.match_subdomains && (i == offset)) || res_elem.match_subdomains) {
+                    return res_elem.gateway;
+                }
+            }
+        }
     }
 
     return GET_GATEWAY_NOT_IN_ROUTES;
@@ -38,6 +53,7 @@ void add_domain(memory_t *cname_domain, int32_t cname_domain_gateway)
             domains_gateway_t add_elem;
             add_elem.offset = domains.size;
             add_elem.gateway = cname_domain_gateway;
+            add_elem.match_subdomains = 1;
 
             domains.size += cname_domain->size;
 
@@ -110,8 +126,6 @@ int32_t domains_read(void)
             CURL *curl = curl_easy_init();
             if (curl) {
                 curl_easy_setopt(curl, CURLOPT_URL, gateway_domains_paths[i]);
-                curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-                curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
                 curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, cb);
                 curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&domains);
 
@@ -207,12 +221,6 @@ int32_t domains_read(void)
             errmsg("No free memory for domain_routes\n");
         }
 
-        int32_t is_thread_safety = 0;
-        is_thread_safety = array_hashmap_is_thread_safety(domain_routes);
-        if (is_thread_safety == 0) {
-            errmsg("No thread safety hashmap\n");
-        }
-
         array_hashmap_set_func(domain_routes, domain_add_hash, domain_add_cmp, domain_find_hash,
                                domain_find_cmp, domain_find_hash, domain_find_cmp);
 
@@ -233,6 +241,12 @@ int32_t domains_read(void)
             }
 
             domains_gateway_t add_elem;
+            if (domains.data[domain_offset] == '!') {
+                domain_offset += 1;
+                add_elem.match_subdomains = 0;
+            } else {
+                add_elem.match_subdomains = 1;
+            }
             add_elem.offset = domain_offset;
             add_elem.gateway = gateway_id;
 

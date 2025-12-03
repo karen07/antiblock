@@ -1,11 +1,10 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <limits.h>
-#include <linux/if.h>
 #include <linux/if_arp.h>
+#include <linux/if.h>
 #include <linux/limits.h>
 #include <linux/route.h>
-#include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -14,19 +13,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <time.h>
 #include <unistd.h>
 
-/* Initial setup */
-//#define MULTIPLE_DNS
+#include "array_hashmap.h"
 
-//#define PROXY_MODE
+#define ANTIBLOCK_VERSION "2.2.0"
+
 #define PCAP_MODE
+/* #define PROXY_MODE */
+/* #define MULTIPLE_DNS */
 
-#define ROUTE_TABLE_MODE
-//#define TUN_MODE
-/* Initial setup */
-
-//Defines check
 #ifdef PCAP_MODE
 #ifdef MULTIPLE_DNS
 #error "You can't use PCAP_MODE and MULTIPLE_DNS"
@@ -34,11 +31,7 @@
 #ifdef PROXY_MODE
 #error "You can't use PCAP_MODE and PROXY_MODE"
 #endif
-#ifdef TUN_MODE
-#error "You can't use PCAP_MODE and TUN_MODE"
 #endif
-#endif
-//Defines check
 
 #ifdef PCAP_MODE
 #include <linux/if_ether.h>
@@ -48,15 +41,32 @@
 #include <pcap/sll.h>
 #endif
 
-#ifdef TUN_MODE
-#include <fcntl.h>
-#include <linux/if_tun.h>
-#include <linux/ip.h>
-#include <linux/tcp.h>
-#include <linux/udp.h>
-#endif
+#define PACKET_MAX_SIZE 1600
+#define DOMAIN_MAX_SIZE 300
 
-#include "array_hashmap.h"
+#define CNAME_DOMAINS_MAP_MAX_SIZE 500
+#define ROUTES_MAP_MAX_SIZE 1000
+
+#define PCAP_POLL_INTERVAL_MS 10
+#define STAT_PRINT_TIME 10
+#define DOMAINS_UPDATE_TIME 60 * 60 * 24
+
+#define BLACKLIST_MAX_COUNT 128
+
+#define GATEWAY_BITS_COUNT 5
+#define MATCH_SUBDOMAINS_BITS_COUNT 1
+#define OFFSET_BITS_COUNT (32 - GATEWAY_BITS_COUNT - MATCH_SUBDOMAINS_BITS_COUNT)
+
+#define GATEWAY_MAX_COUNT (1 << GATEWAY_BITS_COUNT)
+
+#ifndef _DOMAINS_TYPE
+#define _DOMAINS_TYPE
+typedef struct domains_gateway {
+    unsigned int gateway : GATEWAY_BITS_COUNT;
+    unsigned int match_subdomains : MATCH_SUBDOMAINS_BITS_COUNT;
+    unsigned int offset : OFFSET_BITS_COUNT;
+} domains_gateway_t;
+#endif
 
 #ifndef _MEMORY_TYPE
 #define _MEMORY_TYPE
@@ -75,20 +85,6 @@ typedef struct subnet {
 } subnet_t;
 #endif
 
-#define BLACKLIST_MAX_COUNT 128
-
-#define GATEWAY_BITS_COUNT 5
-#define OFFSET_BITS_COUNT (32 - GATEWAY_BITS_COUNT)
-#define GATEWAY_MAX_COUNT (1 << GATEWAY_BITS_COUNT)
-
-#ifndef _DOMAINS_TYPE
-#define _DOMAINS_TYPE
-typedef struct domains_gateway {
-    unsigned int gateway : GATEWAY_BITS_COUNT;
-    unsigned int offset : OFFSET_BITS_COUNT;
-} domains_gateway_t;
-#endif
-
 extern FILE *log_fd;
 extern FILE *stat_fd;
 
@@ -99,12 +95,8 @@ extern int32_t blacklist_count;
 extern subnet_t blacklist[BLACKLIST_MAX_COUNT];
 
 extern struct sockaddr_in listen_addr;
-extern pthread_barrier_t threads_barrier;
 
-#ifdef TUN_MODE
-extern uint32_t tun_ip;
-extern uint32_t tun_prefix;
-#endif
+extern volatile uint64_t last_del_expired_routes;
 
 #ifdef PROXY_MODE
 #ifdef MULTIPLE_DNS
@@ -120,7 +112,5 @@ extern struct sockaddr_in dns_addr[DNS_MAX_COUNT];
 
 void errmsg(const char *format, ...);
 
-#ifdef ROUTE_TABLE_MODE
 void add_route(int32_t gateway_index, uint32_t dst, uint32_t ans_ttl);
 void del_route(int32_t gateway_index, uint32_t dst);
-#endif
