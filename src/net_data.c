@@ -15,8 +15,10 @@ static id_map_t *id_map;
 static int32_t repeater_DNS_socket;
 static int32_t repeater_client_socket;
 
-static void *DNS_data(__attribute__((unused)) void *arg)
+static void *DNS_data(void *arg)
 {
+    (void)arg;
+
     struct sockaddr_in repeater_DNS_addr, receive_DNS_addr, client_addr;
 
     repeater_DNS_addr = listen_addr;
@@ -106,8 +108,10 @@ static void *DNS_data(__attribute__((unused)) void *arg)
     return NULL;
 }
 
-static void *client_data(__attribute__((unused)) void *arg)
+static void *client_data(void *arg)
 {
+    (void)arg;
+
     struct sockaddr_in receive_client_addr;
 
     socklen_t receive_client_addr_length = sizeof(receive_client_addr);
