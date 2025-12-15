@@ -26,7 +26,9 @@ install(TARGETS ${PROJECT_NAME} DESTINATION /usr/bin)
 
 find_program(CLANGFORMAT clang-format)
 if(CLANGFORMAT)
-    add_custom_command(TARGET ${PROJECT_NAME} PRE_BUILD
-        COMMAND clang-format -i ${CMAKE_CURRENT_SOURCE_DIR}/include/* ${CMAKE_CURRENT_SOURCE_DIR}/src/*
-    )
+    add_custom_command(
+        TARGET ${PROJECT_NAME}
+        PRE_BUILD
+        COMMAND clang-format -i ${CMAKE_CURRENT_SOURCE_DIR}/include/*
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/*)
 endif()
