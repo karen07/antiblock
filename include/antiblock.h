@@ -37,7 +37,7 @@
 #include <linux/if_ether.h>
 #include <linux/ip.h>
 #include <linux/udp.h>
-#include <pcap.h>
+#include <pcap/pcap.h>
 #include <pcap/sll.h>
 #endif
 
