@@ -1,5 +1,5 @@
 # AntiBlock
-AntiBlock sniffer DNS requests. The IP addresses of the specified domains are added to the routing table for routing through the specified interfaces.
+AntiBlock sniffs DNS traffic, extracts IP addresses from DNS responses for specified domains, and dynamically adds routes to direct traffic via selected network interfaces.
 ## Usage
 ```c
 Commands:
