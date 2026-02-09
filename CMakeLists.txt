@@ -30,5 +30,5 @@ if(CLANGFORMAT)
         TARGET ${PROJECT_NAME}
         PRE_BUILD
         COMMAND clang-format -i ${CMAKE_CURRENT_SOURCE_DIR}/include/*
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/*)
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/*)
 endif()
