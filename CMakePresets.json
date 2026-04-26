@@ -1,0 +1,67 @@
+{
+	"version": 6,
+	"configurePresets": [
+		{
+			"name": "debug",
+			"displayName": "Debug",
+			"description": "Build with no optimizations and debugging information",
+			"generator": "Unix Makefiles",
+			"binaryDir": "${sourceDir}/build/debug",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"CMAKE_CXX_FLAGS_DEBUG": "-g -Og"
+			}
+		},
+		{
+			"name": "debug-asan",
+			"displayName": "Debug ASan",
+			"description": "Build with no optimizations and debugging information and ASan",
+			"generator": "Unix Makefiles",
+			"binaryDir": "${sourceDir}/build/debug-asan",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug_ASan",
+				"CMAKE_CXX_FLAGS_DEBUG": "-g -Og"
+			}
+		},
+		{
+			"name": "debug-msan",
+			"displayName": "Debug MSan",
+			"description": "Build with no optimizations and debugging information and MSan",
+			"generator": "Unix Makefiles",
+			"binaryDir": "${sourceDir}/build/debug-msan",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug_MSan",
+				"CMAKE_CXX_FLAGS_DEBUG": "-g -Og"
+			}
+		},
+		{
+			"name": "release",
+			"displayName": "Release",
+			"description": "Build with optimizations",
+			"generator": "Unix Makefiles",
+			"binaryDir": "${sourceDir}/build/release",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release",
+				"CMAKE_CXX_FLAGS_RELEASE": "-O2"
+			}
+		}
+	],
+	"buildPresets": [
+		{
+			"name": "debug",
+			"configurePreset": "debug"
+		},
+		{
+			"name": "debug-asan",
+			"configurePreset": "debug-asan"
+		},
+		{
+			"name": "debug-msan",
+			"configurePreset": "debug-msan"
+		},
+		{
+			"name": "release",
+			"configurePreset": "release"
+		}
+	]
+}
