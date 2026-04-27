@@ -1,6 +1,9 @@
 # AntiBlock
+
 AntiBlock sniffs DNS traffic, extracts IP addresses from DNS responses for specified domains, and dynamically adds routes to direct traffic via selected network interfaces.
+
 ## Usage
+
 ```c
 Commands:
   It is necessary to enter from 1 to 32 values:
@@ -19,5 +22,7 @@ Commands:
     --stat            Show statistics data
     --test            Test mode
 ```
+
 ## Article
+
 You can read about the method in the [article](https://habr.com/ru/articles/847412/).
