@@ -8,8 +8,7 @@
 			"generator": "Unix Makefiles",
 			"binaryDir": "${sourceDir}/build/debug",
 			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "Debug",
-				"CMAKE_CXX_FLAGS_DEBUG": "-g -Og"
+				"CMAKE_BUILD_TYPE": "Debug"
 			}
 		},
 		{
@@ -19,8 +18,7 @@
 			"generator": "Unix Makefiles",
 			"binaryDir": "${sourceDir}/build/debug-asan",
 			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "Debug_ASan",
-				"CMAKE_CXX_FLAGS_DEBUG": "-g -Og"
+				"CMAKE_BUILD_TYPE": "Debug_ASan"
 			}
 		},
 		{
@@ -30,8 +28,7 @@
 			"generator": "Unix Makefiles",
 			"binaryDir": "${sourceDir}/build/debug-msan",
 			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "Debug_MSan",
-				"CMAKE_CXX_FLAGS_DEBUG": "-g -Og"
+				"CMAKE_BUILD_TYPE": "Debug_MSan"
 			}
 		},
 		{
@@ -41,8 +38,7 @@
 			"generator": "Unix Makefiles",
 			"binaryDir": "${sourceDir}/build/release",
 			"cacheVariables": {
-				"CMAKE_BUILD_TYPE": "Release",
-				"CMAKE_CXX_FLAGS_RELEASE": "-O2"
+				"CMAKE_BUILD_TYPE": "Release"
 			}
 		}
 	],
