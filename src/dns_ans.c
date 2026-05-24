@@ -346,7 +346,7 @@ void dns_ans_check_test(void)
     memory_t receive_msg;
     receive_msg.size = 0;
     receive_msg.max_size = PACKET_MAX_SIZE;
-    receive_msg.data = (char *)malloc(receive_msg.max_size * sizeof(char));
+    receive_msg.data = (char *)malloc(receive_msg.max_size);
     if (receive_msg.data == 0) {
         errmsg("No free memory for receive_msg from DNS\n");
     }
@@ -354,7 +354,7 @@ void dns_ans_check_test(void)
     memory_t que_domain;
     que_domain.size = 0;
     que_domain.max_size = DOMAIN_MAX_SIZE;
-    que_domain.data = (char *)malloc(que_domain.max_size * sizeof(char));
+    que_domain.data = (char *)malloc(que_domain.max_size);
     if (que_domain.data == 0) {
         errmsg("No free memory for que_domain\n");
     }
@@ -362,7 +362,7 @@ void dns_ans_check_test(void)
     memory_t ans_domain;
     ans_domain.size = 0;
     ans_domain.max_size = DOMAIN_MAX_SIZE;
-    ans_domain.data = (char *)malloc(ans_domain.max_size * sizeof(char));
+    ans_domain.data = (char *)malloc(ans_domain.max_size);
     if (ans_domain.data == 0) {
         errmsg("No free memory for ans_domain\n");
     }
@@ -370,7 +370,7 @@ void dns_ans_check_test(void)
     memory_t cname_domain;
     cname_domain.size = 0;
     cname_domain.max_size = DOMAIN_MAX_SIZE;
-    cname_domain.data = (char *)malloc(cname_domain.max_size * sizeof(char));
+    cname_domain.data = (char *)malloc(cname_domain.max_size);
     if (cname_domain.data == 0) {
         errmsg("No free memory for cname_domain\n");
     }
@@ -386,6 +386,9 @@ void dns_ans_check_test(void)
 
     last_processed_id = 0;
     receive_msg.size = sizeof(correct_test);
+    if (receive_msg.size > receive_msg.max_size) {
+        errmsg("Test data exceeds receive buffer max_size\n");
+    }
     memcpy(receive_msg.data, correct_test, receive_msg.size);
     if (dns_ans_check(DNS_ANS, &receive_msg, &que_domain, &ans_domain, &cname_domain) !=
         GET_GATEWAY_NOT_IN_ROUTES) {
