@@ -6,6 +6,14 @@ Domain lists can be read from local files or downloaded from URLs. A single proc
 
 The default build works in packet-sniffing mode with libpcap. The project is intended for selective routing based on DNS answers rather than for DNS filtering or a full proxy/VPN implementation.
 
+## Описание
+
+AntiBlock - инструмент динамической маршрутизации для Linux и OpenWrt, работающий на основе DNS. Он отслеживает DNS ответы для выбранных списков доменов, извлекает полученные IPv4 адреса и добавляет маршруты к этим адресам через настроенные сетевые интерфейсы.
+
+Списки доменов можно читать из локальных файлов или загружать по URL. Один процесс может одновременно поддерживать несколько соответствий между списками доменов и шлюзами, а дополнительный список подсетей позволяет исключить выбранные сети из таблицы динамической маршрутизации.
+
+Сборка по умолчанию работает в режиме перехвата пакетов через libpcap. Проект предназначен для выборочной маршрутизации на основе DNS ответов, а не для фильтрации DNS и не как полноценный прокси или VPN.
+
 ## Сборка
 
 Нужны `libpcap`, `libcurl`, CMake и git submodule `hashmap`.
