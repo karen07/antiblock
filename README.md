@@ -1,19 +1,23 @@
 # AntiBlock
-AntiBlock program proxies DNS requests. The IP addresses of the specified domains are added to the routing table for routing through the specified interface.
+AntiBlock sniffer DNS requests. The IP addresses of the specified domains are added to the routing table for routing through the specified interfaces.
 ## Usage
-```sh
+```c
 Commands:
-  At least one parameters needs to be filled:
-    -url      https://example.com  Domains file URL
-    -file     /example.txt         Domains file path
+  It is necessary to enter from 1 to 32 values:
+    Route domains from path/url through gateway:
+      -r  "gateway1 https://test1.com"
+      -r  "gateway2 /test1.txt"
+      -r  "gateway2 /test2.txt"
+      -r  "gateway1 https://test2.com"
+      .....................................
   Required parameters:
-    -listen   0.0.0.0:00           Listen address
-    -DNS      0.0.0.0:00           DNS address
-    -gateway  0.0.0.0              Gateway IP
+    -l  "x.x.x.x:xx"  Address for sniffing packets with this src
   Optional parameters:
-    -log                           Show operations log
-    -stat                          Show statistics data
-    -output   /example/            Log or statistics output folder
+    -b  "/test.txt"   Subnets not add to the routing table
+    -o  "/test/"      Log or stat output folder
+    --log             Show operations log
+    --stat            Show statistics data
+    --test            Test mode
 ```
 ## Article
 You can read about the method in the [article](https://habr.com/ru/articles/847412/).

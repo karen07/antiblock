@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 
 project(antiblock)
 
-add_compile_options(-Wall -Wextra -Werror -Wpedantic -DTHREAD_SAFETY)
+add_compile_options(-Wall -Wextra -Werror -Wpedantic -DTHREAD_SAFETY -std=gnu99)
 add_link_options()
 include_directories(include hashmap/include)
 
@@ -20,7 +20,7 @@ endif()
 
 file(GLOB SRC "src/*.c")
 add_executable(${PROJECT_NAME} ${SRC})
-target_link_libraries(${PROJECT_NAME} hashmap curl)
+target_link_libraries(${PROJECT_NAME} hashmap curl pcap)
 
 install(TARGETS ${PROJECT_NAME} DESTINATION /usr/bin)
 

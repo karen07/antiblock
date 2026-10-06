@@ -13,11 +13,11 @@
 array_hashmap_t ip_ip_map_struct;
 static array_hashmap_t nat_map_struct;
 
-subnet_range_t NAT_VPN;
+subnet_range_t NAT;
 
 void subnet_init(subnet_range_t *subnet)
 {
-    uint32_t netMask = (0xFFFFFFFF << (32 - (subnet->network_prefix + 1)) & 0xFFFFFFFF);
+    uint32_t netMask = (INADDR_NONE << (32 - (subnet->network_prefix + 1)) & INADDR_NONE);
     subnet->start_ip = (ntohl(subnet->network_ip) & netMask) + 2;
 
     subnet->subnet_size = 1;
@@ -25,39 +25,66 @@ void subnet_init(subnet_range_t *subnet)
     subnet->end_ip = (ntohl(subnet->network_ip) & netMask) + subnet->subnet_size - 2;
 }
 
-static int32_t tun_alloc(char *dev, int32_t flags)
+int32_t tun_alloc(char *dev, int32_t flags)
 {
     struct ifreq ifr;
-    int32_t fd, err;
-    char *clonedev = "/dev/net/tun";
+    int32_t fd_create;
+    int32_t fd_setip;
+    int32_t err;
+    struct sockaddr_in sin;
 
-    if ((fd = open(clonedev, O_RDWR)) < 0) {
-        printf("Opening /dev/net/tun error\n");
-        return fd;
+    if ((fd_create = open("/dev/net/tun", O_RDWR)) < 0) {
+        return fd_create;
     }
 
     memset(&ifr, 0, sizeof(ifr));
-
     ifr.ifr_flags = flags;
+    strncpy(ifr.ifr_name, dev, IFNAMSIZ);
 
-    if (*dev) {
-        strncpy(ifr.ifr_name, dev, IFNAMSIZ);
-    }
-
-    if ((err = ioctl(fd, TUNSETIFF, (void *)&ifr)) < 0) {
-        printf("ioctl(TUNSETIFF) error\n");
-        close(fd);
+    if ((err = ioctl(fd_create, TUNSETIFF, (void *)&ifr)) < 0) {
         return err;
     }
 
-    strcpy(dev, ifr.ifr_name);
+    if ((fd_setip = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        return fd_setip;
+    }
 
-    //int32_t status = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
-    //if (status == -1) {
-    //    printf("Set O_NONBLOCK error\n");
-    //}
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, dev, IFNAMSIZ);
 
-    return fd;
+    if ((err = ioctl(fd_setip, SIOCGIFFLAGS, &ifr)) < 0) {
+        return err;
+    }
+
+    if (!(ifr.ifr_flags & IFF_UP)) {
+        ifr.ifr_flags |= IFF_UP;
+        if ((err = ioctl(fd_setip, SIOCSIFFLAGS, &ifr)) < 0) {
+            return err;
+        }
+    }
+
+    memset(&sin, 0, sizeof(struct sockaddr_in));
+    sin.sin_family = AF_INET;
+    sin.sin_addr.s_addr = tun_ip;
+    memcpy(&ifr.ifr_addr, &sin, sizeof(struct sockaddr));
+
+    if ((err = ioctl(fd_setip, SIOCSIFADDR, &ifr)) < 0) {
+        return err;
+    }
+
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, dev, IFNAMSIZ);
+
+    memset(&sin, 0, sizeof(struct sockaddr_in));
+    sin.sin_family = AF_INET;
+    sin.sin_addr.s_addr = htonl(INADDR_NONE << (32 - tun_prefix) & INADDR_NONE);
+    memcpy(&ifr.ifr_netmask, &sin, sizeof(struct sockaddr));
+
+    if ((err = ioctl(fd_setip, SIOCSIFNETMASK, &ifr)) < 0) {
+        return err;
+    }
+
+    return fd_create;
 }
 
 static uint16_t checksum(char *buf, uint32_t size)
@@ -91,11 +118,7 @@ static array_hashmap_bool ip_ip_cmp(const void *elem_data, const void *hashmap_e
     const ip_ip_map_t *elem1 = elem_data;
     const ip_ip_map_t *elem2 = hashmap_elem_data;
 
-    if (elem1->ip_local == elem2->ip_local) {
-        return 1;
-    } else {
-        return 0;
-    }
+    return elem1->ip_local == elem2->ip_local;
 }
 
 static array_hashmap_hash nat_hash(const void *elem_data)
@@ -109,75 +132,51 @@ static array_hashmap_bool nat_cmp(const void *elem_data, const void *hashmap_ele
     const nat_map_t *elem1 = elem_data;
     const nat_map_t *elem2 = hashmap_elem_data;
 
-    if (memcmp(&elem1->key, &elem2->key, sizeof(elem1->key)) == 0) {
-        return 1;
-    } else {
-        return 0;
-    }
-}
-
-static void tun_catch_function(__attribute__((unused)) int32_t signo)
-{
-    printf("SIGSEGV catched tun\n");
-    fflush(stdout);
-    if (stat_fd) {
-        fflush(stat_fd);
-    }
-    if (log_fd) {
-        fflush(log_fd);
-    }
-    exit(EXIT_FAILURE);
+    return !memcmp(&elem1->key, &elem2->key, sizeof(elem1->key));
 }
 
 static void *tun(__attribute__((unused)) void *arg)
 {
-    printf("Thread TUN started\n");
+    //char *tap_buffer = NULL;
+    char *tun_buffer = NULL;
+    char *pseudogram = NULL;
 
-    if (signal(SIGSEGV, tun_catch_function) == SIG_ERR) {
-        printf("Can't set signal handler tun\n");
-        exit(EXIT_FAILURE);
+    //tap_buffer = (char *)malloc(PACKET_MAX_SIZE * sizeof(char));
+    tun_buffer = (char *)malloc(PACKET_MAX_SIZE * sizeof(char));
+    pseudogram = (char *)malloc(PACKET_MAX_SIZE * sizeof(char));
+
+    //int32_t tap_fd = 0;
+    int32_t tun_fd = 0;
+
+    //tap_fd = tun_alloc("AntiBlock_NAT_TAP", IFF_TAP | IFF_NO_PI);
+    //if (tap_fd < 0) {
+    //    errmsg("Can't allocate TAP interface\n");
+    //}
+
+    tun_fd = tun_alloc("AntiBlock_NAT", IFF_TUN);
+    if (tun_fd < 0) {
+        errmsg("Can't allocate TUN interface\n");
     }
-
-    int32_t tap_fd;
-    char *buffer = (char *)malloc(PACKET_MAX_SIZE * sizeof(char));
-    char *pseudogram = (char *)malloc(PACKET_MAX_SIZE * sizeof(char));
-
-    tap_fd = tun_alloc(tun_name, IFF_TUN | IFF_MULTI_QUEUE);
-
-    if (tap_fd < 0) {
-        printf("Can't allocate TUN interface\n");
-        exit(EXIT_FAILURE);
-    }
-
-    struct in_addr NAT_subnet_start_addr;
-    NAT_subnet_start_addr.s_addr = htonl(NAT_VPN.start_ip);
-
-    struct in_addr NAT_subnet_end_addr;
-    NAT_subnet_end_addr.s_addr = htonl(NAT_VPN.end_ip);
-
-    printf("TUN dev %s allocated", tun_name);
-    printf(" %s-", inet_ntoa(NAT_subnet_start_addr));
-    printf("%s\n", inet_ntoa(NAT_subnet_end_addr));
 
     pthread_barrier_wait(&threads_barrier);
 
     uint32_t nat_icmp_client_ip = 0;
 
     while (true) {
-        int32_t nread = read(tap_fd, buffer, PACKET_MAX_SIZE);
+        int32_t nread = read(tun_fd, tun_buffer, PACKET_MAX_SIZE);
 
         if (nread < 1) {
             continue;
         }
 
-        tun_header_t *tun_header = (tun_header_t *)buffer;
+        struct tun_pi *tun_header = (struct tun_pi *)tun_buffer;
 
         int32_t proto_L3 = ntohs(tun_header->proto);
         if (proto_L3 != ETH_P_IP) {
             continue;
         }
 
-        char *L3_start_pointer = buffer + sizeof(tun_header_t);
+        char *L3_start_pointer = tun_buffer + sizeof(struct tun_pi);
         struct iphdr *iph = (struct iphdr *)L3_start_pointer;
 
         char proto_L4 = iph->protocol;
@@ -208,7 +207,7 @@ static void *tun(__attribute__((unused)) void *arg)
                 find_elem_ip_ip_flag =
                     array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
                 if (find_elem_ip_ip_flag != array_hashmap_elem_finded) {
-                    stat.nat_sended_to_dev_error++;
+                    statistics_data.nat_sended_to_dev_error++;
                     continue;
                 }
 
@@ -223,7 +222,15 @@ static void *tun(__attribute__((unused)) void *arg)
             iph->check = 0;
             iph->check = checksum(L3_start_pointer, iph->ihl << 2);
 
-            write(tap_fd, buffer, nread);
+            //memcpy(tap_buffer + sizeof(struct ethhdr), L3_start_pointer,
+            //       nread - sizeof(struct tun_pi));
+            //struct ethhdr *ethh = (struct ethhdr *)tap_buffer;
+            //ethh->h_proto = htons(ETH_P_IP);
+            //memset(ethh->h_dest, 0xFF, 6);
+            //memset(ethh->h_source, 0xFF, 6);
+            //write(tap_fd, tap_buffer, nread - sizeof(struct tun_pi) + sizeof(struct ethhdr));
+
+            write(tun_fd, tun_buffer, nread);
 
             continue;
         }
@@ -278,7 +285,7 @@ static void *tun(__attribute__((unused)) void *arg)
             find_elem_nat_flag =
                 array_hashmap_find_elem(nat_map_struct, &find_elem_nat, &res_elem_nat);
             if (find_elem_nat_flag != array_hashmap_elem_finded) {
-                stat.nat_sended_to_client_error++;
+                statistics_data.nat_sended_to_client_error++;
 
                 continue;
             }
@@ -290,8 +297,8 @@ static void *tun(__attribute__((unused)) void *arg)
 
             in_out_flag = 0;
 
-            stat.nat_sended_to_client++;
-            stat.nat_sended_to_client_size += nread;
+            statistics_data.nat_sended_to_client++;
+            statistics_data.nat_sended_to_client_size += nread;
         } else {
             ip_ip_map_t find_elem_ip_ip;
             find_elem_ip_ip.ip_local = iph->daddr;
@@ -302,7 +309,7 @@ static void *tun(__attribute__((unused)) void *arg)
             find_elem_ip_ip_flag =
                 array_hashmap_find_elem(ip_ip_map_struct, &find_elem_ip_ip, &res_elem_ip_ip);
             if (find_elem_ip_ip_flag != array_hashmap_elem_finded) {
-                stat.nat_sended_to_dev_error++;
+                statistics_data.nat_sended_to_dev_error++;
                 continue;
             }
 
@@ -326,7 +333,7 @@ static void *tun(__attribute__((unused)) void *arg)
                     array_hashmap_add_elem(nat_map_struct, &add_elem_nat, &res_elem_nat, NULL);
                 if (add_elem_nat_flag == array_hashmap_elem_finded) {
                     correct_new_srt_port = 0;
-                    stat.nat_records++;
+                    statistics_data.nat_records++;
                 }
                 if (add_elem_nat_flag == 0) {
                     if ((add_elem_nat.value.old_src_ip == res_elem_nat.value.old_src_ip) &&
@@ -343,8 +350,8 @@ static void *tun(__attribute__((unused)) void *arg)
 
             in_out_flag = 1;
 
-            stat.nat_sended_to_dev++;
-            stat.nat_sended_to_dev_size += nread;
+            statistics_data.nat_sended_to_dev++;
+            statistics_data.nat_sended_to_dev_size += nread;
         }
 
         if (log_fd && 0) {
@@ -421,47 +428,54 @@ static void *tun(__attribute__((unused)) void *arg)
 
         iph->check = checksum(L3_start_pointer, iph->ihl << 2);
 
-        write(tap_fd, buffer, nread);
+        //memcpy(tap_buffer + sizeof(struct ethhdr), L3_start_pointer,
+        //       nread - sizeof(struct tun_pi));
+        //struct ethhdr *ethh = (struct ethhdr *)tap_buffer;
+        //ethh->h_proto = htons(ETH_P_IP);
+        //memset(ethh->h_dest, 0xFF, 6);
+        //memset(ethh->h_source, 0xFF, 6);
+        //write(tap_fd, tap_buffer, nread - sizeof(struct tun_pi) + sizeof(struct ethhdr));
+
+        write(tun_fd, tun_buffer, nread);
     }
+
+    return NULL;
 }
 
 void init_tun_thread(void)
 {
-    NAT_VPN.network_ip = tun_ip;
-    NAT_VPN.network_prefix = tun_prefix;
-    subnet_init(&NAT_VPN);
+    NAT.network_ip = tun_ip;
+    NAT.network_prefix = tun_prefix;
+    subnet_init(&NAT);
 
-    ip_ip_map_struct = array_hashmap_init(NAT_VPN.subnet_size, 1.0, sizeof(ip_ip_map_t));
+    ip_ip_map_struct = array_hashmap_init(NAT.subnet_size, 1.0, sizeof(ip_ip_map_t));
     if (ip_ip_map_struct == NULL) {
-        printf("No free memory for ip_ip_map_struct\n");
-        exit(EXIT_FAILURE);
+        errmsg("No free memory for ip_ip_map_struct\n");
     }
 
     array_hashmap_set_func(ip_ip_map_struct, ip_ip_hash, ip_ip_cmp, ip_ip_hash, ip_ip_cmp,
                            ip_ip_hash, ip_ip_cmp);
 
+    //uint32_t NAT_subnet_start_n = htonl(NAT.start_ip++);
     //ip_ip_map_t add_elem;
-    //add_elem.ip_local = htonl(NAT_subnet_start++);
+    //add_elem.ip_local = NAT_subnet_start_n;
     //add_elem.ip_global = inet_addr("192.168.1.10");
     //array_hashmap_add_elem(ip_ip_map_struct, &add_elem, NULL, array_hashmap_save_new_func);
 
     nat_map_struct = array_hashmap_init(NAT_MAP_MAX_SIZE, 1.0, sizeof(nat_map_t));
     if (nat_map_struct == NULL) {
-        printf("No free memory for nat_map_struct\n");
-        exit(EXIT_FAILURE);
+        errmsg("No free memory for nat_map_struct\n");
     }
 
     array_hashmap_set_func(nat_map_struct, nat_hash, nat_cmp, nat_hash, nat_cmp, nat_hash, nat_cmp);
 
     pthread_t tun_thread;
     if (pthread_create(&tun_thread, NULL, tun, NULL)) {
-        printf("Can't create tun_thread\n");
-        exit(EXIT_FAILURE);
+        errmsg("Can't create tun_thread\n");
     }
 
     if (pthread_detach(tun_thread)) {
-        printf("Can't detach tun_thread\n");
-        exit(EXIT_FAILURE);
+        errmsg("Can't detach tun_thread\n");
     }
 }
 
