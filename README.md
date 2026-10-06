@@ -1,23 +1,528 @@
 # AntiBlock
-AntiBlock sniffer DNS requests. The IP addresses of the specified domains are added to the routing table for routing through the specified interfaces.
-## Usage
-```c
-Commands:
-  It is necessary to enter from 1 to 32 values:
-    Route domains from path/url through gateway:
-      -r  "gateway1 https://test1.com"
-      -r  "gateway2 /test1.txt"
-      -r  "gateway2 /test2.txt"
-      -r  "gateway1 https://test2.com"
-      .....................................
-  Required parameters:
-    -l  "x.x.x.x:xx"  Address for sniffing packets with this src
-  Optional parameters:
-    -b  "/test.txt"   Subnets not add to the routing table
-    -o  "/test/"      Log or stat output folder
-    --log             Show operations log
-    --stat            Show statistics data
-    --test            Test mode
+
+AntiBlock dynamically manages IPv4 routes on Linux and OpenWrt using DNS responses for
+domains in selected lists. It watches DNS traffic, learns matching addresses, and routes
+them through configured network interfaces.
+
+AntiBlock - инструмент динамической маршрутизации для Linux и OpenWrt на основе DNS. Он
+отслеживает DNS-ответы для доменов из выбранных списков, извлекает соответствующие
+IPv4-адреса и добавляет маршруты через настроенные сетевые интерфейсы.
+
+## Описание
+
+Списки доменов можно читать из локальных файлов или загружать по HTTP(S). Один процесс может одновременно поддерживать несколько соответствий между списками доменов и интерфейсами. Дополнительный список подсетей позволяет исключить выбранные IPv4-сети из динамической маршрутизации.
+
+Списки обычно обновляются раз в 24 часа. При ошибке загрузки HTTP(S)-источника повтор выполняется через 5 минут; после успешного обновления возвращается обычный интервал. Старая таблица освобождается перед загрузкой новой, чтобы не хранить два больших набора доменов одновременно.
+
+AntiBlock не является DNS-фильтром, прокси или полноценным VPN/PBR-фреймворком. Его задача проще: связать знания из DNS с обычной таблицей маршрутизации Linux.
+
+Версия 3.0.0 - крупная переработка внутренней реализации с сохранением исходной идеи проекта: простой и быстрый код, предсказуемое потребление памяти и минимум лишних механизмов.
+
+## Содержание
+
+- [Навигация](#%D0%BD%D0%B0%D0%B2%D0%B8%D0%B3%D0%B0%D1%86%D0%B8%D1%8F)
+- [Разработка и проверка изменений](#%D1%80%D0%B0%D0%B7%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D0%BA%D0%B0-%D0%B8-%D0%BF%D1%80%D0%BE%D0%B2%D0%B5%D1%80%D0%BA%D0%B0-%D0%B8%D0%B7%D0%BC%D0%B5%D0%BD%D0%B5%D0%BD%D0%B8%D0%B9)
+  - [Поток данных и точки изменения](#%D0%BF%D0%BE%D1%82%D0%BE%D0%BA-%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D1%85-%D0%B8-%D1%82%D0%BE%D1%87%D0%BA%D0%B8-%D0%B8%D0%B7%D0%BC%D0%B5%D0%BD%D0%B5%D0%BD%D0%B8%D1%8F)
+  - [Типовые изменения](#%D1%82%D0%B8%D0%BF%D0%BE%D0%B2%D1%8B%D0%B5-%D0%B8%D0%B7%D0%BC%D0%B5%D0%BD%D0%B5%D0%BD%D0%B8%D1%8F)
+  - [Инварианты для правок](#%D0%B8%D0%BD%D0%B2%D0%B0%D1%80%D0%B8%D0%B0%D0%BD%D1%82%D1%8B-%D0%B4%D0%BB%D1%8F-%D0%BF%D1%80%D0%B0%D0%B2%D0%BE%D0%BA)
+- [Сборка](#%D1%81%D0%B1%D0%BE%D1%80%D0%BA%D0%B0)
+- [Использование](#%D0%B8%D1%81%D0%BF%D0%BE%D0%BB%D1%8C%D0%B7%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D0%B5)
+- [Основная идея](#%D0%BE%D1%81%D0%BD%D0%BE%D0%B2%D0%BD%D0%B0%D1%8F-%D0%B8%D0%B4%D0%B5%D1%8F)
+- [Маршрутизация](#%D0%BC%D0%B0%D1%80%D1%88%D1%80%D1%83%D1%82%D0%B8%D0%B7%D0%B0%D1%86%D0%B8%D1%8F)
+- [TTL](#ttl)
+- [CNAME и HTTPS AliasMode](#cname-%D0%B8-https-aliasmode)
+- [Память и структуры данных](#%D0%BF%D0%B0%D0%BC%D1%8F%D1%82%D1%8C-%D0%B8-%D1%81%D1%82%D1%80%D1%83%D0%BA%D1%82%D1%83%D1%80%D1%8B-%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D1%85)
+- [Перехват DNS](#%D0%BF%D0%B5%D1%80%D0%B5%D1%85%D0%B2%D0%B0%D1%82-dns)
+- [Чёрный список](#%D1%87%D1%91%D1%80%D0%BD%D1%8B%D0%B9-%D1%81%D0%BF%D0%B8%D1%81%D0%BE%D0%BA)
+- [Корректное завершение](#%D0%BA%D0%BE%D1%80%D1%80%D0%B5%D0%BA%D1%82%D0%BD%D0%BE%D0%B5-%D0%B7%D0%B0%D0%B2%D0%B5%D1%80%D1%88%D0%B5%D0%BD%D0%B8%D0%B5)
+- [HTTP-загрузка списков доменов](#http-%D0%B7%D0%B0%D0%B3%D1%80%D1%83%D0%B7%D0%BA%D0%B0-%D1%81%D0%BF%D0%B8%D1%81%D0%BA%D0%BE%D0%B2-%D0%B4%D0%BE%D0%BC%D0%B5%D0%BD%D0%BE%D0%B2)
+- [OpenWrt](#openwrt)
+- [Тестирование](#%D1%82%D0%B5%D1%81%D1%82%D0%B8%D1%80%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D0%B5)
+  - [Регрессионные тесты загрузки доменов](#%D1%80%D0%B5%D0%B3%D1%80%D0%B5%D1%81%D1%81%D0%B8%D0%BE%D0%BD%D0%BD%D1%8B%D0%B5-%D1%82%D0%B5%D1%81%D1%82%D1%8B-%D0%B7%D0%B0%D0%B3%D1%80%D1%83%D0%B7%D0%BA%D0%B8-%D0%B4%D0%BE%D0%BC%D0%B5%D0%BD%D0%BE%D0%B2)
+  - [Интеграционные тесты](#%D0%B8%D0%BD%D1%82%D0%B5%D0%B3%D1%80%D0%B0%D1%86%D0%B8%D0%BE%D0%BD%D0%BD%D1%8B%D0%B5-%D1%82%D0%B5%D1%81%D1%82%D1%8B)
+  - [Нагрузочные и стресс-тесты](#%D0%BD%D0%B0%D0%B3%D1%80%D1%83%D0%B7%D0%BE%D1%87%D0%BD%D1%8B%D0%B5-%D0%B8-%D1%81%D1%82%D1%80%D0%B5%D1%81%D1%81-%D1%82%D0%B5%D1%81%D1%82%D1%8B)
+- [Ограничения](#%D0%BE%D0%B3%D1%80%D0%B0%D0%BD%D0%B8%D1%87%D0%B5%D0%BD%D0%B8%D1%8F)
+- [Статья](#%D1%81%D1%82%D0%B0%D1%82%D1%8C%D1%8F)
+- [Лицензия](#%D0%BB%D0%B8%D1%86%D0%B5%D0%BD%D0%B7%D0%B8%D1%8F)
+
+## Навигация
+
+Если нужно собрать программу и попробовать её на своей системе,
+начните со [сборки](#%D1%81%D0%B1%D0%BE%D1%80%D0%BA%D0%B0) и [использования](#%D0%B8%D1%81%D0%BF%D0%BE%D0%BB%D1%8C%D0%B7%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D0%B5).
+Перед применением на маршрутизаторе прочитайте
+[маршрутизацию](#%D0%BC%D0%B0%D1%80%D1%88%D1%80%D1%83%D1%82%D0%B8%D0%B7%D0%B0%D1%86%D0%B8%D1%8F), [TTL](#ttl) и
+[ограничения](#%D0%BE%D0%B3%D1%80%D0%B0%D0%BD%D0%B8%D1%87%D0%B5%D0%BD%D0%B8%D1%8F).
+Для проверки изменений доступны [интеграционные тесты](#%D0%B8%D0%BD%D1%82%D0%B5%D0%B3%D1%80%D0%B0%D1%86%D0%B8%D0%BE%D0%BD%D0%BD%D1%8B%D0%B5-%D1%82%D0%B5%D1%81%D1%82%D1%8B)
+и [нагрузочные тесты](#%D0%BD%D0%B0%D0%B3%D1%80%D1%83%D0%B7%D0%BE%D1%87%D0%BD%D1%8B%D0%B5-%D0%B8-%D1%81%D1%82%D1%80%D0%B5%D1%81%D1%81-%D1%82%D0%B5%D1%81%D1%82%D1%8B).
+
+## Разработка и проверка изменений
+
+**Опорные символы для изменения поведения:**
+
+1. `config_parse` и `capture_next_dns` - разбор параметров и получение DNS-пакета; API объявлен
+   в `include/config.h` и `include/capture.h`, реализация - в `src/`.
+1. `dns_process_response`, `domains_lookup`, `domains_learn` - обработка ответа, проверка и
+   пополнение доменных правил; смотрите `include/dns.h`, `include/domains.h` и одноимённые
+   `src/*.c`.
+1. `routes_observe`, `routes_expire`, `routes_shutdown` - жизненный цикл маршрутов в
+   `include/routes.h` и `src/routes.c`; сопоставляйте изменения DNS с созданием, истечением и
+   удалением маршрутов.
+1. `telemetry_dns_error`, `telemetry_route_added` - учёт диагностических событий через
+   `include/telemetry.h` и `src/telemetry.c`; при новом событии проверьте также счётчики и
+   вывод.
+
+**Основные точки изменения:**
+
+- `src/main.c` - точка входа, жизненный цикл процесса и сигналы;
+- `src/config.c` - разбор аргументов и blacklist;
+- `src/capture.c` - захват DNS-трафика;
+- `src/dns.c` - разбор DNS-ответов, CNAME и HTTPS AliasMode;
+- `src/domains.c` - загрузка и сопоставление доменных правил;
+- `src/routes.c` - создание, обновление и удаление маршрутов Linux;
+- `src/telemetry.c` - журнал, статистика и диагностический вывод;
+- `tests/unit/` - регрессионные тесты отдельных подсистем.
+
+**Публичные интерфейсы C:** заголовки в `include/` задают контракты модулей,
+а соответствующие файлы `src/` содержат реализацию:
+
+- `include/common.h` - общие типы, ограничения и вспомогательные определения;
+- `include/config.h` - `ab_config_t`, правила маршрутизации и разбор настроек;
+- `include/capture.h` - `capture_t`, открытие libpcap и статистика захвата;
+- `include/dns.h` - входная функция обработки DNS-ответа;
+- `include/domains.h` - доменная таблица, обновление и поиск правил;
+- `include/routes.h` - состояние маршрутов, их наблюдение и удаление;
+- `include/telemetry.h` - счётчики событий, журналы и статистика.
+
+При изменении публичного интерфейса проверяйте соответствующий `src/*.c` и
+тесты в `tests/unit/`; изменения общих ограничений из `include/common.h`
+могут затронуть несколько модулей одновременно.
+
+**Файлы сборки:** `CMakeLists.txt` определяет зависимости и цели программы,
+`CMakePresets.json` - профили конфигурации CMake. Изменение сборочных опций
+не заменяет проверку интерфейсов `include/` и их реализаций.
+
+**Проверка изменений:** Изменения в распознавании DNS проверяйте вместе с `src/domains.c`, а изменения маршрутизации - с `src/routes.c` и тестами отказов маршрутов. Используйте `tests/unit/run.sh`, затем сценарии из `tests/integration/` и `tests/load/`; перед реальными изменениями маршрутов учитывайте режим `--test` и ограничения из README.
+
+### Поток данных и точки изменения
+
+- `src/capture.c` передаёт DNS-пакеты в `dns_process_response` (`src/dns.c`).
+  Обработка включает проверку формата ответа, распространение соответствий
+  через CNAME/HTTPS AliasMode и разбор A-записей.
+- Для подходящей A-записи `domains_lookup` выбирает правило, `config_ip_blocked`
+  исключает запрещенные адреса, а `routes_observe` (`src/routes.c`) изменяет
+  состояние и маршруты ядра. Проверять нужно всю цепочку, а не только DNS-парсер.
+- Основной цикл (`src/main.c`) периодически обновляет домены, удаляет маршруты
+  с истекшим TTL и передаёт события в `src/telemetry.c`.
+
+### Типовые изменения
+
+- Доменные правила: сопоставляйте изменения `src/domains.c` с разбором
+  ответов в `src/dns.c` и `tests/unit/test_domains.c`.
+- Время жизни маршрута или смена интерфейса: проверяйте `src/routes.c`,
+  `tests/unit/test_zero_ttl.c` и `tests/unit/test_route_failures.c`.
+- Новые CLI-параметры: сверяйте разбор в `src/config.c`, использование
+  в `src/main.c` и документированные примеры запуска.
+
+### Инварианты для правок
+
+- TTL=0 не добавляет, не продлевает и не переносит маршрут. Для той же
+  маршрутизации новый TTL продлевает срок жизни, но не сокращает его.
+- Смена интерфейса для существующего IP затрагивает маршрут ядра и запись
+  в hashmap; в `routes_observe` предусмотрен путь отката при ошибках.
+  Изменения проверяйте вместе с `tests/unit/test_route_failures.c`.
+- `domains_reload` сначала уничтожает старую таблицу. Ошибка локального
+  файла прерывает обновление, а ошибки HTTP-источников могут дать частично
+  заполненную новую таблицу. Не обещайте сохранения старого списка при сбое.
+- Разбор `-b` в `src/config.c` не является парсером конфигурационных
+  файлов с комментариями: он читает токены через `fscanf`, а ошибочный
+  CIDR прерывает загрузку. Меняя синтаксис, добавляйте отдельные
+  проверки для `/0`, длинных токенов и строк с `#`.
+- Для TTL и разбора DNS ориентируйтесь на `tests/unit/test_zero_ttl.c`,
+  `tests/unit/test_domains.c` и `tests/integration/test_antiblock.py`.
+
+## Сборка
+
+Нужны:
+
+- компилятор C с поддержкой GNU99 (GCC или Clang);
+- CMake >= 3.13;
+- `libpcap` development files;
+- `libcurl` development files.
+
+Сборка использует GNU99, как и предыдущие версии проекта.
+
+```sh
+git submodule update --init --recursive
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
 ```
-## Article
-You can read about the method in the [article](https://habr.com/ru/articles/847412/).
+
+Исполняемый файл:
+
+```text
+build/antiblock
+```
+
+## Использование
+
+```text
+AntiBlock 3.0.0
+Usage:
+  antiblock -r "iface path-or-url" ... -l IPv4:port [options]
+
+Required:
+  -r "iface source"   Domain source routed through iface (repeatable, max 32)
+  -l IPv4:port        DNS response source to sniff, e.g. 192.168.1.1:53
+
+Optional:
+  -b path             Additional IPv4 CIDR blacklist
+  -o directory        Directory for log.txt/stat.txt (default .)
+  --log               Enable DNS operation log
+  --stat              Enable stat.txt
+  --test              Do not modify the kernel routing table
+  -h, --help          Show this help
+```
+
+Пример:
+
+```sh
+sudo ./build/antiblock \
+  -l 192.168.1.1:53 \
+  -r "wg0 domains-vpn.txt" \
+  -r "eth1 https://example.org/domains.txt" \
+  --stat
+```
+
+Каждый `-r` связывает источник списка доменов с сетевым интерфейсом, через который должны маршрутизироваться найденные IP-адреса. Источником может быть локальный файл или HTTP(S) URL.
+
+Для `-l` требуется конкретный IPv4 источника DNS-ответов: `0.0.0.0:53`
+не проходит итоговую проверку аргументов. Дополнительный blacklist `-b`
+считывается как список IPv4 CIDR, разделённых пробельными символами:
+допустимы префиксы `/1`..`/32`, а `/0` и строки-комментарии с `#`
+не поддерживаются. По умолчанию загружено 18 служебных подсетей;
+общий предел `AB_MAX_BLACKLIST` равен 128, поэтому при добавлении
+собственного файла учитывайте уже занятые записи.
+
+**Файлы телеметрии:** при `--log` и `--stat` пути `log.txt` и `stat.txt`
+открываются через `fopen(..., "w")`. Каталог `-o` должен существовать и быть
+доступным для записи: утилита не создаёт его сама. Повторный запуск с тем
+же каталогом перезаписывает прежние файлы; `stat.txt` дополнительно
+усекается и переписывается при периодическом обновлении. Не используйте
+их как неизменяемый архив без внешнего сохранения.
+
+Обычная строка в списке соответствует самому домену и его поддоменам. Строка с префиксом `!` используется как exact-only правило. Ведущий `www.` нормализуется так же, как в предыдущей реализации.
+
+## Основная идея
+
+Типичный путь выглядит так:
+
+```text
+configured domain
+       |
+       v
+   DNS answer
+       |
+       +-- CNAME -----------> learned domain
+       |
+       +-- HTTPS AliasMode ---> learned domain
+       |
+       +-- A -----------------> IPv4 address
+                         |
+                         v
+                    /32 route
+                         |
+                         v
+                 selected interface
+```
+
+Например, если `example.org` привязан к `wg0`, а DNS возвращает:
+
+```text
+example.org CNAME edge.example.net
+edge.example.net A 1.1.1.1
+```
+
+AntiBlock запоминает связь `edge.example.net` с тем же правилом и создаёт маршрут к `1.1.1.1` через `wg0`.
+
+Если позже приходит отдельный DNS-ответ уже непосредственно для `edge.example.net`, он также будет обработан по ранее выученному соответствию. Выученные через CNAME или HTTPS AliasMode домены сохраняются до следующей перезагрузки списков доменов.
+
+## Маршрутизация
+
+Для L3-интерфейсов, например WireGuard/TUN, AntiBlock создаёт обычный host route:
+
+```text
+1.1.1.1/32 dev wg0
+```
+
+Для Ethernet/L2-интерфейсов AntiBlock находит default gateway этого интерфейса в `/proc/net/route` и создаёт маршрут через него:
+
+```text
+1.1.1.1/32 via 192.168.1.1 dev eth0
+```
+
+Маршруты AntiBlock помечаются отдельным metric (`23117`). Это позволяет при старте удалить старые маршруты AntiBlock, не затрагивая произвольные чужие `/32` маршруты на тех же интерфейсах.
+
+Для одного destination IPv4 в каждый момент существует только одно активное правило. Если более свежий DNS-ответ связывает тот же IP с другим интерфейсом, AntiBlock переносит маршрут на новое правило.
+
+## TTL
+
+Время жизни динамического маршрута определяется TTL соответствующей A-записи DNS.
+При `TTL=0` `routes_observe()` не создаёт маршрут, не продлевает существующий
+и не переносит его на другой интерфейс. Это относится и к ответам,
+которые совпали с уже известным IP. Значения TTL больше `INT32_MAX`
+ограничиваются этим максимумом до расчёта срока действия.
+
+Если тот же IP снова приходит для того же интерфейса, expiration не сокращается:
+
+```text
+expires = max(old_expires, new_expires)
+```
+
+Если тот же IP приходит уже для другого интерфейса, более свежий DNS-ответ побеждает, маршрут переносится, а TTL берётся из нового ответа.
+
+Для внутренних таймеров используется `CLOCK_MONOTONIC`, поэтому коррекция системных часов через NTP не должна неожиданно состарить или продлить маршруты.
+
+## CNAME и HTTPS AliasMode
+
+AntiBlock распространяет принадлежность домена к правилу маршрутизации только по отношениям `domain -> domain`, которые действительно являются alias-связями:
+
+- `CNAME`;
+- `HTTPS` (`TYPE 65`) только в AliasMode, то есть при `SvcPriority=0`.
+
+Например:
+
+```text
+blocked.example CNAME cdn.example
+cdn.example     A     8.8.8.8
+```
+
+и HTTPS AliasMode:
+
+```text
+blocked.example HTTPS 0 edge.example
+edge.example    A     9.9.9.9
+```
+
+В обоих случаях target наследует routing rule исходного домена, а последующая A-запись target создаёт обычный `/32` route. TTL маршрута по-прежнему берётся только из A-записи. TTL CNAME/HTTPS alias не используется для route lifetime, а learned mapping живёт до следующей перезагрузки domain lists.
+
+`HTTPS` ServiceMode (`SvcPriority>0`) намеренно не используется как alias. `ipv4hint` также не превращается в route напрямую: AntiBlock сохраняет простой источник истины `A -> IPv4`, а TYPE 65 нужен только для настоящего AliasMode `domain -> domain`. AliasMode с `TargetName=.` ничего не обучает.
+
+Обработка alias-связей не зависит от порядка Resource Records внутри DNS-ответа. Например, оба варианта обрабатываются одинаково:
+
+```text
+blocked.example CNAME cdn.example
+cdn.example     A     8.8.8.8
+```
+
+и:
+
+```text
+cdn.example     A     8.8.8.8
+blocked.example CNAME cdn.example
+```
+
+То же правило действует для смешанных цепочек CNAME + HTTPS AliasMode. Для этого alias-классификация распространяется отдельными ограниченными проходами по уже полученному DNS-пакету, после чего обрабатываются A-записи. Дополнительных больших структур данных для DNS-графа не создаётся. Предел распространения равен `AB_ALIAS_MAX_PASSES` (32 прохода), поэтому для более длинной цепочки полное обучение не гарантируется.
+
+**Частичные изменения при ошибке DNS:** `propagate_aliases` вызывает `domains_learn` во время обхода ответов, до окончательного завершения разбора пакета. Если более поздняя RR окажется некорректной, `dns_process_response` вернёт ошибку, но уже выученные alias-связи не откатываются. Не трактуйте ошибку разбора как отсутствие изменений состояния доменной таблицы; при исправлении проверяйте отдельно целостность после ошибочного пакета.
+
+## Память и структуры данных
+
+В проекте используется исходная `array_hashmap`, которая изначально разрабатывалась для AntiBlock.
+
+Хеш-таблица хранится одним массивом. Цепочки коллизий используют 32-битные индексы вместо указателей, поэтому нет отдельного `malloc` на каждый элемент и 64-битных pointer-связей между элементами.
+
+Строки доменов находятся в одной последовательной arena. В payload доменной записи хранится компактное 32-битное значение:
+
+```text
+26 bit  offset в arena
+ 5 bit  номер routing rule
+ 1 bit  флаг match_subdomains
+```
+
+Та же hashmap используется для runtime-состояния динамических маршрутов.
+
+При исчерпании места для learned CNAME/HTTPS alias AntiBlock выдаёт одно предупреждение
+до следующей перезагрузки списков. При заполнении таблицы из 1024 маршрутов
+предупреждение также выводится один раз и повторяется только после освобождения
+места и следующего заполнения. Размеры таблиц автоматически не увеличиваются.
+
+## Перехват DNS
+
+AntiBlock использует libpcap и слушает интерфейс `any`. Поддерживаются Linux cooked capture форматы SLL и SLL2.
+
+Параметр `-l` задаёт IPv4-адрес и UDP-порт источника DNS-ответов, которые должен обрабатывать AntiBlock, например:
+
+```text
+-l 192.168.1.1:53
+```
+
+DNS-имена нормализуются в lowercase, поэтому matching не зависит от регистра.
+
+## Чёрный список
+
+AntiBlock имеет встроенные исключения для приватных/служебных IPv4-сетей и позволяет добавить собственный список CIDR через `-b`.
+
+Это позволяет не создавать динамические маршруты для адресов, которые не должны уходить через выбранные внешние интерфейсы.
+
+## Корректное завершение
+
+`SIGINT` и `SIGTERM` не выполняют сложный cleanup внутри signal handler. Обработчик только выставляет `volatile sig_atomic_t` флаг остановки, после чего основной цикл завершается и очистка маршрутов выполняется в обычном execution context.
+
+## HTTP-загрузка списков доменов
+
+Для HTTP/HTTPS-источников установлены таймауты: 5 секунд на соединение и
+30 секунд на весь запрос (включая редиректы и получение тела ответа).
+При ошибке загрузки текущая логика повторной попытки сохраняется.
+Для экономии памяти отдельная резервная копия предыдущей таблицы доменов
+не создаётся.
+
+## OpenWrt
+
+Для OpenWrt используются отдельные репозитории:
+
+- `antiblock-openwrt-package` - пакет и init/UCI конфигурация;
+- `luci-app-antiblock-openwrt-package` - LuCI web interface.
+
+## Тестирование
+
+### Регрессионные тесты загрузки доменов
+
+Без Docker можно проверить пустые файлы и HTTP-chunk, нормализацию `WWW.`, TTL=0,
+границы learned-domain/route hashmap, счётчик ошибок добавления маршрутов
+и коллизии/удаления в array_hashmap
+с санитайзерами GCC и Clang (достаточно заголовков и библиотеки libcurl):
+
+```sh
+./tests/unit/run.sh
+```
+
+При использовании `--stat` файл `stat.txt` также показывает `Route add errors`:
+число неудачных вызовов `SIOCADDRT` с начала текущего периода статистики.
+Попытки добавить маршрут при заполненной userspace-таблице сюда не включаются.
+
+**Карта модульных тестов:** `tests/unit/test_capacity.c` проверяет
+ограничения ёмкости, `tests/unit/test_hashmap.c` - работу собственной
+хеш-таблицы, `tests/unit/test_http_chunk.c` - разбор HTTP-чанков,
+`tests/unit/test_telemetry_log.c` - запись телеметрии. Для проверки
+интеграционного сценария используйте `tests/integration/run.sh`,
+а для нагрузки - `tests/load/run.sh` и `tests/load/load_test.py`.
+Эти группы проверяют разные границы: тест отдельных структур не заменяет
+проверку DNS-трафика или восстановление после отказа.
+Для интеграционной и нагрузочной сред служат отдельные файлы
+`tests/integration/Dockerfile` и `tests/load/Dockerfile`: при
+изменении зависимостей тестового окружения проверяйте соответствующий
+контейнер, а не только код теста.
+
+### Интеграционные тесты
+
+В репозитории есть Docker end-to-end тесты:
+
+```sh
+./tests/integration/run.sh
+```
+
+Тестовый образ строится на `archlinux:latest` и собирает AntiBlock двумя компиляторами: GCC и Clang. Один и тот же набор тестов затем запускается отдельно для каждого бинарника. Контейнеры используют `NET_ADMIN` и `NET_RAW`, без `--privileged` и без host networking, поэтому тестовые маршруты создаются внутри отдельного network namespace и не изменяют routing table хоста.
+
+Тесты проверяют реальную цепочку:
+
+```text
+fake DNS server
+      |
+      v
+ UDP DNS response
+      |
+      v
+   libpcap
+      |
+      v
+  AntiBlock
+      |
+      v
+Linux routing table
+```
+
+На текущем наборе имеется 61 интеграционный тест. Один и тот же suite запускается на GCC release, Clang release и Clang с ASan+UBSan, поэтому полный acceptance-прогон выполняет 183 end-to-end проверки. Помимо исходных сценариев, suite проверяет:
+
+- прямую A-запись;
+- домен вне списка;
+- встроенный и пользовательский blacklist;
+- CNAME + A в одном ответе;
+- learned CNAME и отдельный последующий DNS-ответ;
+- сохранение learned CNAME после истечения DNS TTL самой CNAME-записи;
+- learned CNAME для поддоменов target;
+- multi-hop CNAME и независимость propagation от порядка RR;
+- HTTPS AliasMode (`TYPE 65`, `SvcPriority=0`) и последующий A-ответ target;
+- смешанную CNAME + HTTPS AliasMode цепочку независимо от порядка RR;
+- то, что HTTPS ServiceMode (`SvcPriority>0`) не обучает target как alias;
+- истечение TTL и пропуск записей с TTL=0 без создания или переноса маршрута;
+- продление TTL повторным ответом;
+- то, что более короткий TTL того же route rule не сокращает уже существующий expiration;
+- перенос одного destination между двумя route rules и использование TTL нового наблюдения;
+- L2 и L3 маршруты;
+- выбор lowest-metric default gateway для L2;
+- корректный отказ L2-интерфейса без default gateway;
+- case-insensitive DNS names;
+- matching поддоменов и exact-only правила `!domain`;
+- нормализацию ведущего `www.` и CRLF domain lists;
+- `--test`, `--log` и `--stat`;
+- загрузку domain list по HTTP, ошибку HTTP source, таймаут зависшего сервера и повтор через 5 минут;
+- пустой первый файл доменов и регистронезависимый `WWW.` в списках (включая `!`);
+- разные ответы с одинаковым 16-битным DNS transaction ID;
+- cleanup по `SIGTERM` и `SIGINT`;
+- удаление при старте только маршрутов с metric AntiBlock;
+- valid Additional/OPT section после Answer;
+- malformed DNS packets: truncated header/question/RR, invalid RDLENGTH, invalid compression pointers, pointer loop, malformed CNAME, malformed HTTPS AliasMode TargetName, reserved label encoding и oversized decoded name;
+- тот же набор под Clang ASan+UBSan для поиска memory-safety и undefined-behavior regressions.
+
+Для каждого malformed DNS тест проверяет, что AntiBlock не падает, не создаёт ложный маршрут и после битого пакета продолжает корректно обрабатывать следующий валидный DNS-ответ.
+
+### Нагрузочные и стресс-тесты
+
+Отдельный Docker suite измеряет производительность полного DNS pipeline и проверяет стабильность под
+длительной нагрузкой:
+
+```sh
+./tests/load/run.sh cloudflare-radar_top-1000000-domains_YYYYMMDD-YYYYMMDD.csv
+```
+
+AntiBlock загружает полный Cloudflare Radar Top 1M domain list. Для одноразовой подготовки локального DNS replay-cache `dns-client-test` по умолчанию выбирает 100 000 доменов через `-n 100000 --seed 701184`, явно выполняет A-прогон (`-A`) и запрашивает upstream resolver с консервативной скоростью 250 RPS. Результаты сохраняются как `cache-A.data` и `out_domains-A.txt`. Затем `dns-server-test` запускается с `-c cache-A.data`, и все измеряемые performance/stress прогоны полностью локальны и больше не обращаются к публичному DNS.
+
+Нагрузку создают C-программы `dns-client-test` и `dns-server-test`; Python используется только как
+orchestrator и не находится в измеряемом DNS hot path.
+
+Suite содержит четыре сценария:
+
+- GCC Release DNS throughput с полной таблицей доменов, включая cold lookup sweep и `--test`
+  userspace route-state workload, actual local response rate и libpcap drop counters;
+- GCC Release установку реальных `/32` routes с отдельным измерением времени изменения kernel
+  routing table без post-send ожидания DNS-клиента;
+- Clang ASan+UBSan DNS stress с полной таблицей доменов;
+- Clang ASan+UBSan многократный real-route add/cleanup churn.
+
+Performance-цифры не имеют жёсткого pass/fail threshold, так как зависят от CPU и окружения. При этом
+crash, parser error, sanitizer diagnostic, переполнение route-state workload или оставшиеся после
+cleanup AntiBlock routes считаются ошибкой теста.
+
+Подробности и параметры нагрузки находятся в `tests/load/README.md`.
+
+## Ограничения
+
+Проект намеренно остаётся небольшим и специализированным. В версии 3.0.0 нет:
+
+- IPv6/AAAA routing;
+- DoH/DoT parsing;
+- DNS-over-TCP parsing;
+- маршрутизации по HTTPS ServiceMode/`ipv4hint`;
+- обработки SVCB `TYPE 64` для web-routing;
+- универсального policy-routing engine;
+- потоков или тяжёлых framework-зависимостей.
+
+AntiBlock ориентирован на простой сценарий DNS-driven IPv4 routing.
+
+## Статья
+
+Описание исходной идеи и реализации: [статья на Habr](https://habr.com/ru/articles/847412/).
+
+## Лицензия
+
+Проект распространяется под лицензией GNU Affero General Public License v3.0. Подробности см. в файле [LICENSE](LICENSE).
