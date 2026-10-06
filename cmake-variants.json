@@ -1,0 +1,40 @@
+{
+	"buildType": {
+		"default": "Release",
+		"description": "Build Type Selection",
+		"choices": {
+			"Debug": {
+				"short": "Debug",
+				"long": "Build with no optimizations and debugging information",
+				"buildType": "Debug",
+				"settings": {
+					"CMAKE_CXX_FLAGS_DEBUG": "-g -Og"
+				}
+			},
+			"Debug_ASan": {
+				"short": "Debug_ASan",
+				"long": "Build with no optimizations and debugging information and ASan",
+				"buildType": "Debug_ASan",
+				"settings": {
+					"CMAKE_CXX_FLAGS_DEBUG": "-g -Og"
+				}
+			},
+			"Debug_MSan": {
+				"short": "Debug_MSan",
+				"long": "Build with no optimizations and debugging information and MSan",
+				"buildType": "Debug_MSan",
+				"settings": {
+					"CMAKE_CXX_FLAGS_DEBUG": "-g -Og"
+				}
+			},
+			"Release": {
+				"short": "Release",
+				"long": "Build with optimizations",
+				"buildType": "Release",
+				"settings": {
+					"CMAKE_CXX_FLAGS_RELEASE": "-O2"
+				}
+			}
+		}
+	}
+}
