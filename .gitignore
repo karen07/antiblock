@@ -1,2 +1,5 @@
 # CMake
 build/
+
+# Load/stress test cache
+tests/load/.work/
