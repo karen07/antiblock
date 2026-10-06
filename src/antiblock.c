@@ -153,7 +153,7 @@ static void clean_route_table(void)
                   &refcnt, &use, &metric, &mask, &mtu, &window, &irtt) != EOF) {
         for (int32_t i = 0; i < gateways_count; i++) {
             if ((!strcmp(iface, gateway_name[i])) && (mask == INADDR_NONE)) {
-                del_route(gate_ip, dest_ip);
+                del_route(i, dest_ip);
             }
         }
     }
@@ -522,6 +522,8 @@ int32_t main(int32_t argc, char *argv[])
         }
     }
 
+    dns_ans_check_test();
+
     if (is_log_print) {
         char log_path[PATH_MAX];
         sprintf(log_path, "%s%s", log_or_stat_folder, "/log.txt");
@@ -565,8 +567,6 @@ int32_t main(int32_t argc, char *argv[])
 
     init_net_data_threads();
 
-    dns_ans_check_test();
-
     pthread_barrier_wait(&threads_barrier);
 
     int32_t circles = 0;
@@ -574,6 +574,19 @@ int32_t main(int32_t argc, char *argv[])
 
     while (true) {
         if (circles++ == 0) {
+            if (log_fd) {
+                ftruncate(fileno(log_fd), 0);
+                fseek(log_fd, 0, SEEK_SET);
+                fprintf(log_fd, "Reductions:\n");
+                fprintf(log_fd, "    Q(x)-DNS question x type\n");
+                fprintf(log_fd, "    A(x)-DNS answer x type\n");
+                fprintf(log_fd, "    BA(x)-A in x route\n");
+                fprintf(log_fd, "    BC(x)-CNAME in x route\n");
+                fprintf(log_fd, "    BL-IP in blacklist\n");
+                fprintf(log_fd, "    NA-A not in routes\n");
+                fprintf(log_fd, "    NC-CNAME not in routes\n");
+            }
+
             memset(&statistics_data, 0, sizeof(statistics_data));
             statistics_data.stat_start = time(NULL);
 
