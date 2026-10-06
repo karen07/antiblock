@@ -1,0 +1,173 @@
+# AntiBlock Load and Stress Tests
+
+Docker-based load and stress tests for AntiBlock that measure DNS throughput, packet capture losses, Linux route programming, and sanitizer behavior under sustained traffic.
+
+## Описание
+
+Нагрузочные и стресс-тесты AntiBlock в Docker измеряют пропускную способность обработки DNS, потери пакетов при захвате, программирование маршрутов Linux и устойчивость сборок с санитайзерами под нагрузкой.
+
+Этот набор дополняет `tests/integration/`: интеграционные тесты отвечают на вопрос о корректности, а нагрузочные проверяют реальный путь libpcap -> DNS parser -> domain hashmap -> Linux routes при длительном трафике. Нагрузку генерируют C-программы [`dns-client-test`](https://github.com/karen07/dns-client-test) и [`dns-server-test`](https://github.com/karen07/dns-server-test); Python только управляет сценариями, файлами и статистикой, но не генерирует DNS-пакеты.
+
+## Требования
+
+- Docker для изолированной сети и контейнеров с `NET_ADMIN` и `NET_RAW` (без `--privileged` и host networking).
+- CSV-файл Cloudflare Radar Top 1M для входного набора доменов.
+- Подключение к публичному DNS-резолверу на этапе первоначальной подготовки кеша. Последующие измерения производительности идут исключительно по локальной Docker-сети.
+
+CSV и сгенерированный replay cache не коммитятся. Docker layer cache используется по умолчанию. Для пересборки с обновлением базового образа можно указать `LOAD_NO_CACHE=1` (`--pull --no-cache`).
+
+## Быстрый старт
+
+Скачайте Cloudflare Radar Top 1M CSV и из корня репозитория выполните:
+
+```sh
+./tests/load/run.sh cloudflare-radar_top-1000000-domains_YYYYMMDD-YYYYMMDD.csv
+```
+
+Можно запустить только определённый режим:
+
+```sh
+./tests/load/run.sh cloudflare-radar_top-1000000-domains_YYYYMMDD-YYYYMMDD.csv performance
+./tests/load/run.sh cloudflare-radar_top-1000000-domains_YYYYMMDD-YYYYMMDD.csv stress
+```
+
+## Конфигурация
+
+### Параметры нагрузки
+
+Значения по умолчанию рассчитаны на обычную машину разработчика и допускают изменение через переменные окружения:
+
+```text
+PREP_SAMPLE=100000
+PREP_RPS=250
+PREP_SEED=701184
+UPSTREAM_DNS=1.1.1.1:53
+
+LOAD_RATES="10000 25000 50000 100000 200000 400000"
+LOAD_REQUESTS=200000
+COLD_REQUESTS=50000
+COLD_RPS=50000
+HOT_SET_SIZE=32
+ZERO_LOSS_PERCENT=99.5
+
+ROUTE_QUERY_COUNT=256
+ROUTE_CYCLES=5
+ROUTE_RPS=100000
+
+STRESS_REQUESTS=500000
+STRESS_RPS=50000
+ROUTE_STRESS_QUERY_COUNT=128
+ROUTE_STRESS_CYCLES=10
+ROUTE_STRESS_RPS=20000
+```
+
+Пример более тяжёлого запуска:
+
+```sh
+STRESS_REQUESTS=2000000 STRESS_RPS=100000 \
+ROUTE_STRESS_CYCLES=50 \
+./tests/load/run.sh cloudflare.csv stress
+```
+
+### Фиксация ревизий зависимостей
+
+Docker-образ клонирует `https://github.com/karen07/dns-client-test` и `https://github.com/karen07/dns-server-test`. По умолчанию берётся ветка `main`, точные commit hashes выводятся runner'ом. Для воспроизводимого CI или публикации результатов зафиксируйте ревизии:
+
+```sh
+DNS_CLIENT_REF=<commit> DNS_SERVER_REF=<commit> \
+./tests/load/run.sh cloudflare.csv
+```
+
+## Архитектура и реализация
+
+### Однократная подготовка DNS replay cache
+
+AntiBlock загружает полный нормализованный список Cloudflare, обычно около миллиона доменов, в domain hashmap. Однако replay-серверу не нужны ответы для всего набора. По умолчанию `dns-client-test` выбирает воспроизводимую выборку 100 000 доменов (`-n 100000 --seed 701184`) в режиме A (`-A`) и опрашивает внешний резолвер со скоростью 250 запросов/с:
+
+```text
+Cloudflare Top 1M CSV
+        |
+        +--> domains.txt             full table loaded by AntiBlock
+        |
+        |
+        v
+ dns-client-test -A -n 100000 --seed 701184
+        |
+ 1.1.1.1:53 @ 250 RPS
+        |
+        v
+   cache-A.data
+   out_domains-A.txt
+```
+
+100 000 запросов при 250 RPS требуют как минимум 6 мин 40 с без учёта задержек и таймаутов. Это лишь подготовка: повторно она пропускается, пока совпадают нормализованный набор доменов, upstream, выборка, seed и commit `dns-client-test`.
+
+250 RPS - консервативное значение по умолчанию, **не** объявленный лимит Cloudflare. Переменные `PREP_SAMPLE`, `PREP_RPS`, `PREP_SEED` передаются текущему DNS-клиенту:
+
+```sh
+PREP_RPS=400 PREP_SAMPLE=200000 PREP_SEED=12345 ./tests/load/run.sh cloudflare.csv
+```
+
+Чтобы подготовить ответы для всего списка из миллиона доменов:
+
+```sh
+PREP_SAMPLE=1000000 ./tests/load/run.sh cloudflare.csv
+```
+
+### Локальная сетевая топология
+
+`run.sh` создаёт изолированный Docker bridge. В отдельном контейнере с фиксированным приватным адресом работает `dns-server-test`; в runner-контейнере - `dns-client-test` и AntiBlock:
+
+```text
+dns-client-test (C)
+        |
+        | UDP queries
+        v
+Docker bridge
+        |
+        v
+dns-server-test (C, -c cache-A.data)
+        |
+        | UDP responses
+        v
+Docker bridge -> libpcap(any) -> AntiBlock
+                               -> DNS parser
+                               -> 1M domain hashmap
+                               -> blacklist / CNAME / HTTPS AliasMode logic
+                               -> route state
+                               -> Linux route ioctl when enabled
+```
+
+Маршруты тестов создаются только во временном network namespace runner-контейнера. В актуальной версии клиента имена файлов для режима A - `cache-A.data` и `out_domains-A.txt`; сервер запускается с явным `-c /work/cache-A.data`, без предположения о старом `cache.data`.
+
+### Обработка пакетов и libpcap
+
+AntiBlock держит libpcap в non-blocking mode, чтобы истечение TTL, статистика и обновление списков не зависели от входящего потока. Если `pcap_next_ex()` не находит готовый пакет, основной цикл ждёт на selectable descriptor через `poll()`, а не делает фиксированный `sleep`. При появлении пакета процесс просыпается сразу; ограниченный timeout по-прежнему позволяет выполнять регулярное обслуживание.
+
+Иначе фиксированный сон после пустого чтения мог бы оставлять пакеты в очереди ядра и создавать искусственные потери на всплесках нагрузки.
+
+## Тестирование
+
+### Сценарий 1: пропускная способность DNS (Release)
+
+GCC Release запускается с полной таблицей доменов. Сначала выполняется холодный проход по различным доменам: все IPv4-адреса исключены двумя CIDR `/1`, чтобы не заполнять ограниченное состояние из 1024 живых маршрутов.
+
+Затем проверяется небольшой горячий набор с `--test`: системные route ioctls выключены, но пользовательская логика поиска и обновления состояния маршрутов работает. Частота повышается ступенчато, а отчёт показывает не только заданную QPS, но и фактическую пиковую скорость ответов, измеренную клиентом - чтобы предел генератора не приняли за предел AntiBlock.
+
+AntiBlock пишет счётчики libpcap `ps_recv`, `ps_drop`, `ps_ifdrop` в `stat.txt`. Отчёт показывает долю обработанных пакетов, CPU time и peak RSS. Абсолютная производительность не является pass/fail-критерием из-за различий аппаратуры; важны жизнеспособность процесса, корректный парсинг и непереполненная таблица маршрутов.
+
+### Сценарий 2: настоящие маршруты ядра (Release)
+
+AntiBlock работает без `--test`, получает ограниченный набор доменов и устанавливает реальные `/32`-маршруты через `lo` стандартным `SIOCADDRT`. Runner следит за `/proc/net/route`, фиксирует максимум маршрутов AntiBlock и момент его достижения, затем даёт время на оставшиеся пакеты в libpcap.
+
+Скорость рассчитывается по времени достижения пика, а не по задержке в хвосте ответов клиента. После каждого цикла процесс завершается, и все маршруты с метрикой `23117` должны исчезнуть. Размер нагрузки ограничен штатной ёмкостью состояния AntiBlock в 1024 маршрута - ради бенчмарка лимит не повышается.
+
+### Сценарий 3: DNS stress под Clang ASan + UBSan
+
+Сборка с санитайзерами загружает полную таблицу доменов и обрабатывает длинный высокочастотный DNS replay. Маршруты исключаются blacklist, чтобы тест концентрировался на libpcap, DNS-парсере, алиасах и hashmap без переполнения состояния маршрутов.
+
+Сбой процесса, ошибки парсера, ASan/UBSan диагностика означают провал. Скорости и счётчики потерь выводятся справочно и не сравниваются напрямую с Release.
+
+### Сценарий 4: циклы добавления и очистки маршрутов под ASan + UBSan
+
+AntiBlock многократно запускается, устанавливает реальные маршруты из DNS и завершается с проверкой полной очистки. Так проверяются route hashmap, kernel ioctls, завершение процесса и метрика владения маршрутами под санитайзерами.
