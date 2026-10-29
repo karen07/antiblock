@@ -2,7 +2,9 @@
 
 Docker-based load and stress tests for AntiBlock that measure DNS throughput, packet capture losses, Linux route programming, and sanitizer behavior under sustained traffic.
 
-Нагрузочные и стресс-тесты AntiBlock в Docker измеряют пропускную способность обработки DNS, потери пакетов при захвате, программирование маршрутов Linux и устойчивость сборок с санитайзерами под нагрузкой.
+Нагрузочные и стресс-тесты AntiBlock в Docker измеряют пропускную способность обработки
+DNS, потери пакетов при захвате, программирование маршрутов Linux и поведение сборок с
+санитайзерами при длительном трафике.
 
 ## Описание
 
